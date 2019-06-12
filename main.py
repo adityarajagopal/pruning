@@ -3,11 +3,13 @@ import random
 import sys
 
 # set python path so it points to src
-appDir = os.path.split(os.getcwd())
-userDir = os.path.split(appDir[0])
-srcDir = os.path.split(userDir[0])
-sys.path.append(srcDir[0])
-
+parentDir = os.path.split(os.getcwd())
+childDir = parentDir[1]
+while childDir != 'src':
+    parentDir = os.path.split(parentDir[0])
+    childDir = parentDir[1]
+sys.path.append(parentDir[0])
+    
 import src.ar4414.pruning.app as applic
 
 import argparse

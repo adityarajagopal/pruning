@@ -18,10 +18,6 @@ class MaskedLinear(nn.Linear):
         self.mask_flag = True
     
     def get_mask(self):
-        # print(self.mask_flag)
-        # if self.mask_flag == False :
-        #     return None
-        # else :
         return to_var(self.mask, requires_grad=False)
     
     def forward(self, x):

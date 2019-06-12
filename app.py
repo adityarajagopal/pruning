@@ -1,12 +1,12 @@
-import src.ar4414.pruning.hooks as hookSrc
+import src.ar4414.pruning.gop_calculator as gopSrc
 import src.ar4414.pruning.param_parser as ppSrc 
 import src.ar4414.pruning.model_creator as mcSrc
+import src.ar4414.pruning.inference as inferenceSrc
 
 import src.app as appSrc
 import src.checkpointing as checkpointingSrc
 import src.input_preprocessor as preprocSrc
 import src.training as trainingSrc
-import src.inference as inferenceSrc
 
 import os
 import random
@@ -26,12 +26,17 @@ class Application(appSrc.Application):
         self.setup_tee_printing()
 
         if self.params.getGops:
-            # register hooks
-            self.hooks = hookSrc.Hook(self.model)
-            self.hooks.register_hooks()
+            if 'googlenet' in self.params.arch:
+                # register hooks
+                self.gopCalculator = gopSrc.GoogleNetGopCalculator(self.model, self.params)
+                self.gopCalculator.register_hooks()
+            else:
+                raise ValueError('Gop calculation not implemented for specified architecture')
         
         if self.params.getGops:
-            self.run_inference()
+            self.run_gop_calc()
+            print('Unpruned Gops = ', self.gopCalculator.baseTotalGops)
+            print('Pruned Gops = ', self.gopCalculator.prunedTotalGops)
         elif self.params.evaluate == False : 
             self.run_training()
         else : 
@@ -49,4 +54,7 @@ class Application(appSrc.Application):
         self.mc = mcSrc.ModelCreator()
         self.trainer = trainingSrc.Trainer()
         self.inferer = inferenceSrc.Inferer()
+
+    def run_gop_calc(self):
+        self.inferer.run_single_forward(self.params, self.test_loader, self.model)
     

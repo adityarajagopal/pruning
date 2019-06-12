@@ -28,9 +28,21 @@ class Params() :
         self.weight_decay = config_file.getfloat('training_hyperparameters', 'weight_decay') 
         self.mo_schedule = [self.__to_num(i) for i in config_file.get('training_hyperparameters', 'momentum_schedule').split()]
         self.lr_schedule = [self.__to_num(i) for i in config_file.get('training_hyperparameters', 'lr_schedule').split()]
+        self.trainValSplit = config_file.getfloat('training_hyperparameters', 'train_val_split')
         
         self.sub_classes = config_file.get('pruning_hyperparameters', 'sub_classes').split() 
         self.getGops = config_file.getboolean('pruning_hyperparameters', 'get_gops')
+        self.pruneType = config_file.get('pruning_hyperparameters', 'prune_type')
+        
+        # self.this_layer_up = config_file.getint('pruning_hyperparameters', 'this_layer_up') 
+        # self.pruneAfter = config_file.getint('pruning_hyperparameters', 'iterative_pruning_epochs') 
+        # self.pruneIncrement = config_file.getint('pruning_hyperparameters', 'iterative_pruning_increment') 
+        # self.finetune = config_file.getboolean('pruning_hyperparameters', 'finetune')
+        # self.prune_weights = config_file.getboolean('pruning_hyperparameters', 'prune_weights')
+        # self.prune_filters = config_file.getboolean('pruning_hyperparameters', 'prune_filters')
+        # self.pruning_perc = config_file.getfloat('pruning_hyperparameters', 'pruning_perc')
+        # self.pollution = config_file.getfloat('pruning_hyperparameters', 'test_set_pollution')
+        # assert not (self.prune_weights == True and self.prune_filters == True), 'Cannot prune both weights and filters'
 
         self.manual_seed = config_file.getint('pytorch_parameters', 'manual_seed')
         self.workers = config_file.getint('pytorch_parameters', 'data_loading_workers')
