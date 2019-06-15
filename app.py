@@ -2,9 +2,10 @@ import src.ar4414.pruning.gop_calculator as gopSrc
 import src.ar4414.pruning.param_parser as ppSrc 
 import src.ar4414.pruning.model_creator as mcSrc
 import src.ar4414.pruning.inference as inferenceSrc
+import src.ar4414.pruning.checkpointing as checkpointingSrc
 
 import src.app as appSrc
-import src.checkpointing as checkpointingSrc
+# import src.checkpointing as checkpointingSrc
 import src.input_preprocessor as preprocSrc
 import src.training as trainingSrc
 

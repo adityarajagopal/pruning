@@ -24,7 +24,7 @@ class GoogleNetGopCalculator(object):
                 v.register_forward_hook(self.bn_gops)
             if 'AvgPool' in str(v):
                 v.register_forward_hook(self.avgpool_gops)
-
+    
     def relu_gops(self, module, input, output):
         gops = input[0].numel() / 1e9
         self.baseTotalGops += gops  
@@ -164,7 +164,7 @@ class GoogleNetGopCalculator(object):
         
         elif self.params.pruneType == 'weight':
             totalNodes = mask.numel()
-            prunedNodes = torch.sum((mask == 0))
+            prunedNodes = torch.sum((mask == 1))
             prunePerc = float(prunedNodes) / totalNodes
             kernelSize = math.sqrt(prunePerc) * kernelSize
             
