@@ -30,19 +30,16 @@ class Params() :
         self.lr_schedule = [self.__to_num(i) for i in config_file.get('training_hyperparameters', 'lr_schedule').split()]
         self.trainValSplit = config_file.getfloat('training_hyperparameters', 'train_val_split')
         
-        self.sub_classes = config_file.get('pruning_hyperparameters', 'sub_classes').split() 
         self.getGops = config_file.getboolean('pruning_hyperparameters', 'get_gops')
-        self.pruneType = config_file.get('pruning_hyperparameters', 'prune_type')
-        
-        # self.this_layer_up = config_file.getint('pruning_hyperparameters', 'this_layer_up') 
-        # self.pruneAfter = config_file.getint('pruning_hyperparameters', 'iterative_pruning_epochs') 
-        # self.pruneIncrement = config_file.getint('pruning_hyperparameters', 'iterative_pruning_increment') 
-        # self.finetune = config_file.getboolean('pruning_hyperparameters', 'finetune')
-        # self.prune_weights = config_file.getboolean('pruning_hyperparameters', 'prune_weights')
-        # self.prune_filters = config_file.getboolean('pruning_hyperparameters', 'prune_filters')
-        # self.pruning_perc = config_file.getfloat('pruning_hyperparameters', 'pruning_perc')
+        self.sub_classes = config_file.get('pruning_hyperparameters', 'sub_classes').split() 
+        self.thisLayerUp = config_file.getint('pruning_hyperparameters', 'this_layer_up') 
+        self.pruningPerc = config_file.getfloat('pruning_hyperparameters', 'pruning_perc')
+        self.prunePercIncrement = config_file.getint('pruning_hyperparameters', 'iterative_pruning_increment') 
+        self.pruneAfter = config_file.getint('pruning_hyperparameters', 'iterative_pruning_epochs') 
+        self.pruneWeights = config_file.getboolean('pruning_hyperparameters', 'prune_weights')
+        self.pruneFilters = config_file.getboolean('pruning_hyperparameters', 'prune_filters')
+        assert not (self.pruneWeights == True and self.pruneFilters == True), 'Cannot prune both weights and filters'
         # self.pollution = config_file.getfloat('pruning_hyperparameters', 'test_set_pollution')
-        # assert not (self.prune_weights == True and self.prune_filters == True), 'Cannot prune both weights and filters'
 
         self.manual_seed = config_file.getint('pytorch_parameters', 'manual_seed')
         self.workers = config_file.getint('pytorch_parameters', 'data_loading_workers')
@@ -50,6 +47,7 @@ class Params() :
         self.pretrained = config_file.get('pytorch_parameters', 'pretrained')        
         self.checkpoint = config_file.get('pytorch_parameters', 'checkpoint_path')
         self.test_name = config_file.get('pytorch_parameters', 'test_name')
+        self.finetune = config_file.getboolean('pytorch_parameters', 'finetune')
         self.resume = config_file.getboolean('pytorch_parameters', 'resume')
         self.branch = config_file.getboolean('pytorch_parameters', 'branch')
         self.evaluate = config_file.getboolean('pytorch_parameters', 'evaluate')
@@ -66,6 +64,9 @@ class Params() :
         self.test_top1 = 1
         self.test_top5 = 1
         self.bestValidLoss = 0.0
+
+        # internal pruning attributes 
+        self.prunePercPerLayer = []
 
     def get_state(self) : 
         return self.__dict__

@@ -17,7 +17,7 @@ def weight_prune(params, model, pruning_perc):
     layerCount = 0
     for p in model.named_parameters():
         if 'conv' in p[0] and 'weight' in p[0]:
-            if layerCount >= params.this_layer_up:
+            if layerCount >= params.thisLayerUp:
                 all_weights += list(p[1].cpu().data.abs().numpy().flatten())
             layerCount += 1
     threshold = np.percentile(np.array(all_weights), pruning_perc)
@@ -27,7 +27,7 @@ def weight_prune(params, model, pruning_perc):
     layer_count = 0
     for p in model.named_parameters():
        if 'conv' in p[0] and 'weight' in p[0]:
-           if layer_count >= params.this_layer_up :
+           if layer_count >= params.thisLayerUp :
                pruned_inds = p[1].data.abs() > threshold
                mask = pruned_inds.float()
            else :
@@ -79,18 +79,12 @@ def prune_one_filter(params, model, masks):
     values = np.array(values)
 
     # set mask corresponding to the filter to prune
-    to_prune_layer_ind = np.argmin(values[params.this_layer_up:, 0])
-    to_prune_layer_ind += params.this_layer_up
+    to_prune_layer_ind = np.argmin(values[params.thisLayerUp:, 0])
+    to_prune_layer_ind += params.thisLayerUp
     to_prune_filter_ind = int(values[to_prune_layer_ind, 1])
     masks[to_prune_layer_ind][to_prune_filter_ind] = 0.
 
-    if to_prune_layer_ind in params.pruned_filters.keys(): 
-        params.pruned_filters[to_prune_layer_ind].append(to_prune_filter_ind)
-    else: 
-        params.pruned_filters[to_prune_layer_ind] = [to_prune_filter_ind]
-
     return masks
-
 
 def filter_prune(params, model):
     '''
@@ -99,9 +93,9 @@ def filter_prune(params, model):
     '''
     masks = []
     current_pruning_perc = 0.
-    params.pruned_layers = []
+    # params.prunedLayers = []
 
-    while current_pruning_perc < params.pruning_perc:
+    while current_pruning_perc < params.pruningPerc:
         masks = prune_one_filter(params, model, masks)
         model.module.set_masks(masks)
         current_pruning_perc = prune_rate(params, model, verbose=False)
@@ -109,52 +103,11 @@ def filter_prune(params, model):
     return masks
 
 def prune_model(params, model) : 
-    if params.prune_weights == True : 
-        print('Creating Weight Pruning Mask')
-        masks = weight_prune(params, model, params.pruning_perc)
+    if params.pruneWeights == True: 
+        masks = weight_prune(params, model, params.pruningPerc)
         model.module.set_masks(masks)
     
-    elif params.prune_filters == True : 
-        print('Creating Filter Pruning Mask')
+    elif params.pruneFilters == True: 
         masks = filter_prune(params, model)
 
-        # plot bar chart of filters per layer 
-        # if params.tbx is not None: 
-        #     for layer, filters in params.pruned_filters.items():
-        #         plot_name = '__'.join(params.sub_classes) + '/pruned_filters_layer_' + str(layer)
-        #         pruned_filters = torch.tensor(filters, dtype=torch.int32)
-        #         params.tbx.add_histogram(plot_name, pruned_filters, params.curr_epoch, bins='auto')
-
     return model
-
-def plot_filter_barchart(params): 
-    for layer, filters in params.pruned_filters.items():
-        if layer not in params.plots.keys():
-            fig, ax = plt.subplots()
-            params.plots[layer] = (fig, ax)
-
-        plot_name = '__'.join(params.sub_classes) + '_pruned_filters_layer_' + str(layer) + '_epoch_' + str(params.curr_epoch)
-        filter_ids = np.arange(max(filters)+1)
-        filter_counts = Counter(filters) 
-        present_ids = filter_counts.keys()
-        ids_to_add = [x for x in filter_ids if x not in present_ids]
-        for x in ids_to_add:
-            filter_counts[x] = 0
-
-        params.plots[layer][1].bar(filter_counts.keys(), filter_counts.values())
-        params.plots[layer][0].savefig('img/' + plot_name)
-
-def plot_weight_mask(model, layer_count, mask):
-    layer_names = ['conv1', 'conv2', 'conv3', 'conv4', 'conv5', 'linear']
-    layer = layer_names[layer_count]
-    new_mask = mask.byte()
-
-    new_mask_np = new_mask.cpu().numpy() 
-    for filters in range(new_mask_np.shape[0]) : 
-        for channels in range(new_mask_np.shape[1]) : 
-            plt.imshow(new_mask_np[filters][channels], cmap='hot', interpolation='nearest')
-            img = str(filters) + '_' + str(channels)
-            plt.savefig('img/' + img + '.png')
-    sys.exit()
-     
-    return new_mask

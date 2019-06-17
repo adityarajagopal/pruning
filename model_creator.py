@@ -36,16 +36,18 @@ class ModelCreator(mcSrc.ModelCreator):
             checkpoint = torch.load(params.pretrained)
             model.load_state_dict(checkpoint)
 
-        elif params.getGops == True:
+        elif params.finetune == True or params.getGops == True:
             device_id = params.gpu_list[0]
             location = 'cuda:'+str(device_id)
             checkpoint = torch.load(params.pretrained, map_location=location)
-            model.load_state_dict(checkpoint, strict=False)
+            # model.load_state_dict(checkpoint, strict=False)
+            model.load_state_dict(checkpoint)
             
-            masks = [v.cpu() for k,v in checkpoint.items() if 'mask' in k]
-            if masks != []:
-                print('Setting pruning masks')
-                model.module.set_masks(masks)
+            if params.getGops == True:
+                masks = [v.cpu() for k,v in checkpoint.items() if 'mask' in k]
+                if masks != []:
+                    print('Setting pruning masks')
+                    model.module.set_masks(masks)
     
         if params.evaluate == True : 
             checkpoint = torch.load(params.pretrained)

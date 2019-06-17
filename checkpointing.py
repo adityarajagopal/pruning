@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import torch
+import csv
 
 import time
 import datetime
@@ -58,19 +59,12 @@ class Checkpointer(cpSrc.Checkpointer) :
             params.start_epoch = 0                            
 
         return params
-        
 
-
-
-
-
-
-
-                
-
-
-            
-
-             
-
+    def log_prune_rate(self, params, totalPrunedPerc): 
+        if params.printOnly == True:
+            return 
+        csvName = os.path.join(self.root, 'layer_prune_rate.csv')
+        with open(csvName, 'a') as csvFile:
+            writer = csv.writer(csvFile, delimiter=',')
+            writer.writerow([params.curr_epoch] + params.prunePercPerLayer + [totalPrunedPerc])
         

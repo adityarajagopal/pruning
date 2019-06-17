@@ -30,11 +30,11 @@ class GoogleNetGopCalculator(object):
         self.baseTotalGops += gops  
 
         # if weight pruning
-        if self.params.pruneType == 'weight':
+        if self.params.pruneWeights == True:
             self.prunedTotalGops += gops 
 
         # if filter pruning
-        if self.params.pruneType == 'filter':
+        if self.params.pruneFilters == True:
             inputSize = input[0].size()
             inChannels = inputSize[1]
             tmp = [x[1] for x in reversed(self.outChannelLog) if x[0] == inChannels]
@@ -54,11 +54,11 @@ class GoogleNetGopCalculator(object):
         self.baseTotalGops += gops
 
         # if weight prune
-        if self.params.pruneType == 'weight':
+        if self.params.pruneWeights == True:
             self.prunedTotalGops += gops
 
         # if filter prune
-        if self.params.pruneType == 'filter':
+        if self.params.pruneFilters == True:
             idx = [1,3,5,7]
             inChannels = sum([self.outChannelLog[i][1] for i in idx])
             numKernelOps = output.size()[1] * output.size()[2] * batchSize * inChannels
@@ -75,11 +75,11 @@ class GoogleNetGopCalculator(object):
         self.baseTotalGops += gops
 
         # if weight pruning
-        if self.params.pruneType == 'weight':
+        if self.params.pruneWeights == True:
             self.prunedTotalGops += gops 
 
         # if filter pruning
-        if self.params.pruneType == 'filter':
+        if self.params.pruneFilters == True:
             inChannels = inputSize[1]                         
             tmp = [x[1] for x in reversed(self.outChannelLog) if x[0] == inChannels]
             inChannels = tmp[0]
@@ -98,11 +98,11 @@ class GoogleNetGopCalculator(object):
         self.baseTotalGops += gops
 
         # if weight pruning 
-        if self.params.pruneType == 'weight':
+        if self.params.pruneWeights == True:
             self.prunedTotalGops += gops
         
         # if filter pruning
-        if self.params.pruneType == 'filter':
+        if self.params.pruneFilters == True:
             idx = [1,3,5,7]
             commonDim = sum([self.outChannelLog[i][1] for i in idx])
             gops = (batchSize * commonDim * outputFeatures + biasOps) / 1e9
@@ -137,7 +137,7 @@ class GoogleNetGopCalculator(object):
         self.baseTotalGops += gops
         # print(str(module), 'Base GOps = ', gops)
         
-        if self.params.pruneType == 'filter':
+        if self.params.pruneFilters == True:
             # get number of pruned filters which is equal to new outChannels
             newOutChannels = sum([1 for filt in mask if torch.nonzero(filt).nelement() != 0])
             
@@ -162,7 +162,7 @@ class GoogleNetGopCalculator(object):
             self.prunedTotalGops += gops
             # print(str(module), 'Filter Pruned GOps = ', gops)
         
-        elif self.params.pruneType == 'weight':
+        elif self.params.pruneWeights == True:
             totalNodes = mask.numel()
             prunedNodes = torch.sum((mask == 1))
             prunePerc = float(prunedNodes) / totalNodes
@@ -171,6 +171,3 @@ class GoogleNetGopCalculator(object):
             gops = self.get_conv_gops_for_layer(inChannels, kernelSize, outChannels, batchSize, outputSize)
             self.prunedTotalGops += gops
             # print(str(module), 'Weight Pruned GOps = ', gops)
-
-
-
