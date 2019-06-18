@@ -46,7 +46,7 @@ class Application(appSrc.Application):
             self.run_finetune()
         
         elif self.params.evaluate == False : 
-            setIndicesf.run_training()
+            self.run_training()
         
         else : 
             self.run_inference()
