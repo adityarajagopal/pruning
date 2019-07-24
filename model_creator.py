@@ -24,8 +24,7 @@ class ModelCreator(mcSrc.ModelCreator):
         if params.arch.endswith('resnet'):
             model = models.__dict__[params.arch](
                         num_classes=num_classes,
-                        depth=params.depth
-                    )
+                        depth=params.depth)
         else:
             model = models.__dict__[params.arch](num_classes=num_classes)
 
@@ -40,14 +39,14 @@ class ModelCreator(mcSrc.ModelCreator):
             device_id = params.gpu_list[0]
             location = 'cuda:'+str(device_id)
             checkpoint = torch.load(params.pretrained, map_location=location)
-            # model.load_state_dict(checkpoint, strict=False)
-            model.load_state_dict(checkpoint)
             
             if params.getGops == True:
-                masks = [v.cpu() for k,v in checkpoint.items() if 'mask' in k]
+                masks = [v for k,v in checkpoint.items() if 'mask' in k]
                 if masks != []:
                     print('Setting pruning masks')
                     model.module.set_masks(masks)
+            
+            model.load_state_dict(checkpoint)
     
         if params.evaluate == True : 
             checkpoint = torch.load(params.pretrained)

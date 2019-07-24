@@ -2,9 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from pruning.utils import to_var
+# from pruning.utils import to_var
 
 import sys
+
+def to_gpu(x):
+    return x.cuda()
 
 class MaskedLinear(nn.Linear):
     def __init__(self, in_features, out_features, bias=True):
@@ -18,7 +21,7 @@ class MaskedLinear(nn.Linear):
         self.mask_flag = True
     
     def get_mask(self):
-        return to_var(self.mask, requires_grad=False)
+        return to_gpu(self.mask)
     
     def forward(self, x):
         if self.mask_flag == True:
@@ -43,7 +46,7 @@ class MaskedConv2d(nn.Conv2d):
         self.mask_flag = True
     
     def get_mask(self):
-        return to_var(self.mask, requires_grad=False)
+        return to_gpu(self.mask)
     
     def forward(self, x):
         if self.mask_flag == True:

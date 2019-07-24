@@ -4,11 +4,10 @@ import src.ar4414.pruning.model_creator as mcSrc
 import src.ar4414.pruning.inference as inferenceSrc
 import src.ar4414.pruning.checkpointing as checkpointingSrc
 import src.ar4414.pruning.training as trainingSrc
+import src.ar4414.pruning.prune as pruningSrc
 
 import src.app as appSrc
-# import src.checkpointing as checkpointingSrc
 import src.input_preprocessor as preprocSrc
-# import src.training as trainingSrc
 
 import os
 import random
@@ -43,6 +42,7 @@ class Application(appSrc.Application):
             print('Pruned Gops = ', self.gopCalculator.prunedTotalGops)
         
         elif self.params.finetune == True:
+            self.pruner = pruningSrc.Pruning(self.params, self.model)
             self.run_finetune()
         
         elif self.params.evaluate == False : 
@@ -55,7 +55,7 @@ class Application(appSrc.Application):
 
     def run_finetune(self):
         print('==> Performing Pruning Finetune')
-        self.trainer.finetune_network(self.params, self.tbx_writer, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
+        self.trainer.finetune_network(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
 
     def setup_param_checkpoint(self, configFile):
         config = cp.ConfigParser() 

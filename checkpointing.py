@@ -51,8 +51,11 @@ class Checkpointer(cpSrc.Checkpointer) :
         elif params.evaluate == True : 
             pass 
 
-        if params.getGops == True:
-            params.__dict__.update(**prev_state_dict)
+        elif params.getGops == True:
+            params.arch = prev_state_dict['arch']
+            params.pruneWeights = prev_state_dict['prune_weights']
+            params.pruneFilters = prev_state_dict['prune_filters']
+            # params.__dict__.update(**prev_state_dict)
 
         # if all false, start from epoch 0 and use config file 
         else : 

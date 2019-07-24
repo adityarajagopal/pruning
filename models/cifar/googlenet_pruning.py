@@ -4,7 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import sys
 
-from src.ar4414.pruning.pruning.layers import MaskedLinear, MaskedConv2d 
+# from src.ar4414.pruning.pruning.layers import MaskedLinear, MaskedConv2d 
+from src.ar4414.pruning.pruning_layers import MaskedLinear, MaskedConv2d 
 
 __all__ = ['googlenet_pruning']
 
