@@ -10,10 +10,18 @@ import datetime
 import src.checkpointing as cpSrc
 
 class Checkpointer(cpSrc.Checkpointer) : 
+    def get_root(self):
+        return self.root
+
+    def setup_values(self, params): 
+        self.values = [params.curr_epoch, params.lr, params.train_loss.item(), \
+                       params.train_top1.item(), params.train_top5.item(), params.test_loss, \
+                       params.test_top1, params.test_top5, params.val_loss, \
+                       params.val_top1, params.val_top5]
 
     def restore_state(self, params): 
         # get state to load from
-        if params.resume == True or params.branch == True or params.getGops == True : 
+        if params.resume == True or params.branch == True or params.getGops == True or params.entropy == True : 
             file_to_load = params.pretrained.replace('model', 'state')        
             device = 'cuda:' + str(params.gpu_id)
             prev_state_dict = torch.load(file_to_load, map_location=device)
@@ -56,18 +64,10 @@ class Checkpointer(cpSrc.Checkpointer) :
             params.pruneWeights = prev_state_dict['prune_weights']
             params.pruneFilters = prev_state_dict['prune_filters']
             # params.__dict__.update(**prev_state_dict)
-
+        
         # if all false, start from epoch 0 and use config file 
         else : 
             params.start_epoch = 0                            
 
         return params
 
-    def log_prune_rate(self, params, totalPrunedPerc): 
-        if params.printOnly == True:
-            return 
-        csvName = os.path.join(self.root, 'layer_prune_rate.csv')
-        with open(csvName, 'a') as csvFile:
-            writer = csv.writer(csvFile, delimiter=',')
-            writer.writerow([params.curr_epoch] + params.prunePercPerLayer + [totalPrunedPerc])
-        

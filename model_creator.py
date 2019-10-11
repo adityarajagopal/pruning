@@ -1,3 +1,5 @@
+import sys
+
 import torch.nn
 import torch.backends
 import torchvision 
@@ -7,6 +9,7 @@ import src.model_creator as mcSrc
 class ModelCreator(mcSrc.ModelCreator):
     
     def read_model(self, params):
+        
         if params.dataset == 'cifar10' : 
             import src.ar4414.pruning.models.cifar as models 
             num_classes = 10
@@ -21,7 +24,7 @@ class ModelCreator(mcSrc.ModelCreator):
     
         print("Creating Model %s" % params.arch)
         
-        if params.arch.endswith('resnet'):
+        if 'resnet' in params.arch:
             model = models.__dict__[params.arch](
                         num_classes=num_classes,
                         depth=params.depth)
@@ -31,26 +34,42 @@ class ModelCreator(mcSrc.ModelCreator):
         return model
     
     def load_pretrained(self, params, model):
-        if params.resume == True or params.branch == True: 
+        if params.resume == True or params.branch == True or params.entropy == True or params.pruneFilters == True: 
             checkpoint = torch.load(params.pretrained)
             model.load_state_dict(checkpoint)
 
+        elif params.fbsPruning == True:
+            device_id = params.gpu_list[0]
+            location = 'cuda:'+str(device_id)
+            checkpoint = torch.load(params.pretrained, map_location=location)
+
+            if 'E_g_x' in str(checkpoint.keys()):
+                checkpoint = {k.replace('module.','') : v for k,v in checkpoint.items()}
+                model.module.load_state_dict(checkpoint, initialise=False)
+            else:
+                checkpoint = {k.replace('module.','') : v for k,v in checkpoint.items()}
+                model.module.load_state_dict(checkpoint, initialise=True)
+            
         elif params.finetune == True or params.getGops == True:
             device_id = params.gpu_list[0]
             location = 'cuda:'+str(device_id)
             checkpoint = torch.load(params.pretrained, map_location=location)
-            
+
             if params.getGops == True:
                 masks = [v for k,v in checkpoint.items() if 'mask' in k]
                 if masks != []:
                     print('Setting pruning masks')
                     model.module.set_masks(masks)
             
+            # model.module.load_state_dict(checkpoint)
             model.load_state_dict(checkpoint)
     
-        if params.evaluate == True : 
-            checkpoint = torch.load(params.pretrained)
-            model.load_state_dict(checkpoint['state_dict'])
+        elif params.evaluate == True : 
+            device_id = params.gpu_list[0]
+            location = 'cuda:'+str(device_id)
+            checkpoint = torch.load(params.pretrained, map_location=location)
+            model.load_state_dict(checkpoint)
+            # model.load_state_dict(checkpoint['state_dict'])
             
         torch.backends.cudnn.benchmark = True
         print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))

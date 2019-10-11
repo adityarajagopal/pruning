@@ -25,20 +25,36 @@ class AlexNet(nn.Module):
         self.classifier = nn.Linear(256, num_classes)
 
     def forward(self, x):
+        times = torch.FloatTensor([])
+        
         x = self.conv1(x)
+        
         x = self.relu(x)
+        
         x = self.maxpool2d(x)
+        
         x = self.conv2(x) 
+        
         x = self.relu(x)
+        
         x = self.maxpool2d(x)
+        
         x = self.conv3(x) 
+        
         x = self.relu(x)
+        
         x = self.conv4(x) 
+        
         x = self.relu(x)
+        
         x = self.conv5(x) 
+        
         x = self.relu(x)
+        
         x = self.maxpool2d(x)
+        
         x = x.view(x.size(0), -1)
+        
         x = self.classifier(x)
         
         return x

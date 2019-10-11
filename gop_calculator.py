@@ -4,6 +4,7 @@ import math
 
 class GoogleNetGopCalculator(object):
     def __init__(self, model, params):
+        #{{{
         self.modules = model._modules
         self.layers = self.modules['module']._modules
         self.params = params
@@ -11,8 +12,10 @@ class GoogleNetGopCalculator(object):
         self.outChannelLog = []
         self.baseTotalGops = 0
         self.prunedTotalGops = 0
+        #}}}
 
     def register_hooks(self):
+        #{{{
         for k,v in self.layers.items():
             if 'Conv' in str(v):
                 v.register_forward_hook(self.conv_gops)
@@ -24,8 +27,10 @@ class GoogleNetGopCalculator(object):
                 v.register_forward_hook(self.bn_gops)
             if 'AvgPool' in str(v):
                 v.register_forward_hook(self.avgpool_gops)
+        #}}}
     
     def relu_gops(self, module, input, output):
+        #{{{
         gops = input[0].numel() / 1e9
         self.baseTotalGops += gops  
 
@@ -41,8 +46,10 @@ class GoogleNetGopCalculator(object):
             inChannels = tmp[0]
 
             self.prunedTotalGops += (inputSize[0] * inChannels * inputSize[2] * inputSize[3]) / 1e9
+        #}}}
 
     def avgpool_gops(self, module, input, output): 
+        #{{{
         kernelSize = module.kernel_size
         batchSize = input[0].size()[0]
         inChannels = input[0].size()[1]
@@ -64,8 +71,10 @@ class GoogleNetGopCalculator(object):
             numKernelOps = output.size()[1] * output.size()[2] * batchSize * inChannels
             gops = opsPerKernel * numKernelOps / 1e9
             self.prunedTotalGops += gops
+        #}}}
 
     def bn_gops(self, module, input, output):
+        #{{{
         inputSize = input[0].size()
         batchSize = inputSize[0]
         elementsPerImage = inputSize[1] * inputSize[2] * inputSize[3]
@@ -86,8 +95,10 @@ class GoogleNetGopCalculator(object):
             elementsPerImage = inChannels * inputSize[2] * inputSize[3]
             gops = elementsPerImage * ((batchSize + 1) + (2*batchSize + 1) + (2*batchSize + 2) + 2*batchSize) / 1e9
             self.prunedTotalGops += gops
+        #}}}
 
     def linear_gops(self, module, input, output):
+        #{{{
         batchSize = input[0].size()[0]
         outputFeatures = module._parameters['weight'].size()[0]
         commonDim = input[0].size()[1]
@@ -107,8 +118,10 @@ class GoogleNetGopCalculator(object):
             commonDim = sum([self.outChannelLog[i][1] for i in idx])
             gops = (batchSize * commonDim * outputFeatures + biasOps) / 1e9
             self.prunedTotalGops += gops 
+        #}}}
 
     def get_conv_gops_for_layer(self, inChannels, kernelSize, outChannels, batchSize, outputSize):
+        #{{{
         # weight operation 
         opsPerKernel = 2 * kernelSize * kernelSize * inChannels 
         numKernels = outChannels 
@@ -119,8 +132,10 @@ class GoogleNetGopCalculator(object):
         gops = opsPerKernel * numKernels * totalKernelOps + biasOps
 
         return (gops / 1e9)
+        #}}}
 
     def conv_gops(self, module, input, output):
+        #{{{
         mask = module._buffers['mask']
 
         weightMatSize = module._parameters['weight'].size()
@@ -171,3 +186,4 @@ class GoogleNetGopCalculator(object):
             gops = self.get_conv_gops_for_layer(inChannels, kernelSize, outChannels, batchSize, outputSize)
             self.prunedTotalGops += gops
             # print(str(module), 'Weight Pruned GOps = ', gops)
+        #}}}

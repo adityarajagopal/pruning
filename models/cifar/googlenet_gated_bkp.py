@@ -4,16 +4,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 import sys
 
-from src.ar4414.pruning.pruning_layers import MaskedLinear, MaskedConv2d 
+from src.ar4414.pruning.pruning_layers import GatedConv2d
 
-__all__ = ['googlenet_pruning']
+__all__ = ['googlenet_gated']
 
-class GoogLeNetPruning(nn.Module):
+class GoogLeNetGated(nn.Module):
     def __init__(self, num_classes=10):
-        super(GoogLeNetPruning, self).__init__()
-
+        super(GoogLeNetGated, self).__init__()
+        
         # pre_layers
-        self.conv0 = MaskedConv2d(3, 192, kernel_size=3, padding=1)
+        self.conv0 = GatedConv2d(3, 192, kernel_size=3, padding=1)
         self.bn0 = nn.BatchNorm2d(192) 
         self.relu0 = nn.ReLU(True)
         
@@ -26,28 +26,28 @@ class GoogLeNetPruning(nn.Module):
         n5x5 = 32
         pool_planes = 32
         
-        self.a3_b1_conv0 = MaskedConv2d(in_planes, n1x1, kernel_size=1)  
+        self.a3_b1_conv0 = nn.Conv2d(in_planes, n1x1, kernel_size=1)  
         self.a3_b1_bn0 = nn.BatchNorm2d(n1x1)
         self.a3_b1_relu0 = nn.ReLU(True)
 
-        self.a3_b2_conv0 = MaskedConv2d(in_planes, n3x3red, kernel_size=1)
+        self.a3_b2_conv0 = nn.Conv2d(in_planes, n3x3red, kernel_size=1)
         self.a3_b2_bn0 = nn.BatchNorm2d(n3x3red) 
         self.a3_b2_relu0 = nn.ReLU(True)
-        self.a3_b2_conv1 = MaskedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
+        self.a3_b2_conv1 = GatedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
         self.a3_b2_bn1 = nn.BatchNorm2d(n3x3) 
             
-        self.a3_b3_conv0 = MaskedConv2d(in_planes, n5x5red, kernel_size=1)
+        self.a3_b3_conv0 = nn.Conv2d(in_planes, n5x5red, kernel_size=1)
         self.a3_b3_bn0 = nn.BatchNorm2d(n5x5red)
         self.a3_b3_relu0 = nn.ReLU(True)
-        self.a3_b3_conv1 = MaskedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
+        self.a3_b3_conv1 = GatedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
         self.a3_b3_bn1 = nn.BatchNorm2d(n5x5)
         self.a3_b3_relu1 = nn.ReLU(True)
-        self.a3_b3_conv2 = MaskedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
+        self.a3_b3_conv2 = GatedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
         self.a3_b3_bn2 = nn.BatchNorm2d(n5x5)
         self.a3_b3_relu2 = nn.ReLU(True)
             
         self.a3_b4_maxpool0 = nn.MaxPool2d(3, stride=1, padding=1)
-        self.a3_b4_conv0 = MaskedConv2d(in_planes, pool_planes, kernel_size=1)
+        self.a3_b4_conv0 = nn.Conv2d(in_planes, pool_planes, kernel_size=1)
         self.a3_b4_bn0 = nn.BatchNorm2d(pool_planes)
         self.a3_b4_relu0 = nn.ReLU(True)
 
@@ -60,28 +60,28 @@ class GoogLeNetPruning(nn.Module):
         n5x5 = 96
         pool_planes = 64
         
-        self.b3_b1_conv0 = MaskedConv2d(in_planes, n1x1, kernel_size=1)  
+        self.b3_b1_conv0 = nn.Conv2d(in_planes, n1x1, kernel_size=1)  
         self.b3_b1_bn0 = nn.BatchNorm2d(n1x1)
         self.b3_b1_relu0 = nn.ReLU(True)
 
-        self.b3_b2_conv0 = MaskedConv2d(in_planes, n3x3red, kernel_size=1)
+        self.b3_b2_conv0 = nn.Conv2d(in_planes, n3x3red, kernel_size=1)
         self.b3_b2_bn0 = nn.BatchNorm2d(n3x3red) 
         self.b3_b2_relu0 = nn.ReLU(True)
-        self.b3_b2_conv1 = MaskedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
+        self.b3_b2_conv1 = GatedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
         self.b3_b2_bn1 = nn.BatchNorm2d(n3x3) 
             
-        self.b3_b3_conv0 = MaskedConv2d(in_planes, n5x5red, kernel_size=1)
+        self.b3_b3_conv0 = nn.Conv2d(in_planes, n5x5red, kernel_size=1)
         self.b3_b3_bn0 = nn.BatchNorm2d(n5x5red)
         self.b3_b3_relu0 = nn.ReLU(True)
-        self.b3_b3_conv1 = MaskedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
+        self.b3_b3_conv1 = GatedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
         self.b3_b3_bn1 = nn.BatchNorm2d(n5x5)
         self.b3_b3_relu1 = nn.ReLU(True)
-        self.b3_b3_conv2 = MaskedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
+        self.b3_b3_conv2 = GatedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
         self.b3_b3_bn2 = nn.BatchNorm2d(n5x5)
         self.b3_b3_relu2 = nn.ReLU(True)
             
         self.b3_b4_maxpool0 = nn.MaxPool2d(3, stride=1, padding=1)
-        self.b3_b4_conv0 = MaskedConv2d(in_planes, pool_planes, kernel_size=1)
+        self.b3_b4_conv0 = nn.Conv2d(in_planes, pool_planes, kernel_size=1)
         self.b3_b4_bn0 = nn.BatchNorm2d(pool_planes)
         self.b3_b4_relu0 = nn.ReLU(True)
 
@@ -96,28 +96,28 @@ class GoogLeNetPruning(nn.Module):
         n5x5 = 48
         pool_planes = 64
         
-        self.a4_b1_conv0 = MaskedConv2d(in_planes, n1x1, kernel_size=1)  
+        self.a4_b1_conv0 = nn.Conv2d(in_planes, n1x1, kernel_size=1)  
         self.a4_b1_bn0 = nn.BatchNorm2d(n1x1)
         self.a4_b1_relu0 = nn.ReLU(True)
 
-        self.a4_b2_conv0 = MaskedConv2d(in_planes, n3x3red, kernel_size=1)
+        self.a4_b2_conv0 = nn.Conv2d(in_planes, n3x3red, kernel_size=1)
         self.a4_b2_bn0 = nn.BatchNorm2d(n3x3red) 
         self.a4_b2_relu0 = nn.ReLU(True)
-        self.a4_b2_conv1 = MaskedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
+        self.a4_b2_conv1 = GatedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
         self.a4_b2_bn1 = nn.BatchNorm2d(n3x3) 
             
-        self.a4_b3_conv0 = MaskedConv2d(in_planes, n5x5red, kernel_size=1)
+        self.a4_b3_conv0 = nn.Conv2d(in_planes, n5x5red, kernel_size=1)
         self.a4_b3_bn0 = nn.BatchNorm2d(n5x5red)
         self.a4_b3_relu0 = nn.ReLU(True)
-        self.a4_b3_conv1 = MaskedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
+        self.a4_b3_conv1 = GatedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
         self.a4_b3_bn1 = nn.BatchNorm2d(n5x5)
         self.a4_b3_relu1 = nn.ReLU(True)
-        self.a4_b3_conv2 = MaskedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
+        self.a4_b3_conv2 = GatedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
         self.a4_b3_bn2 = nn.BatchNorm2d(n5x5)
         self.a4_b3_relu2 = nn.ReLU(True)
             
         self.a4_b4_maxpool0 = nn.MaxPool2d(3, stride=1, padding=1)
-        self.a4_b4_conv0 = MaskedConv2d(in_planes, pool_planes, kernel_size=1)
+        self.a4_b4_conv0 = nn.Conv2d(in_planes, pool_planes, kernel_size=1)
         self.a4_b4_bn0 = nn.BatchNorm2d(pool_planes)
         self.a4_b4_relu0 = nn.ReLU(True)
         
@@ -130,28 +130,28 @@ class GoogLeNetPruning(nn.Module):
         n5x5 = 64
         pool_planes = 64
         
-        self.b4_b1_conv0 = MaskedConv2d(in_planes, n1x1, kernel_size=1)  
+        self.b4_b1_conv0 = nn.Conv2d(in_planes, n1x1, kernel_size=1)  
         self.b4_b1_bn0 = nn.BatchNorm2d(n1x1)
         self.b4_b1_relu0 = nn.ReLU(True)
 
-        self.b4_b2_conv0 = MaskedConv2d(in_planes, n3x3red, kernel_size=1)
+        self.b4_b2_conv0 = nn.Conv2d(in_planes, n3x3red, kernel_size=1)
         self.b4_b2_bn0 = nn.BatchNorm2d(n3x3red) 
         self.b4_b2_relu0 = nn.ReLU(True)
-        self.b4_b2_conv1 = MaskedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
+        self.b4_b2_conv1 = GatedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
         self.b4_b2_bn1 = nn.BatchNorm2d(n3x3) 
             
-        self.b4_b3_conv0 = MaskedConv2d(in_planes, n5x5red, kernel_size=1)
+        self.b4_b3_conv0 = nn.Conv2d(in_planes, n5x5red, kernel_size=1)
         self.b4_b3_bn0 = nn.BatchNorm2d(n5x5red)
         self.b4_b3_relu0 = nn.ReLU(True)
-        self.b4_b3_conv1 = MaskedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
+        self.b4_b3_conv1 = GatedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
         self.b4_b3_bn1 = nn.BatchNorm2d(n5x5)
         self.b4_b3_relu1 = nn.ReLU(True)
-        self.b4_b3_conv2 = MaskedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
+        self.b4_b3_conv2 = GatedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
         self.b4_b3_bn2 = nn.BatchNorm2d(n5x5)
         self.b4_b3_relu2 = nn.ReLU(True)
             
         self.b4_b4_maxpool0 = nn.MaxPool2d(3, stride=1, padding=1)
-        self.b4_b4_conv0 = MaskedConv2d(in_planes, pool_planes, kernel_size=1)
+        self.b4_b4_conv0 = nn.Conv2d(in_planes, pool_planes, kernel_size=1)
         self.b4_b4_bn0 = nn.BatchNorm2d(pool_planes)
         self.b4_b4_relu0 = nn.ReLU(True)
 
@@ -164,28 +164,28 @@ class GoogLeNetPruning(nn.Module):
         n5x5 = 64
         pool_planes = 64
         
-        self.c4_b1_conv0 = MaskedConv2d(in_planes, n1x1, kernel_size=1)  
+        self.c4_b1_conv0 = nn.Conv2d(in_planes, n1x1, kernel_size=1)  
         self.c4_b1_bn0 = nn.BatchNorm2d(n1x1)
         self.c4_b1_relu0 = nn.ReLU(True)
 
-        self.c4_b2_conv0 = MaskedConv2d(in_planes, n3x3red, kernel_size=1)
+        self.c4_b2_conv0 = nn.Conv2d(in_planes, n3x3red, kernel_size=1)
         self.c4_b2_bn0 = nn.BatchNorm2d(n3x3red) 
         self.c4_b2_relu0 = nn.ReLU(True)
-        self.c4_b2_conv1 = MaskedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
+        self.c4_b2_conv1 = GatedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
         self.c4_b2_bn1 = nn.BatchNorm2d(n3x3) 
             
-        self.c4_b3_conv0 = MaskedConv2d(in_planes, n5x5red, kernel_size=1)
+        self.c4_b3_conv0 = nn.Conv2d(in_planes, n5x5red, kernel_size=1)
         self.c4_b3_bn0 = nn.BatchNorm2d(n5x5red)
         self.c4_b3_relu0 = nn.ReLU(True)
-        self.c4_b3_conv1 = MaskedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
+        self.c4_b3_conv1 = GatedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
         self.c4_b3_bn1 = nn.BatchNorm2d(n5x5)
         self.c4_b3_relu1 = nn.ReLU(True)
-        self.c4_b3_conv2 = MaskedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
+        self.c4_b3_conv2 = GatedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
         self.c4_b3_bn2 = nn.BatchNorm2d(n5x5)
         self.c4_b3_relu2 = nn.ReLU(True)
             
         self.c4_b4_maxpool0 = nn.MaxPool2d(3, stride=1, padding=1)
-        self.c4_b4_conv0 = MaskedConv2d(in_planes, pool_planes, kernel_size=1)
+        self.c4_b4_conv0 = nn.Conv2d(in_planes, pool_planes, kernel_size=1)
         self.c4_b4_bn0 = nn.BatchNorm2d(pool_planes)
         self.c4_b4_relu0 = nn.ReLU(True)
 
@@ -198,28 +198,28 @@ class GoogLeNetPruning(nn.Module):
         n5x5 = 64
         pool_planes = 64
         
-        self.d4_b1_conv0 = MaskedConv2d(in_planes, n1x1, kernel_size=1)  
+        self.d4_b1_conv0 = nn.Conv2d(in_planes, n1x1, kernel_size=1)  
         self.d4_b1_bn0 = nn.BatchNorm2d(n1x1)
         self.d4_b1_relu0 = nn.ReLU(True)
 
-        self.d4_b2_conv0 = MaskedConv2d(in_planes, n3x3red, kernel_size=1)
+        self.d4_b2_conv0 = nn.Conv2d(in_planes, n3x3red, kernel_size=1)
         self.d4_b2_bn0 = nn.BatchNorm2d(n3x3red) 
         self.d4_b2_relu0 = nn.ReLU(True)
-        self.d4_b2_conv1 = MaskedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
+        self.d4_b2_conv1 = GatedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
         self.d4_b2_bn1 = nn.BatchNorm2d(n3x3) 
             
-        self.d4_b3_conv0 = MaskedConv2d(in_planes, n5x5red, kernel_size=1)
+        self.d4_b3_conv0 = nn.Conv2d(in_planes, n5x5red, kernel_size=1)
         self.d4_b3_bn0 = nn.BatchNorm2d(n5x5red)
         self.d4_b3_relu0 = nn.ReLU(True)
-        self.d4_b3_conv1 = MaskedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
+        self.d4_b3_conv1 = GatedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
         self.d4_b3_bn1 = nn.BatchNorm2d(n5x5)
         self.d4_b3_relu1 = nn.ReLU(True)
-        self.d4_b3_conv2 = MaskedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
+        self.d4_b3_conv2 = GatedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
         self.d4_b3_bn2 = nn.BatchNorm2d(n5x5)
         self.d4_b3_relu2 = nn.ReLU(True)
             
         self.d4_b4_maxpool0 = nn.MaxPool2d(3, stride=1, padding=1)
-        self.d4_b4_conv0 = MaskedConv2d(in_planes, pool_planes, kernel_size=1)
+        self.d4_b4_conv0 = nn.Conv2d(in_planes, pool_planes, kernel_size=1)
         self.d4_b4_bn0 = nn.BatchNorm2d(pool_planes)
         self.d4_b4_relu0 = nn.ReLU(True)
         
@@ -232,28 +232,28 @@ class GoogLeNetPruning(nn.Module):
         n5x5 = 128
         pool_planes = 128
         
-        self.e4_b1_conv0 = MaskedConv2d(in_planes, n1x1, kernel_size=1)  
+        self.e4_b1_conv0 = nn.Conv2d(in_planes, n1x1, kernel_size=1)  
         self.e4_b1_bn0 = nn.BatchNorm2d(n1x1)
         self.e4_b1_relu0 = nn.ReLU(True)
 
-        self.e4_b2_conv0 = MaskedConv2d(in_planes, n3x3red, kernel_size=1)
+        self.e4_b2_conv0 = nn.Conv2d(in_planes, n3x3red, kernel_size=1)
         self.e4_b2_bn0 = nn.BatchNorm2d(n3x3red) 
         self.e4_b2_relu0 = nn.ReLU(True)
-        self.e4_b2_conv1 = MaskedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
+        self.e4_b2_conv1 = GatedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
         self.e4_b2_bn1 = nn.BatchNorm2d(n3x3) 
             
-        self.e4_b3_conv0 = MaskedConv2d(in_planes, n5x5red, kernel_size=1)
+        self.e4_b3_conv0 = nn.Conv2d(in_planes, n5x5red, kernel_size=1)
         self.e4_b3_bn0 = nn.BatchNorm2d(n5x5red)
         self.e4_b3_relu0 = nn.ReLU(True)
-        self.e4_b3_conv1 = MaskedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
+        self.e4_b3_conv1 = GatedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
         self.e4_b3_bn1 = nn.BatchNorm2d(n5x5)
         self.e4_b3_relu1 = nn.ReLU(True)
-        self.e4_b3_conv2 = MaskedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
+        self.e4_b3_conv2 = GatedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
         self.e4_b3_bn2 = nn.BatchNorm2d(n5x5)
         self.e4_b3_relu2 = nn.ReLU(True)
             
         self.e4_b4_maxpool0 = nn.MaxPool2d(3, stride=1, padding=1)
-        self.e4_b4_conv0 = MaskedConv2d(in_planes, pool_planes, kernel_size=1)
+        self.e4_b4_conv0 = nn.Conv2d(in_planes, pool_planes, kernel_size=1)
         self.e4_b4_bn0 = nn.BatchNorm2d(pool_planes)
         self.e4_b4_relu0 = nn.ReLU(True)
         
@@ -266,28 +266,28 @@ class GoogLeNetPruning(nn.Module):
         n5x5 = 128
         pool_planes = 128
         
-        self.a5_b1_conv0 = MaskedConv2d(in_planes, n1x1, kernel_size=1)  
+        self.a5_b1_conv0 = nn.Conv2d(in_planes, n1x1, kernel_size=1)  
         self.a5_b1_bn0 = nn.BatchNorm2d(n1x1)
         self.a5_b1_relu0 = nn.ReLU(True)
 
-        self.a5_b2_conv0 = MaskedConv2d(in_planes, n3x3red, kernel_size=1)
+        self.a5_b2_conv0 = nn.Conv2d(in_planes, n3x3red, kernel_size=1)
         self.a5_b2_bn0 = nn.BatchNorm2d(n3x3red) 
         self.a5_b2_relu0 = nn.ReLU(True)
-        self.a5_b2_conv1 = MaskedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
+        self.a5_b2_conv1 = GatedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
         self.a5_b2_bn1 = nn.BatchNorm2d(n3x3) 
             
-        self.a5_b3_conv0 = MaskedConv2d(in_planes, n5x5red, kernel_size=1)
+        self.a5_b3_conv0 = nn.Conv2d(in_planes, n5x5red, kernel_size=1)
         self.a5_b3_bn0 = nn.BatchNorm2d(n5x5red)
         self.a5_b3_relu0 = nn.ReLU(True)
-        self.a5_b3_conv1 = MaskedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
+        self.a5_b3_conv1 = GatedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
         self.a5_b3_bn1 = nn.BatchNorm2d(n5x5)
         self.a5_b3_relu1 = nn.ReLU(True)
-        self.a5_b3_conv2 = MaskedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
+        self.a5_b3_conv2 = GatedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
         self.a5_b3_bn2 = nn.BatchNorm2d(n5x5)
         self.a5_b3_relu2 = nn.ReLU(True)
             
         self.a5_b4_maxpool0 = nn.MaxPool2d(3, stride=1, padding=1)
-        self.a5_b4_conv0 = MaskedConv2d(in_planes, pool_planes, kernel_size=1)
+        self.a5_b4_conv0 = nn.Conv2d(in_planes, pool_planes, kernel_size=1)
         self.a5_b4_bn0 = nn.BatchNorm2d(pool_planes)
         self.a5_b4_relu0 = nn.ReLU(True)
         
@@ -300,28 +300,28 @@ class GoogLeNetPruning(nn.Module):
         n5x5 = 128
         pool_planes = 128
         
-        self.b5_b1_conv0 = MaskedConv2d(in_planes, n1x1, kernel_size=1)  
+        self.b5_b1_conv0 = nn.Conv2d(in_planes, n1x1, kernel_size=1)  
         self.b5_b1_bn0 = nn.BatchNorm2d(n1x1)
         self.b5_b1_relu0 = nn.ReLU(True)
 
-        self.b5_b2_conv0 = MaskedConv2d(in_planes, n3x3red, kernel_size=1)
+        self.b5_b2_conv0 = nn.Conv2d(in_planes, n3x3red, kernel_size=1)
         self.b5_b2_bn0 = nn.BatchNorm2d(n3x3red) 
         self.b5_b2_relu0 = nn.ReLU(True)
-        self.b5_b2_conv1 = MaskedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
+        self.b5_b2_conv1 = GatedConv2d(n3x3red, n3x3, kernel_size=3, padding=1) 
         self.b5_b2_bn1 = nn.BatchNorm2d(n3x3) 
             
-        self.b5_b3_conv0 = MaskedConv2d(in_planes, n5x5red, kernel_size=1)
+        self.b5_b3_conv0 = nn.Conv2d(in_planes, n5x5red, kernel_size=1)
         self.b5_b3_bn0 = nn.BatchNorm2d(n5x5red)
         self.b5_b3_relu0 = nn.ReLU(True)
-        self.b5_b3_conv1 = MaskedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
+        self.b5_b3_conv1 = GatedConv2d(n5x5red, n5x5, kernel_size=3, padding=1)
         self.b5_b3_bn1 = nn.BatchNorm2d(n5x5)
         self.b5_b3_relu1 = nn.ReLU(True)
-        self.b5_b3_conv2 = MaskedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
+        self.b5_b3_conv2 = GatedConv2d(n5x5, n5x5, kernel_size=3, padding=1)
         self.b5_b3_bn2 = nn.BatchNorm2d(n5x5)
         self.b5_b3_relu2 = nn.ReLU(True)
             
         self.b5_b4_maxpool0 = nn.MaxPool2d(3, stride=1, padding=1)
-        self.b5_b4_conv0 = MaskedConv2d(in_planes, pool_planes, kernel_size=1)
+        self.b5_b4_conv0 = nn.Conv2d(in_planes, pool_planes, kernel_size=1)
         self.b5_b4_bn0 = nn.BatchNorm2d(pool_planes)
         self.b5_b4_relu0 = nn.ReLU(True)
         
@@ -564,7 +564,7 @@ class GoogLeNetPruning(nn.Module):
         
         # b5
         out_1 = self.b5_b1_conv0(out)
-        out_1 = self.b5_b1_bn0(out_1)
+        t_1 = self.b5_b1_bn0(out_1)
         out_1 = self.b5_b1_relu0(out_1)
         
         out_2 = self.b5_b2_conv0(out)
@@ -596,16 +596,26 @@ class GoogLeNetPruning(nn.Module):
         
         return out
     
-    def set_masks(self, masks):
-        layers = self.__dict__['_modules']
-        i = 0
-        for key, val in layers.items():
-            if 'conv' in key:
-                val.set_mask(masks[i])
-                i += 1
+    def load_state_dict(self, state_dict, strict=True, initialise=True):
+        # print(self.__dict__['_modules']['conv1'].conv.weight)
+        if initialise == True:
+            relevantLayers = self.__dict__['_modules']
+            relevantLayerNames = relevantLayers.keys()
+            for k,v in state_dict.items():
+                layer = k.split('.')[0]
+                tensorType = k.split('.')[1]
+                if layer in relevantLayerNames and tensorType == 'weight':
+                    if 'conv' in layer and 'Gated' in str(type(relevantLayers[layer])):
+                        # print(layer, relevantLayers[layer].conv.weight.shape, k, v.shape)
+                        # print(type(relevantLayers[layer].conv.weight.data), type(v))
+                        relevantLayers[layer].conv.weight.data = v
+            return (None, None)
+        
+        else:
+            return super().load_state_dict(state_dict, strict)
 
-def googlenet_pruning(**kwargs):
+def googlenet_gated(**kwargs):
     """
     Constructs a ResNet model.
     """
-    return GoogLeNetPruning(**kwargs)
+    return GoogLeNetGated(**kwargs)

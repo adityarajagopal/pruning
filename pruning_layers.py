@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# from pruning.utils import to_var
-
 import sys
 
 def to_gpu(x):
@@ -57,4 +55,58 @@ class MaskedConv2d(nn.Conv2d):
         else:
             return F.conv2d(x, self.weight, self.bias, self.stride,
                         self.padding, self.dilation, self.groups)
+
+class GatedConv2d(nn.Module):
+    def __init__(self, inChannels, outChannels, kernel_size, stride=1, padding=0, unprunedRatio=1.0, bias=True):
+        super().__init__()
+
+        # as we are performing bn immediately after, which removes the channel mean, the bias will never change 
+        # so we don't need bias here as after each channel bn is performed
+        self.conv = nn.Conv2d(inChannels, outChannels, kernel_size, stride=stride, padding=padding, bias=False) 
+        
+        # affine=False just performs normalisation as matrix - mean / sqrt(var + eps) and does not have 
+        # BN trainable parameters gamma and beta
+        self.bn = nn.BatchNorm2d(outChannels, affine=False)
+
+        self.gate = nn.Linear(inChannels, outChannels)
+        self.gate.reset_parameters()
+        self.gate.bias.data.fill_(1.0)
+        
+        self.beta = torch.nn.Parameter(torch.ones(outChannels))
+        self.unprunedRatio = unprunedRatio
+        self.prunedChannelIdx = list(range(outChannels))
+
+        # E_g_x is the expectation of the l1_norm of the gate activations over
+        # the input channels
+        self.register_buffer('E_g_x', torch.tensor(0.0))
+
+    def forward(self, x): 
+        ss = F.avg_pool2d(x, x.shape[2])
+        # for each image in batch, the avg pool of each feature map
+        tmp = self.gate(ss.view(x.shape[0], x.shape[1]))
+        gates = F.relu(tmp)
+        activationSum = torch.sum(gates, 1)
+        self.E_g_x = torch.mean(activationSum) 
+        
+        beta = self.beta.repeat(x.shape[0], 1)
+        if self.unprunedRatio < 1.0:
+            numPrunedChannels = self.conv.out_channels - round(self.conv.out_channels * self.unprunedRatio)
+            self.prunedChannelIdx = torch.topk(gates, numPrunedChannels, dim=1, largest=False)[1]
+            gates.scatter_(1, self.prunedChannelIdx, 0)
+
+        x = self.conv(x)
+        x = self.bn(x) 
+        x += beta.unsqueeze(2).unsqueeze(3)
+        x = x.mul(gates.unsqueeze(2).unsqueeze(3))
+        x = F.relu(x)
+
+        return x
+            
+
+
+
+
+
+
+
         

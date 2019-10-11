@@ -1,4 +1,6 @@
 import src.ar4414.pruning.gop_calculator as gopSrc
+import src.ar4414.pruning.fbs_channel_probability as fbsChanSrc
+import src.ar4414.pruning.entropy as entropySrc
 import src.ar4414.pruning.param_parser as ppSrc 
 import src.ar4414.pruning.model_creator as mcSrc
 import src.ar4414.pruning.inference as inferenceSrc
@@ -19,6 +21,11 @@ import tensorboardX as tbx
 
 import torch
 import torch.cuda
+import torch.nn as nn
+
+import matplotlib.pyplot as plt
+import math
+import numpy as np
 
 class Application(appSrc.Application):
     def main(self):
@@ -30,46 +37,229 @@ class Application(appSrc.Application):
         self.tbx_writer = tbx.SummaryWriter(comment='-test-1')
 
         if self.params.getGops:
+        #{{{
             if 'googlenet' in self.params.arch:
                 # register hooks
                 self.gopCalculator = gopSrc.GoogleNetGopCalculator(self.model, self.params)
                 self.gopCalculator.register_hooks()
             else:
                 raise ValueError('Gop calculation not implemented for specified architecture')
-            
+           
             self.run_gop_calc()
             print('Unpruned Gops = ', self.gopCalculator.baseTotalGops)
             print('Pruned Gops = ', self.gopCalculator.prunedTotalGops)
+        #}}}
+
+        elif self.params.entropy == True:
+        #{{{
+            print('=========Baseline Accuracy==========')
+            testStats = self.run_inference()
+            print('==========================')
+            
+            #{{{
+            # if self.params.entropyLocalPruning == True:            
+            #     prunePercentages = [x/100.0 for x in range(10,100,10)]
+            #     # for pp in prunePercentages:
+            #     for pp in [0.7, 0.8, 0.9]:
+            #         for n,m in self.model.named_modules():
+            #             if isinstance(m, nn.Conv2d):
+            #                 if n in ['module.conv3', 'module.conv4', 'module.conv5']:
+            #                     entropySrc.EntropyLocalPruner(n, m, self.params, pp)
+            #         
+            #         print('==========No finetune accuracy after pruning {}%==========='.format(pp*100.0))
+            #         self.run_inference()
+            #}}}
+            
+            if self.params.entropyGlobalPruning == True:
+            #{{{
+                if self.params.finetune == True:
+                    self.pruner = entropySrc.EntropyGlobalPruner(self.model, self.params, self.params.pruningPerc, [])
+                    self.run_finetune()
+
+                else:
+                #{{{
+                    prunePercs = [10, 40, 80]
+                    
+                    if self.params.plotChannels:
+                        # channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d)}
+                        channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d) if l in ['module.conv3', 'module.conv4', 'module.conv5']}
+                        fig,ax = plt.subplots(len(prunePercs), len(channels.keys()), sharex=True, sharey=True)
+                        fig.add_subplot(111, frameon=False)
+                    
+                    for i, pp in enumerate(prunePercs):
+                        egp = entropySrc.EntropyGlobalPruner(self.model, self.params, pp, ['module.conv3', 'module.conv4', 'module.conv5'])
+                        channelsPruned = egp.channelsToPrune
+                        loss, top1, top5 = self.run_inference()
+                        print('==========================')
+                        tmp = [len(x) for l,x in channelsPruned.items()]
+                        print(sum(tmp))
+                        
+                        if self.params.plotChannels:
+                            for j,(l,x) in enumerate(channels.items()):
+                                # if l not in channelsPruned.keys():
+                                #     continue
+                                
+                                y = [0 for t in x]                             
+                                for t in channelsPruned[l]:
+                                    y[t] = 1
+                                ax[i][j].bar(x,y)
+                                ax[i][j].get_yaxis().set_ticks([])
+                                
+                                if i == len(channels.keys()) - 1:
+                                    ax[i][j].set_xlabel('Layer-{}'.format(l.split('.')[1]))
+                            
+                            ax[i][0].set_ylabel('Pruned  = {}% \n Top1 = {:.2f}%'.format(pp*100, top1))
+                        
+                    if self.params.plotChannels:
+                        plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+                        plt.xlabel('\nChannel Number')
+                        plt.title('Channels taken when pruning based on Entropy')
+                        plt.show()
+                #}}}
+            #}}}
+            
+            else:
+            #{{{
+                calculators = []
+                layerNames = []
+                for n,m in self.model.named_modules():
+                    if isinstance(m, nn.Conv2d):                                  
+                        calculators.append(entropySrc.Entropy(n, m, self.params, min(self.params.numBatches, len(self.test_loader))))
+                        calculators[-1].register_hooks()
+                        layerNames.append(n)
+                        
+                self.inferer.run_n_minibatches(self.params, self.test_loader, self.model, self.params.numBatches)
+
+                logger = entropySrc.EntropyLogger(self.params, calculators, layerNames) 
+                logger.log_entropies(testStats)
+            #}}}
+        #}}}
         
-        elif self.params.finetune == True:
-            self.pruner = pruningSrc.Pruning(self.params, self.model)
-            self.run_finetune()
+        elif self.params.pruneFilters == True:
+        #{{{
+            print('=========Baseline Accuracy==========')
+            testStats = self.run_inference()
+            print('==========================')
+            
+            if self.params.finetune == True:
+                self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
+                self.run_finetune()
+            
+            else:
+            #{{{
+                print('=========Baseline Accuracy==========')
+                testStats = self.run_inference()
+                print('==========================')
+                
+                prunePercs = [10, 40, 80]
+                
+                if self.params.plotChannels:
+                    # channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d)}
+                    channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d) if l in ['module.conv3', 'module.conv4', 'module.conv5']}
+                    fig,ax = plt.subplots(len(prunePercs), len(channels.keys()), sharex=True, sharey=True)
+                    fig.add_subplot(111, frameon=False)
+                
+                for i, pp in enumerate(prunePercs):
+                    self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
+                    self.params.pruningPerc = pp
+                    self.model, channelsPruned = self.pruner.prune_model(self.model)
+                    print('Pruned Percentage = {}'.format(self.pruner.prune_rate(self.model, True)))
+                    loss, top1, top5 = self.run_inference()
+                    print('==========================')
+                    tmp = [len(x) for l,x in channelsPruned.items()]
+                    print(sum(tmp))
+                    
+                    
+                    if self.params.plotChannels:
+                        for j,(l,x) in enumerate(channels.items()):
+                            y = [0 for t in x]                             
+                            for t in channelsPruned[l]:
+                                y[t] = 1
+                            ax[i][j].bar(x,y)
+                            ax[i][j].get_yaxis().set_ticks([])
+                            
+                            if i == len(channels.keys()) - 1:
+                                ax[i][j].set_xlabel('Layer-{}'.format(l.split('.')[1]))
+                        
+                        ax[i][0].set_ylabel('Pruned  = {}% \n Top1 = {:.2f}%'.format(pp, top1))
+                    
+                if self.params.plotChannels:
+                    plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+                    plt.xlabel('\nChannel Number')
+                    plt.title('Channels taken when pruning based on weight l2-norm')
+                    plt.show()
+            #}}}
+        #}}}
         
-        elif self.params.evaluate == False : 
-            self.run_training()
+        elif self.params.fbsPruning == True:
+        #{{{
+            self.pruner = pruningSrc.FBSPruning(self.params, self.model)
+
+            if self.params.fbsFinetune == True:
+                self.run_finetune()
+            
+            elif self.params.evaluate == True:
+                if self.params.unprunedRatio < 1.0:
+                    self.chanProbCalculator = fbsChanSrc.ChannelProbability(self.model, self.params, self.pruner)
+                    self.chanProbCalculator.register_hooks()
+                    self.model = self.pruner.prune_model(self.model)
+                
+                self.chanProbCalculator = fbsChanSrc.ChannelProbability(self.model, self.params, self.pruner)
+                self.chanProbCalculator.register_hooks()
+                self.run_inference()
+                
+                if self.params.unprunedRatio < 1.0:
+                    rootFolder = self.params.pretrained.split('/')[:-1]
+                    rootFolder = '/'.join(rootFolder)
+                    
+                    self.pruner.log_prune_rate(rootFolder, self.params)
+            
+            else:
+                # self.chanProbCalculator = fbsChanSrc.ChannelProbability(self.model, self.params, self.pruner)
+                # self.chanProbCalculator.register_hooks()
+                self.run_training()
+        #}}} 
         
-        else : 
+        elif self.params.evaluate == True:
             self.run_inference()
+
+        else : 
+            self.run_training()
 
         self.tbx_writer.close()
 
     def run_finetune(self):
-        print('==> Performing Pruning Finetune')
-        self.trainer.finetune_network(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
-
+    #{{{
+        if self.params.entropy and self.params.entropyGlobalPruning:
+            print('==> Performing Activation Entropy Pruning Finetune')
+            self.trainer.finetune_entropy(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
+        elif self.params.pruneFilters:
+            print('==> Performing l2-weight Pruning Finetune')
+            self.trainer.finetune_l2_weights(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
+    #}}}
+    
     def setup_param_checkpoint(self, configFile):
+    #{{{
         config = cp.ConfigParser() 
         config.read(configFile)
         self.params = ppSrc.Params(config)
         self.checkpointer = checkpointingSrc.Checkpointer(self.params, configFile)
         self.setup_params()
+    #}}}
     
     def setup_others(self):
+    #{{{
         self.preproc = preprocSrc.Preproc()
         self.mc = mcSrc.ModelCreator()
-        self.trainer = trainingSrc.Trainer()
+        self.trainer = trainingSrc.Trainer(self.params)
         self.inferer = inferenceSrc.Inferer()
+    #}}}
 
     def run_gop_calc(self):
-        self.inferer.run_single_forward(self.params, self.test_loader, self.model)
+        self.inferer.run_single_minibatch(self.params, self.test_loader, self.model)
     
+    def run_inference(self):
+        # perform inference only
+        print('==> Performing Inference')
+        return self.inferer.test_network(self.params, self.test_loader, self.model, self.criterion, self.optimiser)
+       
