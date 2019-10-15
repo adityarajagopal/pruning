@@ -57,20 +57,6 @@ class FBSPruning(object):
         #}}}
     #}}}
 
-class PruningHook(object):
-    #{{{
-    def __init__(self, module):
-        self.channels = []
-        module.register_forward_hook(self.prune)
-    
-    def update_channels(self, channel):
-        self.channels.append(channel)
-
-    def prune(self, module, input, output):
-        if self.channels != []:
-            output[:,self.channels] = 0
-    #}}}
-
 class BasicPruning(object):
     #{{{
     def __init__(self, params, model, inferer, valLoader):
@@ -83,39 +69,38 @@ class BasicPruning(object):
         self.layers = model._modules['module']._modules
         self.inferer = inferer
         self.valLoader = valLoader
-        self.numLayers = 0
 
         self.masks = {}
-        self.hooks = {}
-        for n,m in model.named_modules():
-            if isinstance(m, nn.Conv2d):
-                # self.masks[n] = []
-                # self.hooks.append(PruningHook(m)) 
-                self.hooks[n] = PruningHook(m)
-        
         for p in model.named_parameters():
             paramsInLayer = 1
             for dim in p[1].size():
                 paramsInLayer *= dim
             self.paramsPerLayer.append(paramsInLayer)
             self.totalParams += paramsInLayer
-            
+
             device = 'cuda:' + str(self.params.gpuList[0])
-            if 'conv' in p[0] and 'weight' in p[0]:
+            if 'conv' in p[0]:
                 layerName = '.'.join(p[0].split('.')[:-1])
-                # self.masks.append(torch.tensor((), dtype=torch.float32).new_ones(p[1].size()).cuda(device))
-                self.masks[layerName] = torch.tensor((), dtype=torch.float32).new_ones(p[1].size()).cuda(device)
-                self.numLayers += 1
+                if layerName not in self.masks.keys():
+                    self.masks[layerName] = [torch.tensor((), dtype=torch.float32).new_ones(p[1].size()).cuda(device)]
+                else:
+                    self.masks[layerName].append(torch.tensor((), dtype=torch.float32).new_ones(p[1].size()).cuda(device))
         #}}} 
     
-    def log_prune_rate(self, rootFolder, params, totalPrunedPerc): 
+    def log_pruned_channels(self, rootFolder, params, totalPrunedPerc, channelsPruned): 
         #{{{
         if params.printOnly == True:
             return 
-        csvName = os.path.join(rootFolder, 'layer_prune_rate.csv')
-        with open(csvName, 'a') as csvFile:
-            writer = csv.writer(csvFile, delimiter=',')
-            writer.writerow([params.curr_epoch] + params.prunePercPerLayer + [totalPrunedPerc])
+
+        jsonName = os.path.join(rootFolder, 'pruned_channels.json')
+        channelsPruned['prunePerc'] = totalPrunedPerc
+        summary = {}
+        summary[str(params.curr_epoch)] = channelsPruned
+        
+        with open(jsonName, 'w') as sumFile:
+            json.dump(summary, sumFile)
+        
+        return summary
         #}}} 
     
     def prune_model(self, model):
@@ -139,44 +124,34 @@ class BasicPruning(object):
     def prune_rate(self, model, verbose=False):
         #{{{
         totalPrunedParams = 0
-        # prunedParamsPerLayer = []
         prunedParamsPerLayer = {}
 
-        # if self.masks == []:
-        #     return 0.
-        # for mask in self.masks:
-        #     prunedParamsPerLayer.append(np.count_nonzero((mask == 0).data.cpu().numpy()))
         if self.masks == {}:
             return 0.
         for layer, mask in self.masks.items():
-            prunedParamsPerLayer[layer] = np.count_nonzero((mask == 0).data.cpu().numpy())
+            # prunedParamsPerLayer[layer] = np.count_nonzero((mask[0] == 0).data.cpu().numpy()) + np.count_nonzero((mask[1] == 0).data.cpu().numpy())
+            for x in mask:
+                if layer not in prunedParamsPerLayer.keys():
+                    prunedParamsPerLayer[layer] = np.count_nonzero((x == 0).data.cpu().numpy())
+                else:
+                    prunedParamsPerLayer[layer] += np.count_nonzero((x == 0).data.cpu().numpy())
         
-        layerNum = 0
-        convNum = 0
         for p in model.named_parameters():
+            # only look at weights here as prunedParamsPerLayer variable accounts for both weight and bias
             if 'conv' in p[0] and 'weight' in p[0]:
                 layerName = '.'.join(p[0].split('.')[:-1])
-                # prunedParams = prunedParamsPerLayer[convNum]  
                 prunedParams = prunedParamsPerLayer[layerName]  
                 totalPrunedParams += prunedParams
-                if verbose:
-                    self.params.prunePercPerLayer.append((prunedParams / self.paramsPerLayer[layerNum]))
-                convNum += 1
-            layerNum += 1
         
         return 100.*(totalPrunedParams/self.totalParams) 
         #}}}        
     
     def structured_l2_weight(self, model):
         #{{{
-        layerNum = 0
         self.metricValues = []
         for p in model.named_parameters():
+            #{{{
             if 'conv' in p[0] and 'weight' in p[0]:
-                if layerNum < self.params.thisLayerUp:
-                    layerNum += 1
-                    continue
-                
                 layerName = '.'.join(p[0].split('.')[:-1])
                 pNp = p[1].data.cpu().numpy()
                 
@@ -189,35 +164,37 @@ class BasicPruning(object):
                 incPrunePerc = 100.*(pNp.shape[1]*pNp.shape[2]*pNp.shape[3]) / self.totalParams
                 
                 # store calculated values to be sorted by l2 norm mag and used later
-                # values = [(layerNum, i, x, incPrunePerc) for i,x in enumerate(metric) if not np.all((self.masks[layerNum][i] == 0.).data.cpu().numpy())]
-                values = [(layerName, i, x, incPrunePerc) for i,x in enumerate(metric) if not np.all((self.masks[layerName][i] == 0.).data.cpu().numpy())]
+                values = [(layerName, i, x, incPrunePerc) for i,x in enumerate(metric) if not np.all((self.masks[layerName][0][i] == 0.).data.cpu().numpy())]
                 self.metricValues += values
-                layerNum += 1
+            #}}}
 
         self.metricValues = sorted(self.metricValues, key=lambda tup: tup[2])
 
         channelsToPrune = {l:[] for l,m in model.named_modules() if isinstance(m, nn.Conv2d)}
 
-        # currentPruneRate = self.prune_rate(model)
         currentPruneRate = 0
         listIdx = 0
         while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(self.metricValues)):
             filterToPrune = self.metricValues[listIdx]
-            # layerNum = filterToPrune[0]
             layerName = filterToPrune[0]
             filterNum = filterToPrune[1]
             
-            # self.masks[layerNum][filterNum] = 0.
-            # self.hooks[layerNum].update_channels(filterNum)
-            # channelsToPrune['module.conv'+str(layerNum+1)].append(filterNum)
-            self.masks[layerName][filterNum] = 0.
-            self.hooks[layerName].update_channels(filterNum)
+            for x in self.masks[layerName]:
+                x[filterNum] = 0.
             channelsToPrune[layerName].append(filterNum)
 
             currentPruneRate += filterToPrune[3]
             listIdx += 1
+        
+        # perform pruning 
+        for p in model.named_parameters():
+            if 'conv' in p[0]:
+                layerName = '.'.join(p[0].split('.')[:-1])
+                # print(p[0], layerName, np.count_nonzero((self.masks[layerName][0 if 'weight' in p[0] else 1] == 0).data.cpu().numpy()))
+                p[1].data = p[1].mul(self.masks[layerName][0 if 'weight' in p[0] else 1])
+                p[1].requires_grad = True
       
-        return model, channelsToPrune
+        return channelsToPrune
         #}}}
 
     def structured_activations(self, model):

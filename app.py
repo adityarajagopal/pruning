@@ -38,16 +38,40 @@ class Application(appSrc.Application):
 
         if self.params.getGops:
         #{{{
-            if 'googlenet' in self.params.arch:
+            if self.params.pruneFilters:
+                #{{{
+                if self.params.finetune:
+                    self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
+                    channelsPruned = self.pruner.prune_model(self.model)
+
+                    self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch, channelsPruned) 
+                    self.trainGopCalc.register_hooks()
+                    
+                    self.trainer.single_forward_backward(self.params, self.model, self.criterion, self.optimiser, self.train_loader)      
+                    self.trainGopCalc.remove_hooks()
+
+                    _, tfg, _, tbg = self.trainGopCalc.get_gops()
+                    
+                    loss, top1, top5 = self.run_inference()
+                    print('Pruned Percentage = {}'.format(self.pruner.prune_rate(self.model, True)))
+                    print('Total Forward GOps = {}'.format(tfg))
+                    print('Total Backward GOps = {}'.format(tbg))
+                    print('Total GOps = {}'.format(tfg + tbg))
+
+                #}}} 
+            
+            elif 'googlenet' in self.params.arch:
+            #{{{
                 # register hooks
                 self.gopCalculator = gopSrc.GoogleNetGopCalculator(self.model, self.params)
                 self.gopCalculator.register_hooks()
+                self.run_gop_calc()
+                print('Unpruned Gops = ', self.gopCalculator.baseTotalGops)
+                print('Pruned Gops = ', self.gopCalculator.prunedTotalGops)
+            #}}} 
+
             else:
                 raise ValueError('Gop calculation not implemented for specified architecture')
-           
-            self.run_gop_calc()
-            print('Unpruned Gops = ', self.gopCalculator.baseTotalGops)
-            print('Pruned Gops = ', self.gopCalculator.prunedTotalGops)
         #}}}
 
         elif self.params.entropy == True:
@@ -147,11 +171,7 @@ class Application(appSrc.Application):
             
             else:
             #{{{
-                print('=========Baseline Accuracy==========')
-                testStats = self.run_inference()
-                print('==========================')
-                
-                prunePercs = [10, 40, 80]
+                prunePercs = [80]
                 
                 if self.params.plotChannels:
                     # channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d)}
@@ -162,13 +182,12 @@ class Application(appSrc.Application):
                 for i, pp in enumerate(prunePercs):
                     self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
                     self.params.pruningPerc = pp
-                    self.model, channelsPruned = self.pruner.prune_model(self.model)
+                    # self.model, channelsPruned = self.pruner.prune_model(self.model)
+                    channelsPruned = self.pruner.prune_model(self.model)
                     print('Pruned Percentage = {}'.format(self.pruner.prune_rate(self.model, True)))
                     loss, top1, top5 = self.run_inference()
                     print('==========================')
                     tmp = [len(x) for l,x in channelsPruned.items()]
-                    print(sum(tmp))
-                    
                     
                     if self.params.plotChannels:
                         for j,(l,x) in enumerate(channels.items()):

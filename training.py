@@ -62,14 +62,13 @@ class Trainer(trainingSrc.Trainer):
             state = self.update_lr(params, optimiser)
             
             # perform pruning 
-            if (params.pruneWeights == True or params.pruneFilters == True) and (epoch == params.pruneAfter): 
+            if params.pruneFilters == True and epoch == params.pruneAfter: 
                 tqdm.write('Pruning Network')
-                model, channelsPruned = pruner.prune_model(model)
+                channelsPruned = pruner.prune_model(model)
                 totalPrunedPerc = pruner.prune_rate(model, True)
                 tqdm.write('Pruned Percentage = {}'.format(totalPrunedPerc))
-                pruner.log_prune_rate(checkpointer.root, params, totalPrunedPerc)
+                summary = pruner.log_pruned_channels(checkpointer.root, params, totalPrunedPerc, channelsPruned)
                 params.prunePercPerLayer = []
-    
     
             losses = utils.AverageMeter()
             top1 = utils.AverageMeter()
@@ -116,6 +115,19 @@ class Trainer(trainingSrc.Trainer):
             
             tqdm.write("{},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f}".format(epoch, params.lr, params.train_loss, params.train_top1, params.train_top5, params.test_loss, params.test_top1, params.test_top5, params.val_loss, params.val_top1, params.val_top5))
     #}}} 
+    
+    def single_forward_backward(self, params, model, criterion, optimiser, train_loader): 
+    #{{{
+        for batch_idx, (inputs, targets) in enumerate(train_loader):
+            if params.use_cuda : 
+                inputs, targets = inputs.cuda(), targets.cuda()
+                
+            loss, prec1, prec5 = self.train(model, criterion, optimiser, inputs, targets)
+            
+            return
+    #}}}
+    
+    
     
     #{{{
     # def finetune_newtork(self, params, pruner, checkpointer, train_loader, test_loader, valLoader, model, criterion, optimiser, inferer):  
