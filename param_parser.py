@@ -33,6 +33,7 @@ class Params(ppSrc.Params) :
         self.unprunedRatio = config_file.getfloat('pruning_hyperparameters', 'unpruned_ratio', fallback=1.0)
         self.unprunedLB = config_file.getfloat('pruning_hyperparameters', 'unpruned_lb', fallback=0.1)
         self.batchLim = config_file.getint('pruning_hyperparameters', 'batch_lim', fallback=-1)
+        self.logDir = config_file.get('pruning_hyperparameters', 'logfile', fallback='/home/ar4414/pytorch_training/src/ar4414/pruning/logs')
         
         # --------------------------------  
         self.entropy = config_file.getboolean('entropy_hyperparameters', 'entropy', fallback=False)
@@ -42,7 +43,6 @@ class Params(ppSrc.Params) :
         if self.eLayers != []:
             self.eLayers = self.eLayers.split()
         self.plotChannels = config_file.getboolean('entropy_hyperparameters', 'plot_channels', fallback=False)
-        self.eLogDir = config_file.get('entropy_hyperparameters', 'logfile', fallback='/home/ar4414/pytorch_training/src/ar4414/pruning/logs')
         # self.entropyLocalPruning = config_file.getboolean('entropy_hyperparameters', 'entropy_local_pruning', fallback=False)
         self.entropyGlobalPruning = config_file.getboolean('entropy_hyperparameters', 'entropy_global_pruning', fallback=False)
         # assert not (self.entropyLocalPruning == True and self.entropyGlobalPruning == True), 'Cannot prune by ranking both locally and globally'

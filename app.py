@@ -14,6 +14,7 @@ import src.input_preprocessor as preprocSrc
 import os
 import random
 import sys
+import json
 
 import configparser as cp
 
@@ -26,6 +27,7 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 import math
 import numpy as np
+import pandas as pd
 
 class Application(appSrc.Application):
     def main(self):
@@ -39,8 +41,60 @@ class Application(appSrc.Application):
         if self.params.getGops:
         #{{{
             if self.params.pruneFilters:
-                #{{{
+            #{{{
                 if self.params.finetune:
+                #{{{
+                    try:
+                        with open(os.path.join(self.params.logDir, 'pruned_channels.json'), 'r') as cpFile:
+                            channelsPruned = json.load(cpFile)
+                    except FileNotFoundError:
+                        print("File : {} does not exist.".format(os.path.join(self.params.logDir, 'pruned_channels.json')))
+                        print("Either the log directory is wrong or run finetuning without GetGops to generate file before running this command.")
+                        sys.exit()
+                    
+                    pruneEpoch = int(list(channelsPruned.keys())[0])
+                    channelsPruned = list(channelsPruned.values())[0]
+                    prunePerc = channelsPruned.pop('prunePerc')
+
+                    # get unpruned gops
+                    self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
+                    self.trainGopCalc.register_hooks()
+                    self.trainer.single_forward_backward(self.params, self.model, self.criterion, self.optimiser, self.train_loader)      
+                    self.trainGopCalc.remove_hooks()
+                    _, tfg, _, tbg = self.trainGopCalc.get_gops()
+                    unprunedGops = tfg + tbg
+                    
+                    # get pruned gops
+                    self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch, channelsPruned) 
+                    self.trainGopCalc.register_hooks()
+                    self.trainer.single_forward_backward(self.params, self.model, self.criterion, self.optimiser, self.train_loader)      
+                    self.trainGopCalc.remove_hooks()
+                    _, tfg, _, tbg = self.trainGopCalc.get_gops()
+                    prunedGops = tfg + tbg
+                    
+                    print('Pruned Percentage = {}'.format(prunePerc))
+                    print('Total Unpruned GOps = {}'.format(unprunedGops))
+                    print('Total Pruned GOps = {}'.format(prunedGops))
+
+                    log = os.path.join(self.params.logDir, 'log.csv')
+                    log = pd.read_csv(log, delimiter = ',\t', engine='python')
+                    fig, axes = plt.subplots(1,1)
+
+                    gops = [unprunedGops if epoch < pruneEpoch else prunedGops for epoch in log['Epoch']]
+                    log['Gops'] = np.cumsum(gops)
+
+                    print(log)
+
+                    log.plot(x='Gops', y='Test_Top1', ax=axes)
+                    axes.set_ylabel('Top1 Test Accuracy')
+                    axes.set_xlabel('GOps')
+                    axes.set_title('Cost of performing finetuning in GOps \n ({:.2f}% pruning)'.format(prunePerc))
+                    
+                    plt.show()
+                #}}}
+                
+                else:
+                #{{{
                     self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
                     channelsPruned = self.pruner.prune_model(self.model)
 
@@ -57,8 +111,8 @@ class Application(appSrc.Application):
                     print('Total Forward GOps = {}'.format(tfg))
                     print('Total Backward GOps = {}'.format(tbg))
                     print('Total GOps = {}'.format(tfg + tbg))
-
                 #}}} 
+            #}}}
             
             elif 'googlenet' in self.params.arch:
             #{{{

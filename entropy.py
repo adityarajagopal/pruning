@@ -22,12 +22,12 @@ class Entropy(object):
         self.temporalActivations = torch.FloatTensor([]).cuda(self.gpu)
         
         if 'mobilenet' in params.arch:
-            logFolder = os.path.join(params.eLogDir, 'activations')
+            logFolder = os.path.join(params.logDir, 'activations')
             if not os.path.isdir(logFolder):
                 cmd = 'mkdir -p ' + logFolder
                 subprocess.check_call(cmd, shell=True)
             
-            self.logFile = os.path.join(params.eLogDir, 'activations', str(moduleName).replace('.','-') + '.pth.tar')
+            self.logFile = os.path.join(params.logDir, 'activations', str(moduleName).replace('.','-') + '.pth.tar')
             if not os.path.isfile(self.logFile):
                 torch.save(self.temporalActivations, self.logFile)
             
@@ -133,7 +133,7 @@ class EntropyLogger(object):
 
     def log_entropies(self, testStats):
         #{{{
-        logDir = self.params.eLogDir
+        logDir = self.params.logDir
             
         if self.params.sub_classes == []:
             subClasses = 'all'
@@ -167,7 +167,7 @@ class EntropyLogger(object):
             print('=============================================')
             
             if 'mobilenet' in self.params.arch:
-                actLog = os.path.join(self.params.eLogDir, 'activations', self.layerNames[i].replace('.','-') + '.pth.tar')
+                actLog = os.path.join(self.params.logDir, 'activations', self.layerNames[i].replace('.','-') + '.pth.tar')
                 tempAct = torch.load(actLog).cpu()
                 print(tempAct.shape)
                 entropies, meanAct = calc.calc_2d_entropy(tempAct)
@@ -214,7 +214,7 @@ class EntropyGlobalPruner(object):
     def __init__(self, model, params, prunePerc, layers):
         self.gpu = 'cuda:' + params.gpu_id[0]
         
-        rawLogFile = os.path.join(params.eLogDir, 'raw_log.csv')
+        rawLogFile = os.path.join(params.logDir, 'raw_log.csv')
         log = pd.read_csv(rawLogFile)
         if params.sub_classes == []:
             subClasses = 'all'
@@ -275,7 +275,7 @@ class EntropyGlobalPruner(object):
 # 
 #         mppByLayer = {'module.conv3': 0.0006924752624433156, 'module.conv4': 0.0013849505248866311, 'module.conv5': 0.0009233003499244208}
 #         
-#         rawLogFile = os.path.join(params.eLogDir, 'raw_log.csv')
+#         rawLogFile = os.path.join(params.logDir, 'raw_log.csv')
 #         log = pd.read_csv(rawLogFile)
 #         if params.sub_classes == []:
 #             subClasses = 'all'

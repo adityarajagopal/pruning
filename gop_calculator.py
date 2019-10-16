@@ -257,9 +257,6 @@ class GopCalculator(object):
         self.outPtr += 1
         outChannels = output.shape[1] - outChannelsPruned 
 
-        # print(input[0].shape[1], inChannelsPruned)
-        # print(output.shape[1], outChannelsPruned)
-
         outputSize = output.shape[2]
         kernelSize = module.kernel_size[0]
 
