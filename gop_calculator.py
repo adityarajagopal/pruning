@@ -246,9 +246,9 @@ class GopCalculator(object):
     def forward_conv_hook(self, module, input, output):
     #{{{
         gops = 0.
-        
+
         batchSize = input[0].shape[0]
-        
+
         inChannelsPruned = self.channelsPruned[self.inPtr] if self.prune else 0
         self.inPtr += 1
         inChannels = input[0].shape[1] - inChannelsPruned
@@ -304,13 +304,13 @@ class GopCalculator(object):
         outputChannels = gradWrtW[0] - outChannelsPruned
         
         self.inPtr -= 1
-        if module.groups == 1:
-            inChannelsPruned = self.channelsPruned[self.inPtr] if self.prune else 0
-        else:
-            inChannelsPruned = 0
+        inChannelsPruned = self.channelsPruned[self.inPtr] if self.prune else 0
         inputChannels = gradWrtW[1] - inChannelsPruned
         
         kernelSize = gradWrtW[2]
+
+        # no division by inputChannels needed here, as the size of inputChannels is obtained 
+        # from gradWrtW, which accounts for groups automatically
 
         # gradient wrt inputs
         if gradWrtIp != []:

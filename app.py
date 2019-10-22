@@ -42,6 +42,13 @@ class Application(appSrc.Application):
         #{{{
             if self.params.pruneFilters:
             #{{{
+                if 'mobilenet' in self.params.arch:
+                    self.pruner = pruningSrc.MobileNetV2Pruning(self.params, self.model, self.inferer, self.valLoader)
+                elif 'resnet' in self.params.arch:
+                    self.pruner = pruningSrc.ResNet20Pruning(self.params, self.model, self.inferer, self.valLoader)
+                else:
+                    self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
+                
                 if self.params.finetune:
                 #{{{
                     try:
@@ -55,6 +62,7 @@ class Application(appSrc.Application):
                     pruneEpoch = int(list(channelsPruned.keys())[0])
                     channelsPruned = list(channelsPruned.values())[0]
                     prunePerc = channelsPruned.pop('prunePerc')
+                    numBatches = len(self.train_loader)
 
                     # get unpruned gops
                     self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
@@ -80,7 +88,7 @@ class Application(appSrc.Application):
                     log = pd.read_csv(log, delimiter = ',\t', engine='python')
                     fig, axes = plt.subplots(1,1)
 
-                    gops = [unprunedGops if epoch < pruneEpoch else prunedGops for epoch in log['Epoch']]
+                    gops = [(numBatches * unprunedGops) if epoch < pruneEpoch else (numBatches * prunedGops) for epoch in log['Epoch']]
                     log['Gops'] = np.cumsum(gops)
 
                     print(log)
@@ -95,7 +103,7 @@ class Application(appSrc.Application):
                 
                 else:
                 #{{{
-                    self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
+                    # self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
                     channelsPruned = self.pruner.prune_model(self.model)
 
                     self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch, channelsPruned) 
@@ -219,13 +227,19 @@ class Application(appSrc.Application):
             testStats = self.run_inference()
             print('==========================')
             
-            if self.params.finetune == True:
+            if 'mobilenet' in self.params.arch:
+                self.pruner = pruningSrc.MobileNetV2Pruning(self.params, self.model, self.inferer, self.valLoader)
+            elif 'resnet' in self.params.arch:
+                self.pruner = pruningSrc.ResNet20Pruning(self.params, self.model, self.inferer, self.valLoader)
+            else:
                 self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
+            
+            if self.params.finetune == True:
                 self.run_finetune()
             
             else:
             #{{{
-                prunePercs = [80]
+                prunePercs = [30]
                 
                 if self.params.plotChannels:
                     # channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d)}
@@ -234,9 +248,8 @@ class Application(appSrc.Application):
                     fig.add_subplot(111, frameon=False)
                 
                 for i, pp in enumerate(prunePercs):
-                    self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
+                    # self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
                     self.params.pruningPerc = pp
-                    # self.model, channelsPruned = self.pruner.prune_model(self.model)
                     channelsPruned = self.pruner.prune_model(self.model)
                     print('Pruned Percentage = {}'.format(self.pruner.prune_rate(self.model, True)))
                     loss, top1, top5 = self.run_inference()
