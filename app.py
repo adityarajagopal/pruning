@@ -232,48 +232,68 @@ class Application(appSrc.Application):
             elif 'resnet' in self.params.arch:
                 self.pruner = pruningSrc.ResNet20Pruning(self.params, self.model, self.inferer, self.valLoader)
             else:
-                self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
+                # self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
+                self.pruner = pruningSrc.AlexNetPruning(self.params, self.model, self.inferer, self.valLoader)
             
             if self.params.finetune == True:
                 self.run_finetune()
             
             else:
             #{{{
-                prunePercs = [30]
+                prunePercs = [10]
                 
-                if self.params.plotChannels:
-                    # channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d)}
-                    channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d) if l in ['module.conv3', 'module.conv4', 'module.conv5']}
-                    fig,ax = plt.subplots(len(prunePercs), len(channels.keys()), sharex=True, sharey=True)
-                    fig.add_subplot(111, frameon=False)
+                #{{{
+                # if self.params.plotChannels:
+                #     # channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d)}
+                #     channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d) if l in ['module.conv3', 'module.conv4', 'module.conv5']}
+                #     fig,ax = plt.subplots(len(prunePercs), len(channels.keys()), sharex=True, sharey=True)
+                #     fig.add_subplot(111, frameon=False)
+                #}}}
                 
                 for i, pp in enumerate(prunePercs):
-                    # self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
                     self.params.pruningPerc = pp
                     channelsPruned = self.pruner.prune_model(self.model)
                     print('Pruned Percentage = {}'.format(self.pruner.prune_rate(self.model, True)))
+                    self.pruner.write_net()
+
+                    # import src.ar4414.pruning.mobilenetv2 as model
+                    # prunedModel = model.__dict__['mobilenetv2'](num_classes = 100)
+                    # import src.ar4414.pruning.alexnet as model
+                    # prunedModel = model.__dict__['alexnet'](num_classes = 100)
+                    import src.ar4414.pruning.models.cifar.pruned as model
+                    # prunedModel = model.__dict__['resnet_{}'.format(self.params.pruningPerc)](num_classes = 100)
+                    prunedModel = model.__dict__['resnet'](num_classes = 100)
+                    
+                    gpu_list = [int(x) for x in self.params.gpu_id.split(',')]
+                    prunedModel = torch.nn.DataParallel(prunedModel, gpu_list).cuda()
+
+                    updatedModel = self.pruner.transfer_weights(self.model, prunedModel)
+                    self.inferer.test_network(self.params, self.test_loader, updatedModel, self.criterion, self.optimiser)
+                    
                     loss, top1, top5 = self.run_inference()
                     print('==========================')
                     tmp = [len(x) for l,x in channelsPruned.items()]
                     
-                    if self.params.plotChannels:
-                        for j,(l,x) in enumerate(channels.items()):
-                            y = [0 for t in x]                             
-                            for t in channelsPruned[l]:
-                                y[t] = 1
-                            ax[i][j].bar(x,y)
-                            ax[i][j].get_yaxis().set_ticks([])
-                            
-                            if i == len(channels.keys()) - 1:
-                                ax[i][j].set_xlabel('Layer-{}'.format(l.split('.')[1]))
-                        
-                        ax[i][0].set_ylabel('Pruned  = {}% \n Top1 = {:.2f}%'.format(pp, top1))
-                    
-                if self.params.plotChannels:
-                    plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
-                    plt.xlabel('\nChannel Number')
-                    plt.title('Channels taken when pruning based on weight l2-norm')
-                    plt.show()
+                #{{{
+                #     if self.params.plotChannels:
+                #         for j,(l,x) in enumerate(channels.items()):
+                #             y = [0 for t in x]                             
+                #             for t in channelsPruned[l]:
+                #                 y[t] = 1
+                #             ax[i][j].bar(x,y)
+                #             ax[i][j].get_yaxis().set_ticks([])
+                #             
+                #             if i == len(channels.keys()) - 1:
+                #                 ax[i][j].set_xlabel('Layer-{}'.format(l.split('.')[1]))
+                #         
+                #         ax[i][0].set_ylabel('Pruned  = {}% \n Top1 = {:.2f}%'.format(pp, top1))
+                #     
+                # if self.params.plotChannels:
+                #     plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+                #     plt.xlabel('\nChannel Number')
+                #     plt.title('Channels taken when pruning based on weight l2-norm')
+                #     plt.show()
+                #}}}
             #}}}
         #}}}
         
