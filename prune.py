@@ -3,11 +3,15 @@ import csv
 import os
 import numpy as np
 import time
-import torch
 from tqdm import tqdm
 import json
 import pickle
+import subprocess
+import importlib
 
+from abc import ABC, abstractmethod
+
+import torch
 import torch.nn as nn
 
 class FBSPruning(object):
@@ -57,20 +61,17 @@ class FBSPruning(object):
         #}}}
     #}}}
 
-class BasicPruning(object):
+class BasicPruning(ABC):
 #{{{
-    def __init__(self, params, model, inferer, valLoader):
+    def __init__(self, params, model, layerSkip=(lambda lName : False)):
         #{{{
         self.params = params
+        self.model = model
+        
         self.metricValues = []
         self.totalParams = 0
         self.paramsPerLayer = []
         self.channelsToPrune = {}
-        self.model = model
-
-        self.layers = model._modules['module']._modules
-        self.inferer = inferer
-        self.valLoader = valLoader
 
         self.masks = {}
         for p in model.named_parameters():
@@ -83,10 +84,24 @@ class BasicPruning(object):
             device = 'cuda:' + str(self.params.gpuList[0])
             if 'conv' in p[0]:
                 layerName = '.'.join(p[0].split('.')[:-1])
+                
+                if layerSkip(layerName):
+                    continue
+
                 if layerName not in self.masks.keys():
                     self.masks[layerName] = [torch.tensor((), dtype=torch.float32).new_ones(p[1].size()).cuda(device)]
                 else:
                     self.masks[layerName].append(torch.tensor((), dtype=torch.float32).new_ones(p[1].size()).cuda(device))
+        
+        # create model directory and file
+        dirName = 'models/pruned/{}/{}'.format(params.dataset, params.subsetName)
+        self.filePath = os.path.join(dirName, self.fileName)
+        
+        ## create dir if it doesn't exist
+        cmd = 'mkdir -p {}'.format(dirName)
+        subprocess.check_call(cmd, shell=True)
+        
+        self.importPath = 'src.ar4414.pruning.{}.{}'.format('.'.join(dirName.split('/')), self.fileName.split('.')[0])
         #}}} 
     
     def log_pruned_channels(self, rootFolder, params, totalPrunedPerc, channelsPruned): 
@@ -111,7 +126,18 @@ class BasicPruning(object):
             # pruning based on l2 norm of weights
             if self.params.pruningMetric == 'weights':
                 tqdm.write("Pruning filters - Weights")
-                return self.structured_l2_weight(model)
+                channelsPruned = self.structured_l2_weight(model)
+
+                # perform pruning by writing out pruned network
+                self.write_net()
+                pModel = importlib.import_module(self.importPath).__dict__[self.netName]
+                prunedModel = pModel(num_classes=100)
+                gpu_list = [int(x) for x in self.params.gpu_id.split(',')]
+                prunedModel = torch.nn.DataParallel(prunedModel, gpu_list).cuda()
+                prunedModel = self.transfer_weights(model, prunedModel)
+                optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
+
+                return channelsPruned, prunedModel, optimiser
             
             # pruning based on activations 
             if self.params.pruningMetric == 'activations':
@@ -142,21 +168,6 @@ class BasicPruning(object):
         return 100.*(totalPrunedParams/self.totalParams) 
     #}}}        
 
-    def prune(self, module, input, output):
-    #{{{
-        layerName = self.pruneLayerNames[self.pruneCount]
-        channelsToPrune = self.channelsToPrune[layerName]
-
-        device = 'cuda:' + str(self.params.gpuList[0])
-        mask = torch.tensor((), dtype=torch.float32).new_ones(output.shape).cuda(device)  
-        mask[:,channelsToPrune] = 0.
-        output.data = output.mul(mask)
-
-        self.pruneCount += 1
-        if self.pruneCount == len(self.pruneLayerNames):
-            self.pruneCount = 0
-    #}}} 
-    
     def structured_l2_weight(self, model):
     #{{{
         self.metricValues = []
@@ -194,137 +205,39 @@ class BasicPruning(object):
 
             currentPruneRate += filterToPrune[3]
             listIdx += 1
-        
-        # perform pruning 
-        # layersToPrune = self.masks.keys()
-        # for p in model.named_parameters():
-        #     if 'conv' in p[0]:
-        #         layerName = '.'.join(p[0].split('.')[:-1])
-        #         if layerName in layersToPrune:
-        #             # print(p[0], layerName, np.count_nonzero((self.masks[layerName][0 if 'weight' in p[0] else 1] == 0).data.cpu().numpy()))
-        #             p[1].data = p[1].mul(self.masks[layerName][0 if 'weight' in p[0] else 1])
-        #             p[1].requires_grad = True
-        
-        # perform pruning (with hooks)
-        # self.pruneCount = 0
-        # self.pruneLayerNames = []
-        # layersToPrune = self.masks.keys()
-        # for n,m in model.named_modules():
-        #     if n in layersToPrune:
-        #         m.register_forward_hook(self.prune)
-        #         self.pruneLayerNames.append(n)
       
         return self.channelsToPrune
     #}}}
 
-#{{{
-    def structured_activations(self, model):
-        #{{{
-        # potentially have to change finetuning structure to prune single feature map each iteration
-        # and alternate between finetuning and pruning till desired sparsity is reached
-        # will take a lot more iterations
-
-        handles = []
-        for k,v in self.layers.items():
-            if 'Conv' in str(v):
-                handles.append(v.register_forward_hook(self.mean_activations))
-        
-        incPrunePerc = []
-        for p in model.named_parameters(): 
-            if 'conv' in p[0] and 'weight' in p[0]:
-                pNp = p[1].data.cpu().numpy()
-                tmp = 100.*(pNp.shape[1]*pNp.shape[2]*pNp.shape[3]) / self.totalParams
-                incPrunePerc.append(tmp)
-
-        numConvLayers = len(incPrunePerc)
-        numBatches = 0
-        self.meanActivations = {i:[] for i in range(numConvLayers)}
-                
-        for batchIdx, (inputs, targets) in enumerate(self.valLoader):
-            self.layerNum = 0
-            numBatches = len(targets)
-            self.inferer.run_single_forward(self.params, inputs, targets, model)
-        
-        layerNum = 0
-        for p in model.named_parameters(): 
-            if 'conv' in p[0] and 'weight' in p[0]:
-                act = self.meanActivations[layerNum]
-                act /= numBatches
-                magAct = act.shape[1] * act.shape[2] 
-
-                metric = act.reshape(act.shape[0], -1).sum(axis=1)
-                metric /= magAct
-                metric /= np.sqrt(np.square(metric).sum())
-
-                self.meanActivations[layerNum] = metric
-                
-                layerNum += 1
-        
-        meanActivationsByFilter = []
-        for layerNum, x in self.meanActivations.items():
-            # x /= numBatches
-            meanActivationsByFilter += [(int(layerNum), int(filterNum), float(np.abs(act))) for filterNum, act in enumerate(x) if not np.all((self.masks[layerNum][filterNum] == 0.).data.cpu().numpy())]
-                        
-        meanActivationsByFilter = sorted(meanActivationsByFilter, key=lambda tup:tup[2])
-        
-        currentPruneRate = self.prune_rate(model)
-
-        listIdx = 0
-        while currentPruneRate < self.params.pruningPerc:
-            filterToPrune = meanActivationsByFilter[listIdx]
-            layerNum = filterToPrune[0]
-            filterNum = filterToPrune[1]
-            self.masks[layerNum][filterNum] = 0.
-            model.module.set_masks(self.masks)
-            currentPruneRate += incPrunePerc[layerNum] 
-            listIdx += 1
-        
-        [handle.remove() for handle in handles]
-        
-        return model
-        #}}}
-
-    def mean_activations(self, module, input, output):
-        #{{{
-        # try averaging activations and then performing metric calculation at the end instead 
-
-        outNp = output[0].data.cpu().numpy()
-        # magAct = outNp.shape[1] * outNp.shape[2]
-
-        # metric = outNp.reshape(outNp.shape[0], -1).sum(axis=1)
-        # metric /= magAct
-        # metric /= np.sqrt(np.square(metric).sum())
-
-        if self.meanActivations[self.layerNum] == []:
-            # self.meanActivations[self.layerNum] = metric
-            self.meanActivations[self.layerNum] = outNp
-        else:
-            # self.meanActivations[self.layerNum] += metric 
-            self.meanActivations[self.layerNum] += outNp
-
-        self.layerNum += 1
-        #}}}
-#}}}
+    @abstractmethod
+    def write_net(self, subsetName=None):
+        pass
+    
+    @abstractmethod
+    def transfer_weights(self, oModel, pModel): 
+        pass
 #}}}
 
 class AlexNetPruning(BasicPruning):
 #{{{
-    def __init__(self, params, model, inferer, valLoader):
-        super().__init__(params, model, inferer, valLoader)
+    def __init__(self, params, model):
+        self.fileName = 'alexnet_{}.py'.format(int(params.pruningPerc))
+        self.netName = 'AlexNet'
+        super().__init__(params, model)
         
     def write_net(self):
     #{{{
         def fprint(text):
             print(text, file=self.modelDesc)
         
-        self.modelDesc = open('models/cifar/pruned/alexnet.py', 'w+')
+        self.modelDesc = open(self.filePath, 'w+')
 
         fprint('import torch')
         fprint('import torch.nn as nn')
         fprint('import torch.nn.functional as F')
     
         fprint('')
-        fprint('class AlexNet(nn.Module):')
+        fprint('class {}(nn.Module):'.format(self.netName))
         fprint('\tdef __init__(self, num_classes=10):')
         fprint('\t\tsuper().__init__()')
         fprint('')
@@ -435,84 +348,25 @@ class AlexNetPruning(BasicPruning):
 
 class MobileNetV2Pruning(BasicPruning):
 #{{{
-    def __init__(self, params, model, inferer, valLoader):
-    #{{{
-        self.params = params
-        self.model = model
-        
-        self.metricValues = []
-        self.totalParams = 0
-        self.paramsPerLayer = []
-
-        self.layers = model._modules['module']._modules
-        self.inferer = inferer
-        self.valLoader = valLoader
-
-        self.channelsToPrune = {}
-
-        self.masks = {}
-        for p in model.named_parameters():
-            paramsInLayer = 1
-            for dim in p[1].size():
-                paramsInLayer *= dim
-            self.paramsPerLayer.append(paramsInLayer)
-            self.totalParams += paramsInLayer
-
-            device = 'cuda:' + str(self.params.gpuList[0])
-            if 'conv' in p[0]:
-                layerName = '.'.join(p[0].split('.')[:-1])
-                
-                # with dw convs, the initial 1x1 conv and the 3x3 dw need to have the same number of channels
-                # so instead of pruning both together, only the final 1x1 which completes the dw conv is pruned
-                if 'layers' in layerName and 'conv3' not in layerName:
-                        continue
-                
-                if layerName not in self.masks.keys():
-                    self.masks[layerName] = [torch.tensor((), dtype=torch.float32).new_ones(p[1].size()).cuda(device)]
-                else:
-                    self.masks[layerName].append(torch.tensor((), dtype=torch.float32).new_ones(p[1].size()).cuda(device))
-        
-        # identify blocks with residuals
-        # self.resNames = []
-        # self.layerCount = 0
-        # for n,m in model.named_modules():
-        #     if 'layers' in n and len(n.split('.')) == 3:
-        #         if m._modules['conv2'].stride[0] == 1:
-        #             # m.register_forward_hook(self.residual_mod)
-        #             self.resNames.append(n)
-    #}}} 
-    
-    # def residual_mod(self, module, input, output):
-    # #{{{
-    #     if self.channelsToPrune == {}:
-    #         return 
-
-    #     layerName = self.resNames[self.layerCount] + '.conv3'
-    #     channelsToPrune = self.channelsToPrune[layerName]
-
-    #     device = 'cuda:' + str(self.params.gpuList[0])
-    #     mask = torch.tensor((), dtype=torch.float32).new_ones(output.shape).cuda(device)  
-    #     mask[:,channelsToPrune] = 0.
-    #     output.data = output.mul(mask)
-
-    #     self.layerCount += 1
-    #     if self.layerCount == len(self.resNames):
-    #         self.layerCount = 0
-    # #}}}
+    def __init__(self, params, model):
+        self.fileName = 'mobilenetv2_{}.py'.format(int(params.pruningPerc))
+        self.netName = 'MobileNetV2'
+        skipFn = lambda lName : True if 'layers' in lName and 'conv3' not in lName else False
+        super().__init__(params, model, layerSkip = skipFn)
     
     def write_net(self):
     #{{{
         def fprint(text):
             print(text, file=self.modelDesc)
         
-        self.modelDesc = open('models/cifar/pruned/mobilenetv2.py', 'w+')
+        self.modelDesc = open(self.filePath, 'w+')
 
         fprint('import torch')
         fprint('import torch.nn as nn')
         fprint('import torch.nn.functional as F')
     
         fprint('')
-        fprint('class MobileNetV2(nn.Module):')
+        fprint('class {}(nn.Module):'.format(self.netName))
         fprint('\tdef __init__(self, num_classes=10):')
         fprint('\t\tsuper().__init__()')
         fprint('')
@@ -676,16 +530,17 @@ class MobileNetV2Pruning(BasicPruning):
 
 class ResNet20Pruning(BasicPruning):
 #{{{
-    def __init__(self, params, model, inferer, valLoader):  
-        super().__init__(params, model, inferer, valLoader)
+    def __init__(self, params, model):  
+        self.fileName = 'resnet{}_{}.py'.format(int(params.depth), int(params.pruningPerc))
+        self.netName = 'ResNet{}'.format(int(params.depth))
+        super().__init__(params, model)
 
     def write_net(self):
     #{{{
         def fprint(text):
             print(text, file=self.modelDesc)
         
-        # self.modelDesc = open('models/cifar/pruned/resnet_{}.py'.format(self.params.pruningPerc), 'w+')
-        self.modelDesc = open('models/cifar/pruned/resnet.py', 'w+')
+        self.modelDesc = open(self.filePath, 'w+')
 
         fprint('import torch')
         fprint('import torch.nn as nn')
@@ -693,7 +548,7 @@ class ResNet20Pruning(BasicPruning):
     
         fprint('')
         # fprint('class ResNet_{}(nn.Module):'.format(self.params.pruningPerc))
-        fprint('class ResNet(nn.Module):')
+        fprint('class {}(nn.Module):'.format(self.netName))
         fprint('\tdef __init__(self, num_classes=10):')
         fprint('\t\tsuper().__init__()')
         fprint('')
@@ -860,24 +715,6 @@ class ResNet20Pruning(BasicPruning):
 
         return pModel
     #}}}
-    
-    # def residual_mod(self, module, input, output):
-    # #{{{
-    #     if self.channelsToPrune == {}:
-    #         return 
-
-    #     layerName = self.resNames[self.layerCount] + '.conv2'
-    #     channelsToPrune = self.channelsToPrune[layerName]
-
-    #     device = 'cuda:' + str(self.params.gpuList[0])
-    #     mask = torch.tensor((), dtype=torch.float32, requires_grad=False).new_ones(output.shape).cuda(device)  
-    #     mask[:,channelsToPrune] = 0.
-    #     output.data = output.mul(mask)
-
-    #     self.layerCount += 1
-    #     if self.layerCount == len(self.resNames):
-    #         self.layerCount = 0
-    # #}}}
 #}}}
 
 

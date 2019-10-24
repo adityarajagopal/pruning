@@ -11,6 +11,7 @@ class Params(ppSrc.Params) :
         super().__init__(config_file)
         
         self.getGops = config_file.getboolean('pruning_hyperparameters', 'get_gops')
+        self.subsetName = config_file.get('pruning_hyperparameters', 'sub_name', fallback='subset1')
         self.sub_classes = config_file.get('pruning_hyperparameters', 'sub_classes').split() 
         
         # --------------------------------  

@@ -66,20 +66,11 @@ class Trainer(trainingSrc.Trainer):
             # perform pruning 
             if params.pruneFilters == True and epoch == params.pruneAfter: 
                 tqdm.write('Pruning Network')
-                channelsPruned = pruner.prune_model(model)
+                channelsPruned, model, optimiser = pruner.prune_model(model)
                 totalPrunedPerc = pruner.prune_rate(model, True)
                 tqdm.write('Pruned Percentage = {}'.format(totalPrunedPerc))
                 summary = pruner.log_pruned_channels(checkpointer.root, params, totalPrunedPerc, channelsPruned)
                 
-                pruner.write_net()
-                import src.ar4414.pruning.models.cifar.pruned as pModel
-                # prunedModel = pModel.__dict__[str(params.arch) + '_' + str(int(params.pruningPerc))](num_classes = 100)
-                prunedModel = pModel.__dict__[str(params.arch)](num_classes = 100)
-                gpu_list = [int(x) for x in params.gpu_id.split(',')]
-                prunedModel = torch.nn.DataParallel(prunedModel, gpu_list).cuda()
-                model = pruner.transfer_weights(model, prunedModel)
-                optimiser = torch.optim.SGD(model.parameters(), lr=params.lr, momentum=params.momentum, weight_decay=params.weight_decay)
-    
             losses = utils.AverageMeter()
             top1 = utils.AverageMeter()
             top5 = utils.AverageMeter()

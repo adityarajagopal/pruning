@@ -35,20 +35,21 @@ class Application(appSrc.Application):
         self.setup_model()
         self.setup_tee_printing()
         
-        # setup tensorboardX and checkpointer  
-        self.tbx_writer = tbx.SummaryWriter(comment='-test-1')
+        # done here as within both get gops and 
+        if self.params.pruneFilters:
+            if 'mobilenet' in self.params.arch:
+                self.pruner = pruningSrc.MobileNetV2Pruning(self.params, self.model)
+            elif 'resnet' in self.params.arch:
+                self.pruner = pruningSrc.ResNet20Pruning(self.params, self.model)
+            elif 'alexnet' in self.params.arch:
+                self.pruner = pruningSrc.AlexNetPruning(self.params, self.model)
+            else:
+                raise ValueError("Pruning not implemented for architecture ({})".format(self.params.arch))
 
         if self.params.getGops:
         #{{{
             if self.params.pruneFilters:
             #{{{
-                if 'mobilenet' in self.params.arch:
-                    self.pruner = pruningSrc.MobileNetV2Pruning(self.params, self.model, self.inferer, self.valLoader)
-                elif 'resnet' in self.params.arch:
-                    self.pruner = pruningSrc.ResNet20Pruning(self.params, self.model, self.inferer, self.valLoader)
-                else:
-                    self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
-                
                 if self.params.finetune:
                 #{{{
                     try:
@@ -103,8 +104,7 @@ class Application(appSrc.Application):
                 
                 else:
                 #{{{
-                    # self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
-                    channelsPruned = self.pruner.prune_model(self.model)
+                    channelsPruned, _, _ = self.pruner.prune_model(self.model)
 
                     self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch, channelsPruned) 
                     self.trainGopCalc.register_hooks()
@@ -227,14 +227,6 @@ class Application(appSrc.Application):
             testStats = self.run_inference()
             print('==========================')
             
-            if 'mobilenet' in self.params.arch:
-                self.pruner = pruningSrc.MobileNetV2Pruning(self.params, self.model, self.inferer, self.valLoader)
-            elif 'resnet' in self.params.arch:
-                self.pruner = pruningSrc.ResNet20Pruning(self.params, self.model, self.inferer, self.valLoader)
-            else:
-                # self.pruner = pruningSrc.BasicPruning(self.params, self.model, self.inferer, self.valLoader)
-                self.pruner = pruningSrc.AlexNetPruning(self.params, self.model, self.inferer, self.valLoader)
-            
             if self.params.finetune == True:
                 self.run_finetune()
             
@@ -252,27 +244,10 @@ class Application(appSrc.Application):
                 
                 for i, pp in enumerate(prunePercs):
                     self.params.pruningPerc = pp
-                    channelsPruned = self.pruner.prune_model(self.model)
+                    channelsPruned, prunedModel, optimiser = self.pruner.prune_model(self.model)
                     print('Pruned Percentage = {}'.format(self.pruner.prune_rate(self.model, True)))
-                    self.pruner.write_net()
-
-                    # import src.ar4414.pruning.mobilenetv2 as model
-                    # prunedModel = model.__dict__['mobilenetv2'](num_classes = 100)
-                    # import src.ar4414.pruning.alexnet as model
-                    # prunedModel = model.__dict__['alexnet'](num_classes = 100)
-                    import src.ar4414.pruning.models.cifar.pruned as model
-                    # prunedModel = model.__dict__['resnet_{}'.format(self.params.pruningPerc)](num_classes = 100)
-                    prunedModel = model.__dict__['resnet'](num_classes = 100)
-                    
-                    gpu_list = [int(x) for x in self.params.gpu_id.split(',')]
-                    prunedModel = torch.nn.DataParallel(prunedModel, gpu_list).cuda()
-
-                    updatedModel = self.pruner.transfer_weights(self.model, prunedModel)
-                    self.inferer.test_network(self.params, self.test_loader, updatedModel, self.criterion, self.optimiser)
-                    
-                    loss, top1, top5 = self.run_inference()
+                    self.inferer.test_network(self.params, self.test_loader, prunedModel, self.criterion, optimiser)
                     print('==========================')
-                    tmp = [len(x) for l,x in channelsPruned.items()]
                     
                 #{{{
                 #     if self.params.plotChannels:
@@ -331,8 +306,6 @@ class Application(appSrc.Application):
 
         else : 
             self.run_training()
-
-        self.tbx_writer.close()
 
     def run_finetune(self):
     #{{{
