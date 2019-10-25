@@ -232,8 +232,6 @@ class Application(appSrc.Application):
             
             else:
             #{{{
-                prunePercs = [10]
-                
                 #{{{
                 # if self.params.plotChannels:
                 #     # channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d)}
@@ -242,12 +240,10 @@ class Application(appSrc.Application):
                 #     fig.add_subplot(111, frameon=False)
                 #}}}
                 
-                for i, pp in enumerate(prunePercs):
-                    self.params.pruningPerc = pp
-                    channelsPruned, prunedModel, optimiser = self.pruner.prune_model(self.model)
-                    print('Pruned Percentage = {}'.format(self.pruner.prune_rate(self.model, True)))
-                    self.inferer.test_network(self.params, self.test_loader, prunedModel, self.criterion, optimiser)
-                    print('==========================')
+                channelsPruned, prunedModel, optimiser = self.pruner.prune_model(self.model)
+                print('Pruned Percentage = {}'.format(self.pruner.prune_rate(self.model, True)))
+                self.inferer.test_network(self.params, self.test_loader, prunedModel, self.criterion, optimiser)
+                print('==========================')
                     
                 #{{{
                 #     if self.params.plotChannels:
