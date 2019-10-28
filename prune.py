@@ -119,6 +119,16 @@ class BasicPruning(ABC):
         
         return summary
         #}}} 
+
+    def import_pruned_model(self):
+    #{{{
+        pModel = importlib.import_module(self.importPath).__dict__[self.netName]
+        prunedModel = pModel(num_classes=100)
+        gpu_list = [int(x) for x in self.params.gpu_id.split(',')]
+        prunedModel = torch.nn.DataParallel(prunedModel, gpu_list).cuda()
+
+        return prunedModel
+    #}}}
     
     def prune_model(self, model):
         #{{{
@@ -130,10 +140,7 @@ class BasicPruning(ABC):
 
                 # perform pruning by writing out pruned network
                 self.write_net()
-                pModel = importlib.import_module(self.importPath).__dict__[self.netName]
-                prunedModel = pModel(num_classes=100)
-                gpu_list = [int(x) for x in self.params.gpu_id.split(',')]
-                prunedModel = torch.nn.DataParallel(prunedModel, gpu_list).cuda()
+                prunedModel = self.import_pruned_model()
                 prunedModel = self.transfer_weights(model, prunedModel)
                 optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
 
@@ -224,7 +231,7 @@ class AlexNetPruning(BasicPruning):
         self.fileName = 'alexnet_{}.py'.format(int(params.pruningPerc))
         self.netName = 'AlexNet'
         super().__init__(params, model)
-        
+
     def write_net(self):
     #{{{
         def fprint(text):
@@ -661,6 +668,7 @@ class ResNet20Pruning(BasicPruning):
         opChannelsKept = []
         for k in self.orderedKeys:
             if 'conv' in k:
+            #{{{
                 layer = k
                 param = k + '.weight'
                 pParam = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.weight'
@@ -675,8 +683,10 @@ class ResNet20Pruning(BasicPruning):
                 prunedModel[pParam] = tmp[:,ipChannelsKept] 
                 
                 ipChannelsToPrune = opChannelsToPrune
+            #}}}
             
             elif 'bn' in k:
+            #{{{
                 layer = k
                 
                 paramW = k + '.weight'
@@ -697,11 +707,10 @@ class ResNet20Pruning(BasicPruning):
                 prunedModel[pParamM] = parentModel[paramM][opChannelsKept]
                 prunedModel[pParamV] = parentModel[paramV][opChannelsKept]
                 prunedModel[pParamNB] = parentModel[paramNB]
-                # prunedModel[pParamM] = torch.zeros(len(opChannelsKept))
-                # prunedModel[pParamV] = torch.ones(len(opChannelsKept))
-                # prunedModel[pParamNB] = torch.tensor(0, dtype=torch.long)
+            #}}}
             
             elif 'fc' in k:
+            #{{{
                 layer = k
                 paramW = k + '.weight'
                 paramB = k + '.bias'
@@ -710,6 +719,24 @@ class ResNet20Pruning(BasicPruning):
                 
                 prunedModel[pParamB] = parentModel[paramB]
                 prunedModel[pParamW] = parentModel[paramW][:,opChannelsKept]
+            #}}}
+
+            # elif 'downsample.0' in k:
+            # #{{{
+            #     layer = k
+            #     pParamW = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.weight'
+            #     device = prunedModel[pParamW].device
+            #     prunedModel[pParamW] = torch.ones(prunedModel[pParamW].shape).cuda(device)
+            # #}}}
+            # 
+            # elif 'downsample.1' in k:
+            # #{{{
+            #     layer = k
+            #     pParamW = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.weight'
+            #     pParamB = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.bias'
+            #     device = prunedModel[pParamB].device
+            #     prunedModel[pParamW] = torch.ones(prunedModel[pParamW].shape).cuda(device)
+            # #}}}
                 
         pModel.load_state_dict(prunedModel)
 

@@ -60,6 +60,8 @@ class Application(appSrc.Application):
                         print("Either the log directory is wrong or run finetuning without GetGops to generate file before running this command.")
                         sys.exit()
                     
+                    assert float(self.params.logDir.split('/')[-3].split('_')[1]) == float(self.params.pruningPerc), 'Pruning percentage specified in config file does not correspond to log file\'s pruning percentage'
+                    
                     pruneEpoch = int(list(channelsPruned.keys())[0])
                     channelsPruned = list(channelsPruned.values())[0]
                     prunePerc = channelsPruned.pop('prunePerc')
@@ -72,15 +74,17 @@ class Application(appSrc.Application):
                     self.trainGopCalc.remove_hooks()
                     _, tfg, _, tbg = self.trainGopCalc.get_gops()
                     unprunedGops = tfg + tbg
-                    
+
                     # get pruned gops
-                    self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch, channelsPruned) 
+                    prunedModel = self.pruner.import_pruned_model()
+                    optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
+                    self.trainGopCalc = gopSrc.GopCalculator(prunedModel, self.params.arch) 
                     self.trainGopCalc.register_hooks()
-                    self.trainer.single_forward_backward(self.params, self.model, self.criterion, self.optimiser, self.train_loader)      
+                    self.trainer.single_forward_backward(self.params, prunedModel, self.criterion, optimiser, self.train_loader)      
                     self.trainGopCalc.remove_hooks()
                     _, tfg, _, tbg = self.trainGopCalc.get_gops()
                     prunedGops = tfg + tbg
-                    
+
                     print('Pruned Percentage = {}'.format(prunePerc))
                     print('Total Unpruned GOps = {}'.format(unprunedGops))
                     print('Total Pruned GOps = {}'.format(prunedGops))
