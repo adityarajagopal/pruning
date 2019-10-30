@@ -820,7 +820,6 @@ class ResNet20PruningConcat(BasicPruning):
                     toEdit = self.orderedKeys[self.orderedKeys.index(k + '.bn2') + 2]
                     lineToEdit = linesToWrite[toEdit]
                     modName, module = lineToEdit.split('=',1)
-                    print(modName)
                     module = eval(module)
                     module.in_channels = v[0]
                     linesToWrite[toEdit] = '\t\t{} = nn.{}'.format(modName.strip(), str(module))

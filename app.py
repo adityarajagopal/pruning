@@ -40,8 +40,6 @@ class Application(appSrc.Application):
             if 'mobilenet' in self.params.arch:
                 self.pruner = pruningSrc.MobileNetV2Pruning(self.params, self.model)
             elif 'resnet' in self.params.arch:
-                # self.pruner = pruningSrc.ResNet20Pruning(self.params, self.model)
-                # self.pruner = pruningSrc.ResNet20PruningConcat(self.params, self.model)
                 self.pruner = pruningSrc.ResNet20PruningDependency(self.params, self.model)
             elif 'alexnet' in self.params.arch:
                 self.pruner = pruningSrc.AlexNetPruning(self.params, self.model)
@@ -110,12 +108,12 @@ class Application(appSrc.Application):
                 
                 else:
                 #{{{
-                    channelsPruned, _, _ = self.pruner.prune_model(self.model)
+                    channelsPruned, prunedModel, optimiser = self.pruner.prune_model(self.model)
 
-                    self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch, channelsPruned) 
+                    self.trainGopCalc = gopSrc.GopCalculator(prunedModel, self.params.arch) 
                     self.trainGopCalc.register_hooks()
                     
-                    self.trainer.single_forward_backward(self.params, self.model, self.criterion, self.optimiser, self.train_loader)      
+                    self.trainer.single_forward_backward(self.params, prunedModel, self.criterion, optimiser, self.train_loader)      
                     self.trainGopCalc.remove_hooks()
 
                     _, tfg, _, tbg = self.trainGopCalc.get_gops()
