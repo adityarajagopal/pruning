@@ -40,7 +40,9 @@ class Application(appSrc.Application):
             if 'mobilenet' in self.params.arch:
                 self.pruner = pruningSrc.MobileNetV2Pruning(self.params, self.model)
             elif 'resnet' in self.params.arch:
-                self.pruner = pruningSrc.ResNet20PruningConcat(self.params, self.model)
+                # self.pruner = pruningSrc.ResNet20Pruning(self.params, self.model)
+                # self.pruner = pruningSrc.ResNet20PruningConcat(self.params, self.model)
+                self.pruner = pruningSrc.ResNet20PruningDependency(self.params, self.model)
             elif 'alexnet' in self.params.arch:
                 self.pruner = pruningSrc.AlexNetPruning(self.params, self.model)
             else:
