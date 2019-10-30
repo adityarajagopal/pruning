@@ -1225,6 +1225,8 @@ class ResNet20PruningDependency(BasicPruning):
         ipChannelsKept = []
         opChannelsKept = []
 
+        groupIpPruned = []
+
         for k in self.orderedKeys:
             if 'conv' in k:
             #{{{
@@ -1239,8 +1241,11 @@ class ResNet20PruningDependency(BasicPruning):
                 ipChannelsKept = list(set(allIpChannels) - set(ipChannelsToPrune))
                 opChannelsKept = list(set(allOpChannels) - set(opChannelsToPrune))
                 tmp = parentModel[param][opChannelsKept,:]
-                prunedModel[pParam][:,:len(ipChannelsKept)] = tmp[:,ipChannelsKept] 
+                prunedModel[pParam] = tmp[:,ipChannelsKept] 
 
+                if 'layer' in k and 'conv1' in k:
+                    groupIpPruned = ipChannelsToPrune
+                
                 ipChannelsToPrune = opChannelsToPrune
             #}}}
             
@@ -1278,9 +1283,47 @@ class ResNet20PruningDependency(BasicPruning):
                 pParamB = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.bias'
 
                 prunedModel[pParamB] = parentModel[paramB]
-                prunedModel[pParamW][:,:len(opChannelsKept)] = parentModel[paramW][:,opChannelsKept]
+                prunedModel[pParamW] = parentModel[paramW][:,opChannelsKept]
             #}}}
 
+            elif 'downsample.0' in k:
+            #{{{
+                layer = k
+                param = k + '.weight'
+                pParam = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.weight'
+                
+                allIpChannels = list(range(parentModel[param].shape[1]))
+                allOpChannels = list(range(parentModel[param].shape[0]))
+                ipChannelsKept = list(set(allIpChannels) - set(groupIpPruned))
+                opChannelsKept = list(set(allOpChannels) - set(opChannelsToPrune))
+                tmp = parentModel[param][opChannelsKept,:]
+                prunedModel[pParam] = tmp[:,ipChannelsKept] 
+            #}}}
+            
+            elif 'downsample.1' in k:
+            #{{{
+                layer = k
+                
+                paramW = k + '.weight'
+                paramB = k + '.bias'
+                paramM = k + '.running_mean'
+                paramV = k + '.running_var'
+                paramNB = k + '.num_batches_tracked'
+                
+                pParamW = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.weight'
+                pParamB = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.bias'
+                pParamM = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.running_mean'
+                pParamV = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.running_var'
+                pParamNB = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.num_batches_tracked'
+
+                prunedModel[pParamW] = parentModel[paramW][opChannelsKept]
+                prunedModel[pParamB] = parentModel[paramB][opChannelsKept]
+                
+                prunedModel[pParamM] = parentModel[paramM][opChannelsKept]
+                prunedModel[pParamV] = parentModel[paramV][opChannelsKept]
+                prunedModel[pParamNB] = parentModel[paramNB]
+            #}}}
+        
         pModel.load_state_dict(prunedModel)
 
         return pModel
