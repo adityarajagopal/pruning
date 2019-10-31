@@ -242,7 +242,7 @@ class GopCalculator(object):
         
         return (forwardGopsPerLayer, totalForwardGops, backwardGopsPerLayer, totalBackwardGops)
     #}}}
-    
+
     def forward_conv_hook(self, module, input, output):
     #{{{
         gops = 0.

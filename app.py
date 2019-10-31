@@ -52,57 +52,85 @@ class Application(appSrc.Application):
             #{{{
                 if self.params.finetune:
                 #{{{
-                    try:
-                        with open(os.path.join(self.params.logDir, 'pruned_channels.json'), 'r') as cpFile:
-                            channelsPruned = json.load(cpFile)
-                    except FileNotFoundError:
-                        print("File : {} does not exist.".format(os.path.join(self.params.logDir, 'pruned_channels.json')))
-                        print("Either the log directory is wrong or run finetuning without GetGops to generate file before running this command.")
-                        sys.exit()
-                    
-                    assert float(self.params.logDir.split('/')[-3].split('_')[1]) == float(self.params.pruningPerc), 'Pruning percentage specified in config file does not correspond to log file\'s pruning percentage'
-                    
-                    pruneEpoch = int(list(channelsPruned.keys())[0])
-                    channelsPruned = list(channelsPruned.values())[0]
-                    prunePerc = channelsPruned.pop('prunePerc')
-                    numBatches = len(self.train_loader)
-
-                    # get unpruned gops
-                    self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
-                    self.trainGopCalc.register_hooks()
-                    self.trainer.single_forward_backward(self.params, self.model, self.criterion, self.optimiser, self.train_loader)      
-                    self.trainGopCalc.remove_hooks()
-                    _, tfg, _, tbg = self.trainGopCalc.get_gops()
-                    unprunedGops = tfg + tbg
-
-                    # get pruned gops
-                    prunedModel = self.pruner.import_pruned_model()
-                    optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
-                    self.trainGopCalc = gopSrc.GopCalculator(prunedModel, self.params.arch) 
-                    self.trainGopCalc.register_hooks()
-                    self.trainer.single_forward_backward(self.params, prunedModel, self.criterion, optimiser, self.train_loader)      
-                    self.trainGopCalc.remove_hooks()
-                    _, tfg, _, tbg = self.trainGopCalc.get_gops()
-                    prunedGops = tfg + tbg
-
-                    print('Pruned Percentage = {}'.format(prunePerc))
-                    print('Total Unpruned GOps = {}'.format(unprunedGops))
-                    print('Total Pruned GOps = {}'.format(prunedGops))
-
-                    log = os.path.join(self.params.logDir, 'log.csv')
-                    log = pd.read_csv(log, delimiter = ',\t', engine='python')
                     fig, axes = plt.subplots(1,1)
+                    listPrunePercs = [0,5,10,25,50,75,80]
+                    for i, logFile in enumerate(self.params.logFiles):
+                        logDir = os.path.join(self.params.logDir, logFile)
+                        
+                        try:
+                            # with open(os.path.join(self.params.logDir, 'pruned_channels.json'), 'r') as cpFile:
+                            with open(os.path.join(logDir, 'pruned_channels.json'), 'r') as cpFile:
+                                channelsPruned = json.load(cpFile)
+                        except FileNotFoundError:
+                            # print("File : {} does not exist.".format(os.path.join(self.params.logDir, 'pruned_channels.json')))
+                            print("File : {} does not exist.".format(os.path.join(logDir, 'pruned_channels.json')))
+                            print("Either the log directory is wrong or run finetuning without GetGops to generate file before running this command.")
+                            sys.exit()
+                        
+                        # assert float(self.params.logDir.split('/')[-3].split('_')[1]) == float(self.params.pruningPerc), 'Pruning percentage specified in config file does not correspond to log file\'s pruning percentage'
+                        
+                        pruneEpoch = int(list(channelsPruned.keys())[0])
+                        channelsPruned = list(channelsPruned.values())[0]
+                        prunePerc = channelsPruned.pop('prunePerc')
+                        numBatches = len(self.train_loader)
 
-                    gops = [(numBatches * unprunedGops) if epoch < pruneEpoch else (numBatches * prunedGops) for epoch in log['Epoch']]
-                    log['Gops'] = np.cumsum(gops)
+                        self.params.pruningPerc = listPrunePercs[i]
+                        self.pruner = pruningSrc.ResNet20PruningDependency(self.params, self.model)
 
-                    print(log)
+                        # get unpruned gops
+                        self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
+                        self.trainGopCalc.register_hooks()
+                        self.trainer.single_forward_backward(self.params, self.model, self.criterion, self.optimiser, self.train_loader)      
+                        self.trainGopCalc.remove_hooks()
+                        _, tfg, _, tbg = self.trainGopCalc.get_gops()
+                        unprunedGops = tfg + tbg
 
-                    log.plot(x='Gops', y='Test_Top1', ax=axes)
+                        totalUnprunedParams = 0
+                        for p in self.model.named_parameters():
+                            paramsInLayer = 1
+                            for dim in p[1].size():
+                                paramsInLayer *= dim
+                            totalUnprunedParams += (paramsInLayer * 4) / 1e6
+
+                        # get pruned gops
+                        prunedModel = self.pruner.import_pruned_model()
+                        optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
+                        self.trainGopCalc = gopSrc.GopCalculator(prunedModel, self.params.arch) 
+                        self.trainGopCalc.register_hooks()
+                        self.trainer.single_forward_backward(self.params, prunedModel, self.criterion, optimiser, self.train_loader)      
+                        self.trainGopCalc.remove_hooks()
+                        _, tfg, _, tbg = self.trainGopCalc.get_gops()
+                        prunedGops = tfg + tbg
+                        
+                        totalPrunedParams = 0
+                        for p in prunedModel.named_parameters():
+                            paramsInLayer = 1
+                            for dim in p[1].size():
+                                paramsInLayer *= dim
+                            totalPrunedParams += (paramsInLayer * 4) / 1e6
+
+                        print('Pruned Percentage = {:.2f}'.format(prunePerc))
+                        print('Total Unpruned GOps = {:.2f}'.format(unprunedGops))
+                        print('Total Unpruned Params = {:.2f}MB'.format(totalUnprunedParams))
+                        print('Total Pruned GOps = {:.2f}'.format(prunedGops))
+                        print('Total Pruned Params = {:.2f}MB'.format(totalPrunedParams))
+
+                        # log = os.path.join(self.params.logDir, 'log.csv')
+                        log = os.path.join(logDir, 'log.csv')
+                        log = pd.read_csv(log, delimiter = ',\t', engine='python')
+
+                        gops = [(numBatches * unprunedGops) if epoch < pruneEpoch else (numBatches * prunedGops) for epoch in log['Epoch']]
+                        log['Gops'] = np.cumsum(gops)
+
+                        print(log)
+
+                        log.plot(x='Gops', y='Test_Top1', ax=axes, label="{:.2f}%,{:.2f}MB".format(prunePerc, totalPrunedParams))
+                    
                     axes.set_ylabel('Top1 Test Accuracy')
                     axes.set_xlabel('GOps')
-                    axes.set_title('Cost of performing finetuning in GOps \n ({:.2f}% pruning)'.format(prunePerc))
-                    
+                    # axes.set_title('Cost of performing finetuning in GOps \n ({:.2f}% pruning, {:.2f}MB)'.format(prunePerc, totalUnprunedParams))
+                    axes.set_title('Cost of performing finetuning in GOps')
+                    axes.legend()
                     plt.show()
                 #}}}
                 

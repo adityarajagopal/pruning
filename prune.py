@@ -73,6 +73,8 @@ class BasicPruning(ABC):
         self.totalParams = 0
         self.paramsPerLayer = []
         self.channelsToPrune = {}
+                
+        self.gpu_list = [int(x) for x in self.params.gpu_id.split(',')]
 
         self.masks = {}
         for p in model.named_parameters():

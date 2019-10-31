@@ -34,7 +34,8 @@ class Params(ppSrc.Params) :
         self.unprunedRatio = config_file.getfloat('pruning_hyperparameters', 'unpruned_ratio', fallback=1.0)
         self.unprunedLB = config_file.getfloat('pruning_hyperparameters', 'unpruned_lb', fallback=0.1)
         self.batchLim = config_file.getint('pruning_hyperparameters', 'batch_lim', fallback=-1)
-        self.logDir = config_file.get('pruning_hyperparameters', 'logfile', fallback='/home/ar4414/pytorch_training/src/ar4414/pruning/logs')
+        self.logDir = config_file.get('pruning_hyperparameters', 'logdir', fallback='/home/ar4414/pytorch_training/src/ar4414/pruning/logs')
+        self.logFiles = config_file.get('pruning_hyperparameters', 'logfiles', fallback='').split()
         
         # --------------------------------  
         self.entropy = config_file.getboolean('entropy_hyperparameters', 'entropy', fallback=False)
