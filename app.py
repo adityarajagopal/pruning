@@ -54,6 +54,7 @@ class Application(appSrc.Application):
                 #{{{
                     fig, axes = plt.subplots(1,1)
                     listPrunePercs = [0,5,10,25,50,75,80]
+                    
                     for i, logFile in enumerate(self.params.logFiles):
                         logDir = os.path.join(self.params.logDir, logFile)
                         
@@ -66,8 +67,6 @@ class Application(appSrc.Application):
                             print("File : {} does not exist.".format(os.path.join(logDir, 'pruned_channels.json')))
                             print("Either the log directory is wrong or run finetuning without GetGops to generate file before running this command.")
                             sys.exit()
-                        
-                        # assert float(self.params.logDir.split('/')[-3].split('_')[1]) == float(self.params.pruningPerc), 'Pruning percentage specified in config file does not correspond to log file\'s pruning percentage'
                         
                         pruneEpoch = int(list(channelsPruned.keys())[0])
                         channelsPruned = list(channelsPruned.values())[0]
