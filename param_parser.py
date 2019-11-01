@@ -10,6 +10,7 @@ class Params(ppSrc.Params) :
     def __init__(self, config_file) : 
         super().__init__(config_file)
         
+        self.plotChannels = config_file.getboolean('pruning_hyperparameters', 'plot_channels', fallback=False)
         self.getGops = config_file.getboolean('pruning_hyperparameters', 'get_gops')
         self.subsetName = config_file.get('pruning_hyperparameters', 'sub_name', fallback='subset1')
         self.sub_classes = config_file.get('pruning_hyperparameters', 'sub_classes').split() 
@@ -44,7 +45,6 @@ class Params(ppSrc.Params) :
         self.eLayers = config_file.get('entropy_hyperparameters', 'layers', fallback=[])
         if self.eLayers != []:
             self.eLayers = self.eLayers.split()
-        self.plotChannels = config_file.getboolean('entropy_hyperparameters', 'plot_channels', fallback=False)
         # self.entropyLocalPruning = config_file.getboolean('entropy_hyperparameters', 'entropy_local_pruning', fallback=False)
         self.entropyGlobalPruning = config_file.getboolean('entropy_hyperparameters', 'entropy_global_pruning', fallback=False)
         # assert not (self.entropyLocalPruning == True and self.entropyGlobalPruning == True), 'Cannot prune by ranking both locally and globally'

@@ -15,6 +15,7 @@ import os
 import random
 import sys
 import json
+import subprocess
 
 import configparser as cp
 
@@ -59,11 +60,9 @@ class Application(appSrc.Application):
                         logDir = os.path.join(self.params.logDir, logFile)
                         
                         try:
-                            # with open(os.path.join(self.params.logDir, 'pruned_channels.json'), 'r') as cpFile:
                             with open(os.path.join(logDir, 'pruned_channels.json'), 'r') as cpFile:
                                 channelsPruned = json.load(cpFile)
                         except FileNotFoundError:
-                            # print("File : {} does not exist.".format(os.path.join(self.params.logDir, 'pruned_channels.json')))
                             print("File : {} does not exist.".format(os.path.join(logDir, 'pruned_channels.json')))
                             print("Either the log directory is wrong or run finetuning without GetGops to generate file before running this command.")
                             sys.exit()
@@ -165,6 +164,61 @@ class Application(appSrc.Application):
 
             else:
                 raise ValueError('Gop calculation not implemented for specified architecture')
+        #}}}
+
+        elif self.params.plotChannels:
+        #{{{
+            if self.params.pruneFilters:
+                for i, logFile in enumerate(self.params.logFiles):
+                    logDir = os.path.join(self.params.logDir, logFile)
+                    try:
+                        with open(os.path.join(logDir, 'pruned_channels.json'), 'r') as cpFile:
+                            channelsPruned = json.load(cpFile)
+                    except FileNotFoundError:
+                        print("File : {} does not exist.".format(os.path.join(logDir, 'pruned_channels.json')))
+                        print("Either the log directory is wrong or run finetuning without GetGops to generate file before running this command.")
+                        sys.exit()
+                        
+                    pruneEpoch = int(list(channelsPruned.keys())[0])
+                    channelsPruned = list(channelsPruned.values())[0]
+                    prunePerc = channelsPruned.pop('prunePerc')
+                    allChannelsByLayer = {l:np.zeros(m.out_channels,dtype=int) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d)}
+
+                    if prunePerc == 0.:
+                        continue
+                    
+                    for j,(l,c) in enumerate(allChannelsByLayer.items()):
+                        c[channelsPruned[l]] = 1                              
+
+                    layerNames = ['.'.join(x.split('.')[1:]) for x in list(allChannelsByLayer.keys())]
+                    numChannelsPerLayer = [len(v) for v in allChannelsByLayer.values()]
+
+                    fig, ax = plt.subplots()
+                    bar = ax.barh(layerNames, numChannelsPerLayer)
+    
+                    ax = bar[0].axes
+                    lim = ax.get_xlim() + ax.get_ylim()
+                    
+                    for i, bar in enumerate(bar):
+                        layer = 'module.' + layerNames[i]
+                        grad = np.array(allChannelsByLayer[layer])
+                        grad = np.expand_dims(grad, 1).T
+                        bar.set_zorder(1)
+                        bar.set_facecolor("none")
+                        x,y = bar.get_xy()
+                        w,h = bar.get_width(), bar.get_height()
+                        ax.imshow(grad, extent=[x,x+w,y,y+h], aspect="auto", zorder=0)
+                    
+                    ax.axis(lim)
+                    ax.set_title('Channels Pruned By Layer for {:.2f}% pruning\n[{}]'.format(prunePerc, self.params.subsetName))
+                    
+                    plt.tight_layout()
+                    folder = '/home/ar4414/remote_copy/channels/{}'.format(self.params.subsetName)
+                    fig = os.path.join(folder, 'p_{}.png'.format(int(prunePerc)))
+                    cmd = 'mkdir -p {}'.format(folder)
+                    subprocess.check_call(cmd, shell=True)
+                    print('Saving - {}'.format(fig))
+                    plt.savefig(fig, format='png') 
         #}}}
 
         elif self.params.entropy == True:
