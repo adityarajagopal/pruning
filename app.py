@@ -6,7 +6,10 @@ import src.ar4414.pruning.model_creator as mcSrc
 import src.ar4414.pruning.inference as inferenceSrc
 import src.ar4414.pruning.checkpointing as checkpointingSrc
 import src.ar4414.pruning.training as trainingSrc
-import src.ar4414.pruning.prune as pruningSrc
+
+from src.ar4414.pruning.prune import AlexNetPruning
+from src.ar4414.pruning.resnet_pruning import ResNet20PruningDependency as ResNetPruning
+from src.ar4414.pruning.mobilenet_pruning import MobileNetV2PruningDependency as MobileNetV2Pruning 
 
 import src.app as appSrc
 import src.input_preprocessor as preprocSrc
@@ -39,11 +42,11 @@ class Application(appSrc.Application):
         # done here as within both get gops and 
         if self.params.pruneFilters:
             if 'mobilenet' in self.params.arch:
-                self.pruner = pruningSrc.MobileNetV2Pruning(self.params, self.model)
+                self.pruner = MobileNetV2Pruning(self.params, self.model)
             elif 'resnet' in self.params.arch:
-                self.pruner = pruningSrc.ResNet20PruningDependency(self.params, self.model)
+                self.pruner = ResNet20Pruning(self.params, self.model)
             elif 'alexnet' in self.params.arch:
-                self.pruner = pruningSrc.AlexNetPruning(self.params, self.model)
+                self.pruner = AlexNetPruning(self.params, self.model)
             else:
                 raise ValueError("Pruning not implemented for architecture ({})".format(self.params.arch))
 
