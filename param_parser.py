@@ -10,7 +10,7 @@ class Params(ppSrc.Params) :
     def __init__(self, config_file) : 
         super().__init__(config_file)
         
-        self.plotChannels = config_file.getboolean('pruning_hyperparameters', 'plot_channels', fallback=False)
+        self.plotChannels = config_file.get('pruning_hyperparameters', 'plot_channels', fallback='').split()
         self.getGops = config_file.getboolean('pruning_hyperparameters', 'get_gops')
         self.subsetName = config_file.get('pruning_hyperparameters', 'sub_name', fallback='subset1')
         self.sub_classes = config_file.get('pruning_hyperparameters', 'sub_classes').split() 

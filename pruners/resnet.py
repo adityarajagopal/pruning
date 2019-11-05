@@ -13,7 +13,7 @@ import math
 import torch
 import torch.nn as nn
 
-from src.ar4414.pruning.prune import BasicPruning
+from src.ar4414.pruning.pruners.base import BasicPruning
 
 class ResNet20Pruning(BasicPruning):
 #{{{

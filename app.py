@@ -7,9 +7,12 @@ import src.ar4414.pruning.inference as inferenceSrc
 import src.ar4414.pruning.checkpointing as checkpointingSrc
 import src.ar4414.pruning.training as trainingSrc
 
-from src.ar4414.pruning.prune import AlexNetPruning
-from src.ar4414.pruning.resnet_pruning import ResNet20PruningDependency as ResNetPruning
-from src.ar4414.pruning.mobilenet_pruning import MobileNetV2PruningDependency as MobileNetV2Pruning 
+from src.ar4414.pruning.pruners.alexnet import AlexNetPruning
+from src.ar4414.pruning.pruners.resnet import ResNet20PruningDependency as ResNetPruning
+from src.ar4414.pruning.pruners.mobilenetv2 import MobileNetV2PruningDependency as MobileNetV2Pruning 
+from src.ar4414.pruning.pruners.squeezenet import SqueezeNetPruning 
+
+from src.ar4414.pruning.plotter import ChannelPlotter
 
 import src.app as appSrc
 import src.input_preprocessor as preprocSrc
@@ -41,12 +44,14 @@ class Application(appSrc.Application):
         
         # done here as within both get gops and 
         if self.params.pruneFilters:
-            if 'mobilenet' in self.params.arch:
-                self.pruner = MobileNetV2Pruning(self.params, self.model)
-            elif 'resnet' in self.params.arch:
-                self.pruner = ResNet20Pruning(self.params, self.model)
-            elif 'alexnet' in self.params.arch:
+            if 'alexnet' in self.params.arch:
                 self.pruner = AlexNetPruning(self.params, self.model)
+            elif 'resnet' in self.params.arch:
+                self.pruner = ResNetPruning(self.params, self.model)
+            elif 'mobilenet' in self.params.arch:
+                self.pruner = MobileNetV2Pruning(self.params, self.model)
+            elif 'squeezenet' in self.params.arch:
+                self.pruner = SqueezeNetPruning(self.params, self.model)
             else:
                 raise ValueError("Pruning not implemented for architecture ({})".format(self.params.arch))
 
@@ -57,7 +62,7 @@ class Application(appSrc.Application):
                 if self.params.finetune:
                 #{{{
                     fig, axes = plt.subplots(1,1)
-                    listPrunePercs = [0,5,10,25,50,75,80]
+                    listPrunePercs = [0,5,10,25,50,65,80]
                     
                     for i, logFile in enumerate(self.params.logFiles):
                         logDir = os.path.join(self.params.logDir, logFile)
@@ -71,12 +76,12 @@ class Application(appSrc.Application):
                             sys.exit()
                         
                         pruneEpoch = int(list(channelsPruned.keys())[0])
+                        numBatches = len(self.train_loader)
                         channelsPruned = list(channelsPruned.values())[0]
                         prunePerc = channelsPruned.pop('prunePerc')
-                        numBatches = len(self.train_loader)
 
                         self.params.pruningPerc = listPrunePercs[i]
-                        self.pruner = pruningSrc.ResNet20PruningDependency(self.params, self.model)
+                        self.pruner.params = self.params
 
                         # get unpruned gops
                         self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
@@ -129,7 +134,6 @@ class Application(appSrc.Application):
                     
                     axes.set_ylabel('Top1 Test Accuracy')
                     axes.set_xlabel('GOps')
-                    # axes.set_title('Cost of performing finetuning in GOps \n ({:.2f}% pruning, {:.2f}MB)'.format(prunePerc, totalUnprunedParams))
                     axes.set_title('Cost of performing finetuning in GOps')
                     axes.legend()
                     plt.show()
@@ -138,90 +142,43 @@ class Application(appSrc.Application):
                 else:
                 #{{{
                     channelsPruned, prunedModel, optimiser = self.pruner.prune_model(self.model)
-
                     self.trainGopCalc = gopSrc.GopCalculator(prunedModel, self.params.arch) 
                     self.trainGopCalc.register_hooks()
-                    
                     self.trainer.single_forward_backward(self.params, prunedModel, self.criterion, optimiser, self.train_loader)      
                     self.trainGopCalc.remove_hooks()
-
                     _, tfg, _, tbg = self.trainGopCalc.get_gops()
                     
+                    self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
+                    self.trainGopCalc.register_hooks()
+                    self.trainer.single_forward_backward(self.params, self.model, self.criterion, self.optimiser, self.train_loader)      
+                    self.trainGopCalc.remove_hooks()
+                    _, utfg, _, utbg = self.trainGopCalc.get_gops()
+
+                    
+                    print('Unpruned Performance ==============')
                     loss, top1, top5 = self.run_inference()
+                    print('Total Unpruned Forward GOps = {}'.format(utfg))
+                    print('Total Unpruned Backward GOps = {}'.format(utbg))
+                    print('Total Unpruned GOps = {}'.format(utfg + utbg))
+
+                    print('Prune Performance (without finetuning) ============')
+                    self.inferer.test_network(self.params, self.test_loader, prunedModel, self.criterion, optimiser)
                     print('Pruned Percentage = {}'.format(self.pruner.prune_rate(self.model, True)))
-                    print('Total Forward GOps = {}'.format(tfg))
-                    print('Total Backward GOps = {}'.format(tbg))
-                    print('Total GOps = {}'.format(tfg + tbg))
+                    print('Total Pruned Forward GOps = {}'.format(tfg))
+                    print('Total Pruned Backward GOps = {}'.format(tbg))
+                    print('Total Pruned GOps = {}'.format(tfg + tbg))
                 #}}} 
             #}}}
             
-            elif 'googlenet' in self.params.arch:
-            #{{{
-                # register hooks
-                self.gopCalculator = gopSrc.GoogleNetGopCalculator(self.model, self.params)
-                self.gopCalculator.register_hooks()
-                self.run_gop_calc()
-                print('Unpruned Gops = ', self.gopCalculator.baseTotalGops)
-                print('Pruned Gops = ', self.gopCalculator.prunedTotalGops)
-            #}}} 
-
             else:
                 raise ValueError('Gop calculation not implemented for specified architecture')
         #}}}
 
-        elif self.params.plotChannels:
+        elif self.params.plotChannels != []:
         #{{{
             if self.params.pruneFilters:
-                for i, logFile in enumerate(self.params.logFiles):
-                    logDir = os.path.join(self.params.logDir, logFile)
-                    try:
-                        with open(os.path.join(logDir, 'pruned_channels.json'), 'r') as cpFile:
-                            channelsPruned = json.load(cpFile)
-                    except FileNotFoundError:
-                        print("File : {} does not exist.".format(os.path.join(logDir, 'pruned_channels.json')))
-                        print("Either the log directory is wrong or run finetuning without GetGops to generate file before running this command.")
-                        sys.exit()
-                        
-                    pruneEpoch = int(list(channelsPruned.keys())[0])
-                    channelsPruned = list(channelsPruned.values())[0]
-                    prunePerc = channelsPruned.pop('prunePerc')
-                    allChannelsByLayer = {l:np.zeros(m.out_channels,dtype=int) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d)}
-
-                    if prunePerc == 0.:
-                        continue
-                    
-                    for j,(l,c) in enumerate(allChannelsByLayer.items()):
-                        c[channelsPruned[l]] = 1                              
-
-                    layerNames = ['.'.join(x.split('.')[1:]) for x in list(allChannelsByLayer.keys())]
-                    numChannelsPerLayer = [len(v) for v in allChannelsByLayer.values()]
-
-                    fig, ax = plt.subplots()
-                    bar = ax.barh(layerNames, numChannelsPerLayer)
-    
-                    ax = bar[0].axes
-                    lim = ax.get_xlim() + ax.get_ylim()
-                    
-                    for i, bar in enumerate(bar):
-                        layer = 'module.' + layerNames[i]
-                        grad = np.array(allChannelsByLayer[layer])
-                        grad = np.expand_dims(grad, 1).T
-                        bar.set_zorder(1)
-                        bar.set_facecolor("none")
-                        x,y = bar.get_xy()
-                        w,h = bar.get_width(), bar.get_height()
-                        ax.imshow(grad, extent=[x,x+w,y,y+h], aspect="auto", zorder=0)
-                    
-                    ax.axis(lim)
-                    ax.set_title('Channels Pruned By Layer for {:.2f}% pruning\n[{}]'.format(prunePerc, self.params.subsetName))
-                    
-                    plt.tight_layout()
-                    folder = '/home/ar4414/remote_copy/channels/{}'.format(self.params.subsetName)
-                    fig = os.path.join(folder, 'p_{}.png'.format(int(prunePerc)))
-                    cmd = 'mkdir -p {}'.format(folder)
-                    subprocess.check_call(cmd, shell=True)
-                    print('Saving - {}'.format(fig))
-                    plt.savefig(fig, format='png') 
+                plotter = ChannelPlotter(self.params, self.model)
+                plotter.plot_channels()
         #}}}
 
         elif self.params.entropy == True:

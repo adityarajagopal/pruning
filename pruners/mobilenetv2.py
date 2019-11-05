@@ -10,7 +10,7 @@ import subprocess
 import importlib
 import math
 
-from src.ar4414.pruning.prune import BasicPruning
+from src.ar4414.pruning.pruners.base import BasicPruning
 
 import torch
 import torch.nn as nn
