@@ -81,7 +81,13 @@ class Application(appSrc.Application):
                         prunePerc = channelsPruned.pop('prunePerc')
 
                         self.params.pruningPerc = listPrunePercs[i]
-                        self.pruner.params = self.params
+                        newImportPath = self.pruner.importPath.split('.')
+                        newFileName = newImportPath[-1].split('_')
+                        newFileName[-1] = str(listPrunePercs[i])
+                        newFileName = '_'.join(newFileName)
+                        newImportPath[-1] = newFileName
+                        newImportPath = '.'.join(newImportPath)
+                        self.pruner.importPath = newImportPath
 
                         # get unpruned gops
                         self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
@@ -134,32 +140,31 @@ class Application(appSrc.Application):
                     
                     axes.set_ylabel('Top1 Test Accuracy')
                     axes.set_xlabel('GOps')
-                    axes.set_title('Cost of performing finetuning in GOps')
+                    axes.set_title('Cost of performing finetuning in GOps [{}]'.format(self.params.subsetName))
                     axes.legend()
                     plt.show()
                 #}}}
                 
                 else:
                 #{{{
-                    channelsPruned, prunedModel, optimiser = self.pruner.prune_model(self.model)
-                    self.trainGopCalc = gopSrc.GopCalculator(prunedModel, self.params.arch) 
-                    self.trainGopCalc.register_hooks()
-                    self.trainer.single_forward_backward(self.params, prunedModel, self.criterion, optimiser, self.train_loader)      
-                    self.trainGopCalc.remove_hooks()
-                    _, tfg, _, tbg = self.trainGopCalc.get_gops()
-                    
                     self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
                     self.trainGopCalc.register_hooks()
                     self.trainer.single_forward_backward(self.params, self.model, self.criterion, self.optimiser, self.train_loader)      
                     self.trainGopCalc.remove_hooks()
                     _, utfg, _, utbg = self.trainGopCalc.get_gops()
-
                     
                     print('Unpruned Performance ==============')
                     loss, top1, top5 = self.run_inference()
                     print('Total Unpruned Forward GOps = {}'.format(utfg))
                     print('Total Unpruned Backward GOps = {}'.format(utbg))
                     print('Total Unpruned GOps = {}'.format(utfg + utbg))
+                    
+                    channelsPruned, prunedModel, optimiser = self.pruner.prune_model(self.model)
+                    self.trainGopCalc = gopSrc.GopCalculator(prunedModel, self.params.arch) 
+                    self.trainGopCalc.register_hooks()
+                    self.trainer.single_forward_backward(self.params, prunedModel, self.criterion, optimiser, self.train_loader)      
+                    self.trainGopCalc.remove_hooks()
+                    _, tfg, _, tbg = self.trainGopCalc.get_gops()
 
                     print('Prune Performance (without finetuning) ============')
                     self.inferer.test_network(self.params, self.test_loader, prunedModel, self.criterion, optimiser)

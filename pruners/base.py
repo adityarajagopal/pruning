@@ -111,12 +111,12 @@ class BasicPruning(ABC):
         #{{{
         if params.printOnly == True:
             return 
-
+        
         jsonName = os.path.join(rootFolder, 'pruned_channels.json')
         channelsPruned['prunePerc'] = totalPrunedPerc
         summary = {}
         summary[str(params.curr_epoch)] = channelsPruned
-        
+
         with open(jsonName, 'w') as sumFile:
             json.dump(summary, sumFile)
         
@@ -143,9 +143,12 @@ class BasicPruning(ABC):
                 # perform pruning by writing out pruned network
                 self.gpu = 'cuda:{}'.format(self.gpu_list[0])
                 self.write_net()
+                
                 prunedModel = self.import_pruned_model()
+                
                 prunedModel = self.transfer_weights(model, prunedModel)
                 optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
+        
 
                 return channelsPruned, prunedModel, optimiser
             

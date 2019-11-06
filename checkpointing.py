@@ -18,6 +18,37 @@ class Checkpointer(cpSrc.Checkpointer) :
                        params.train_top1.item(), params.train_top5.item(), params.test_loss, \
                        params.test_top1, params.test_top5, params.val_loss, \
                        params.val_top1, params.val_top5]
+    
+    def save_checkpoint(self, model_dict, optimiser_dict, params) : 
+    #{{{
+        if params.printOnly == True:
+            return
+
+        # create directory if not done already, this way empty directory is never created
+        if self.created_dir == False : 
+            self.__create_dir(self.root)
+            self.__create_log(self.root)
+        
+        # copy config file into root dir
+        cmd = 'cp ' + self.configFile + ' ' + self.root
+        subprocess.check_call(cmd, shell=True)         
+
+        # write to log file
+        self.setup_values(params)
+        line = [str(x) for x in self.values]
+        line = ',\t'.join(line)
+        line += '\n'
+        with open(self.logfile, 'a') as f :
+            f.write(line)
+
+        # store best model separately 
+        if params.test_top1 >= params.bestValidLoss:
+            params.bestValidLoss = params.test_top1
+            bestModelPath = os.path.join(self.root, 'best-model' + '.pth.tar')
+            bestStatePath = os.path.join(self.root, 'best-state' + '.pth.tar')
+            torch.save(model_dict, bestModelPath) 
+            torch.save(params.get_state(), bestStatePath)
+        #}}}
 
     def restore_state(self, params): 
     #{{{

@@ -70,7 +70,7 @@ class SqueezeNetPruning(BasicPruning):
 
             currentPruneRate += incPrunePerc
             listIdx += 1
-        
+            
         return self.channelsToPrune
     #}}}
 
@@ -197,7 +197,7 @@ class SqueezeNetPruning(BasicPruning):
                 pParam = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.weight'
                 pParamB = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.bias'
 
-                opChannelsToPrune = self.channelsToPrune[layer]
+                opChannelsToPrune = self.channelsToPrune[layer].copy()
 
                 allIpChannels = list(range(parentModel[param].shape[1]))
                 allOpChannels = list(range(parentModel[param].shape[0]))
@@ -210,7 +210,7 @@ class SqueezeNetPruning(BasicPruning):
                 
                 if 'fire' in k:
                     if 'conv2' in k:
-                        fireIpChannelsPruned = opChannelsToPrune
+                        fireIpChannelsPruned = opChannelsToPrune.copy()
                         offset = len(allOpChannels)
                     elif 'conv3' in k:
                         fireIpChannelsPruned += [x + offset for x in opChannelsToPrune]
