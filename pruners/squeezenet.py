@@ -18,41 +18,88 @@ import torch.nn as nn
 class SqueezeNetPruning(BasicPruning):
 #{{{
     def __init__(self, params, model):
+    #{{{
         self.fileName = 'squeezenet_{}.py'.format(int(params.pruningPerc))
         self.netName = 'SqueezeNet'
         layerSkip = lambda lName : True if 'conv2' in lName and 'fire' not in lName else False
+
+        # selects only convs and fc layers  
+        self.convs_and_fcs = lambda lName : True if ('conv' in lName and 'weight' in lName) else False
+
         super().__init__(params, model, layerSkip)
+    #}}}
     
-    def structured_l2_weight(self, model):
+    def get_layer_params(self):
+    #{{{
+        for p in self.model.named_parameters():
+            paramsInLayer = 1
+            for dim in p[1].size():
+                paramsInLayer *= dim
+            self.totalParams += paramsInLayer
+            
+            if self.convs_and_fcs(p[0]):
+                self.layerSizes[p[0]] = p[1].size()
+        
+        # construct layers in order to have the fire.conv1 as next layer after both fire.conv2 and fire.conv3
+        # since concatenation occurs 
+        self.layersInOrder = list(self.layerSizes.keys())
+        newOrder = {}
+        for i,l in enumerate(self.layersInOrder):
+            if 'fire' not in l:
+                if 'conv1' in l:
+                    newOrder[l] = [self.layersInOrder[i+1]]
+            elif 'fire' in l:
+                if 'conv1' in l:
+                    newOrder[l] = [self.layersInOrder[i+1], self.layersInOrder[i+2]]
+                elif 'conv2' in l:
+                    newOrder[l] = [self.layersInOrder[i+2]]
+                elif 'conv3' in l:
+                    newOrder[l] = [self.layersInOrder[i+1]]
+        
+        self.layersInOrder = newOrder
+    #}}}
+    
+    def structured_l1_weight(self, model):
     #{{{
         localRanking = {}        
         globalRanking = []
         namedParams = dict(model.named_parameters())
-        for layerName, mask in self.masks.items():
-            pNp = namedParams[layerName + '.weight'].data.cpu().numpy()
-            
-            # calculate metric
-            
-            # l2-norm
-            # metric = np.square(pNp).reshape(pNp.shape[0], -1).sum(axis=1)
-            # metric /= (pNp.shape[1]*pNp.shape[2]*pNp.shape[3])
-            # metric /= np.sqrt(np.square(metric).sum())
-
-            #l1-norm
-            metric = np.absolute(pNp).reshape(pNp.shape[0], -1).sum(axis=1)
-            metric /= (pNp.shape[1]*pNp.shape[2]*pNp.shape[3])
-
-            # calculte incremental prune percentage of pruning filter
-            incPrunePerc = 100.*(pNp.shape[1]*pNp.shape[2]*pNp.shape[3]) / self.totalParams
-            
-            # store calculated values to be sorted by l2 norm mag and used later
-            globalRanking += [(layerName, i, x, incPrunePerc) for i,x in enumerate(metric) if not np.all((mask[0][i] == 0.).data.cpu().numpy())]
-            localRanking[layerName] = sorted([(i, x, incPrunePerc) for i,x in enumerate(metric) if not np.all((mask[0][i] == 0.).data.cpu().numpy())], key=lambda tup:tup[1])
         
-        globalRanking = sorted(globalRanking, key=lambda tup:tup[2])
+        for p in model.named_parameters():
+        #{{{
+            if 'conv' in p[0] and 'weight' in p[0]:
+                layerName = '.'.join(p[0].split('.')[:-1])
+                if self.layerSkip(layerName):
+                    continue
+            
+                pNp = p[1].data.cpu().numpy()
+            
+                # calculate metric
+                #l1-norm
+                metric = np.absolute(pNp).reshape(pNp.shape[0], -1).sum(axis=1)
+                metric /= (pNp.shape[1]*pNp.shape[2]*pNp.shape[3])
 
+                # calculate incremental prune percentage
+                nextLayerName = self.layersInOrder[p[0]]
+                nextLayerSize = [self.layerSizes[n] for n in nextLayerName]
+                paramsPruned = pNp.shape[1]*pNp.shape[2]*pNp.shape[3]
+                # check if FC layer
+                if nextLayerName == ['module.conv2.weight']: 
+                    paramsPruned += nextLayerSize[0][0]
+                else:
+                    for nLS in nextLayerSize:
+                        paramsPruned += nLS[0]*nLS[2]*nLS[3] 
+                incPrunePerc = 100.* paramsPruned / self.totalParams
+                
+                globalRanking += [(layerName, i, x, incPrunePerc) for i,x in enumerate(metric)]
+                localRanking[layerName] = sorted([(i, x, incPrunePerc) for i,x in enumerate(metric)], key=lambda tup:tup[1])
+        #}}}
+
+        globalRanking = sorted(globalRanking, key=lambda tup:tup[2])
         self.channelsToPrune = {l:[] for l,m in model.named_modules() if isinstance(m, nn.Conv2d)}
 
+        # remove filters
+        #{{{
         currentPruneRate = 0
         listIdx = 0
         while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(globalRanking)):
@@ -62,14 +109,12 @@ class SqueezeNetPruning(BasicPruning):
                 listIdx += 1
                 continue
             
-            # localRanking[layerName].pop(localRanking[layerName].index((filterNum, metric, incPrunePerc)))
             localRanking[layerName].pop(0)
-            for x in self.masks[layerName]:
-                x[filterNum] = 0.
             self.channelsToPrune[layerName].append(filterNum)
 
             currentPruneRate += incPrunePerc
             listIdx += 1
+        #}}}
             
         return self.channelsToPrune
     #}}}

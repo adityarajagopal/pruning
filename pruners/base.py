@@ -70,32 +70,15 @@ class BasicPruning(ABC):
         self.model = model
         
         self.metricValues = []
-        self.totalParams = 0
-        self.paramsPerLayer = []
         self.channelsToPrune = {}
-                
         self.gpu_list = [int(x) for x in self.params.gpu_id.split(',')]
-
-        self.masks = {}
-        for p in model.named_parameters():
-            paramsInLayer = 1
-            for dim in p[1].size():
-                paramsInLayer *= dim
-            self.paramsPerLayer.append(paramsInLayer)
-            self.totalParams += paramsInLayer
-
-            device = 'cuda:' + str(self.params.gpuList[0])
-            if 'conv' in p[0]:
-                layerName = '.'.join(p[0].split('.')[:-1])
-                
-                if layerSkip(layerName):
-                    continue
-
-                if layerName not in self.masks.keys():
-                    self.masks[layerName] = [torch.tensor((), dtype=torch.float32).new_ones(p[1].size()).cuda(device)]
-                else:
-                    self.masks[layerName].append(torch.tensor((), dtype=torch.float32).new_ones(p[1].size()).cuda(device))
         
+        self.layerSkip = layerSkip
+
+        self.totalParams = 0
+        self.layerSizes = {}
+        self.get_layer_params()
+
         # create model directory and file
         dirName = 'models/pruned/{}/{}'.format(params.dataset, params.subsetName)
         self.filePath = os.path.join(dirName, self.fileName)
@@ -106,7 +89,7 @@ class BasicPruning(ABC):
         
         self.importPath = 'src.ar4414.pruning.{}.{}'.format('.'.join(dirName.split('/')), self.fileName.split('.')[0])
         #}}} 
-    
+
     def log_pruned_channels(self, rootFolder, params, totalPrunedPerc, channelsPruned): 
         #{{{
         if params.printOnly == True:
@@ -135,10 +118,10 @@ class BasicPruning(ABC):
     def prune_model(self, model):
         #{{{
         if self.params.pruneFilters == True: 
-            # pruning based on l2 norm of weights
+            # pruning based on l1 norm of weights
             if self.params.pruningMetric == 'weights':
                 tqdm.write("Pruning filters - Weights")
-                channelsPruned = self.structured_l2_weight(model)
+                channelsPruned = self.structured_l1_weight(model)
 
                 # perform pruning by writing out pruned network
                 self.gpu = 'cuda:{}'.format(self.gpu_list[0])
@@ -148,7 +131,6 @@ class BasicPruning(ABC):
                 
                 prunedModel = self.transfer_weights(model, prunedModel)
                 optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
-        
 
                 return channelsPruned, prunedModel, optimiser
             
@@ -162,71 +144,35 @@ class BasicPruning(ABC):
         minIdx = np.argmin(array[np.nonzero(array)]) 
         return (minIdx, array[minIdx])     
     
-    def prune_rate(self, model, verbose=False):
+    def prune_rate(self, pModel):
     #{{{
-        totalPrunedParams = 0
-        totalPrunedParams1 = 0
-        prunedParamsPerLayer = {}
-
-        if self.masks == {}:
-            return 0.
-        for layer, mask in self.masks.items():
-            for x in mask:
-                if layer not in prunedParamsPerLayer.keys():
-                    prunedParamsPerLayer[layer] = np.count_nonzero((x == 0).data.cpu().numpy())
-                else:
-                    prunedParamsPerLayer[layer] += np.count_nonzero((x == 0).data.cpu().numpy())
-            totalPrunedParams += prunedParamsPerLayer[layer]
+        prunedParams = 0
+        for p in pModel.named_parameters():
+            params = 1
+            for dim in p[1].size():
+                params *= dim 
+            prunedParams += params
         
-        return 100.*(totalPrunedParams/self.totalParams) 
+        return 100.*((self.totalParams - prunedParams) / self.totalParams), (prunedParams * 4) / 1e6, (self.totalParams * 4)/1e6
     #}}}        
 
-    def structured_l2_weight(self, model):
+    def get_layer_params(self):
     #{{{
-        self.metricValues = []
+        for p in self.model.named_parameters():
+            paramsInLayer = 1
+            for dim in p[1].size():
+                paramsInLayer *= dim
+            self.totalParams += paramsInLayer
+            
+            if self.convs_and_fcs(p[0]):
+                self.layerSizes[p[0]] = p[1].size()
         
-        namedParams = dict(model.named_parameters())
-        for layerName, mask in self.masks.items():
-            pNp = namedParams[layerName + '.weight'].data.cpu().numpy()
-            
-            # calculate metric
-            
-            # l2-norm
-            # metric = np.square(pNp).reshape(pNp.shape[0], -1).sum(axis=1)
-            # metric /= (pNp.shape[1]*pNp.shape[2]*pNp.shape[3])
-            # metric /= np.sqrt(np.square(metric).sum())
-
-            #l1-norm
-            metric = np.absolute(pNp).reshape(pNp.shape[0], -1).sum(axis=1)
-            metric /= (pNp.shape[1]*pNp.shape[2]*pNp.shape[3])
-
-            # calculte incremental prune percentage of pruning filter
-            incPrunePerc = 100.*(pNp.shape[1]*pNp.shape[2]*pNp.shape[3]) / self.totalParams
-            
-            # store calculated values to be sorted by l2 norm mag and used later
-            values = [(layerName, i, x, incPrunePerc) for i,x in enumerate(metric) if not np.all((mask[0][i] == 0.).data.cpu().numpy())]
-            self.metricValues += values
-        
-        self.metricValues = sorted(self.metricValues, key=lambda tup: tup[2])
-
-        self.channelsToPrune = {l:[] for l,m in model.named_modules() if isinstance(m, nn.Conv2d)}
-
-        currentPruneRate = 0
-        listIdx = 0
-        while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(self.metricValues)):
-            filterToPrune = self.metricValues[listIdx]
-            layerName = filterToPrune[0]
-            filterNum = filterToPrune[1]
-            
-            for x in self.masks[layerName]:
-                x[filterNum] = 0.
-            self.channelsToPrune[layerName].append(filterNum)
-
-            currentPruneRate += filterToPrune[3]
-            listIdx += 1
-        
-        return self.channelsToPrune
+        self.layersInOrder = list(self.layerSizes.keys())
     #}}}
+    
+    @abstractmethod
+    def structured_l1_weight(self, model):
+        pass
 
     @abstractmethod
     def write_net(self, subsetName=None):

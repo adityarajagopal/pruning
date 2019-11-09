@@ -7,12 +7,12 @@ class AlexNet(nn.Module):
 		super().__init__()
 
 		self.conv1 = nn.Conv2d(3, 64, kernel_size=(11, 11), stride=(4, 4), padding=(5, 5))
-		self.conv2 = nn.Conv2d(64, 184, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2))
-		self.conv3 = nn.Conv2d(184, 245, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-		self.conv4 = nn.Conv2d(245, 146, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-		self.conv5 = nn.Conv2d(146, 249, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+		self.conv2 = nn.Conv2d(64, 183, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2))
+		self.conv3 = nn.Conv2d(183, 221, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+		self.conv4 = nn.Conv2d(221, 121, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+		self.conv5 = nn.Conv2d(121, 248, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
 		self.maxpool2d = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-		self.classifier = nn.Linear(in_features=249, out_features=100, bias=True)
+		self.classifier = nn.Linear(in_features=248, out_features=100, bias=True)
 
 	def forward(self, x):
 		x = F.relu(self.conv1(x))

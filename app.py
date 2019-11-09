@@ -168,7 +168,8 @@ class Application(appSrc.Application):
 
                     print('Prune Performance (without finetuning) ============')
                     self.inferer.test_network(self.params, self.test_loader, prunedModel, self.criterion, optimiser)
-                    print('Pruned Percentage = {}'.format(self.pruner.prune_rate(self.model, True)))
+                    pruneRate, _, _ = self.pruner.prune_rate(prunedModel)
+                    print('Pruned Percentage = {:.2f}%'.format(pruneRate))
                     print('Total Pruned Forward GOps = {}'.format(tfg))
                     print('Total Pruned Backward GOps = {}'.format(tbg))
                     print('Total Pruned GOps = {}'.format(tfg + tbg))
@@ -282,39 +283,11 @@ class Application(appSrc.Application):
             
             else:
             #{{{
-                #{{{
-                # if self.params.plotChannels:
-                #     # channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d)}
-                #     channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d) if l in ['module.conv3', 'module.conv4', 'module.conv5']}
-                #     fig,ax = plt.subplots(len(prunePercs), len(channels.keys()), sharex=True, sharey=True)
-                #     fig.add_subplot(111, frameon=False)
-                #}}}
-                
                 channelsPruned, prunedModel, optimiser = self.pruner.prune_model(self.model)
-                print('Pruned Percentage = {}'.format(self.pruner.prune_rate(self.model, True)))
+                pruneRate, prunedSize, origSize = self.pruner.prune_rate(prunedModel)
+                print('Pruned Percentage = {:.2f}%, NewModelSize = {:.2f}MB, OrigModelSize = {:.2f}MB'.format(pruneRate, prunedSize, origSize))
                 self.inferer.test_network(self.params, self.test_loader, prunedModel, self.criterion, optimiser)
                 print('==========================')
-                    
-                #{{{
-                #     if self.params.plotChannels:
-                #         for j,(l,x) in enumerate(channels.items()):
-                #             y = [0 for t in x]                             
-                #             for t in channelsPruned[l]:
-                #                 y[t] = 1
-                #             ax[i][j].bar(x,y)
-                #             ax[i][j].get_yaxis().set_ticks([])
-                #             
-                #             if i == len(channels.keys()) - 1:
-                #                 ax[i][j].set_xlabel('Layer-{}'.format(l.split('.')[1]))
-                #         
-                #         ax[i][0].set_ylabel('Pruned  = {}% \n Top1 = {:.2f}%'.format(pp, top1))
-                #     
-                # if self.params.plotChannels:
-                #     plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
-                #     plt.xlabel('\nChannel Number')
-                #     plt.title('Channels taken when pruning based on weight l2-norm')
-                #     plt.show()
-                #}}}
             #}}}
         #}}}
         

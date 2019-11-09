@@ -438,41 +438,58 @@ class ResNet20PruningConcat(BasicPruning):
 class ResNet20PruningDependency(BasicPruning):
 #{{{
     def __init__(self, params, model):  
+    #{{{
         self.fileName = 'resnet{}_{}.py'.format(int(params.depth), int(params.pruningPerc))
         self.netName = 'ResNet{}'.format(int(params.depth))
+        
+        # selects only convs and fc layers  
+        self.convs_and_fcs = lambda lName : True if ('conv' in lName or 'fc' in lName) and ('weight' in lName) else False
+        
         super().__init__(params, model)
+    #}}}
 
-    def structured_l2_weight(self, model):
+    def structured_l1_weight(self, model):
     #{{{
         localRanking = {} 
         globalRanking = []
         namedParams = dict(model.named_parameters())
-        for layerName, mask in self.masks.items():
-            pNp = namedParams[layerName + '.weight'].data.cpu().numpy()
-            
-            # calculate metric
-            
-            # l2-norm
-            # metric = np.square(pNp).reshape(pNp.shape[0], -1).sum(axis=1)
-            # metric /= (pNp.shape[1]*pNp.shape[2]*pNp.shape[3])
-            # metric /= np.sqrt(np.square(metric).sum())
 
-            #l1-norm
-            metric = np.absolute(pNp).reshape(pNp.shape[0], -1).sum(axis=1)
-            metric /= (pNp.shape[1]*pNp.shape[2]*pNp.shape[3])
-
-            # calculte incremental prune percentage of pruning filter
-            incPrunePerc = 100.*(pNp.shape[1]*pNp.shape[2]*pNp.shape[3]) / self.totalParams
+        # create global ranking
+        for p in model.named_parameters():
+        #{{{
+            if 'conv' in p[0]:
+                layerName = '.'.join(p[0].split('.')[:-1])
+                if self.layerSkip(layerName):
+                    continue
             
-            # store calculated values to be sorted by l1 norm mag and used later
-            globalRanking += [(layerName, i, x, incPrunePerc) for i,x in enumerate(metric) if not np.all((mask[0][i] == 0.).data.cpu().numpy())]
-            localRanking[layerName] = sorted([(i, x, incPrunePerc) for i,x in enumerate(metric) if not np.all((mask[0][i] == 0.).data.cpu().numpy())], key=lambda tup:tup[1])
-        
+                pNp = p[1].data.cpu().numpy()
+            
+                # calculate metric
+                #l1-norm
+                metric = np.absolute(pNp).reshape(pNp.shape[0], -1).sum(axis=1)
+                metric /= (pNp.shape[1]*pNp.shape[2]*pNp.shape[3])
+
+                # calculate incremental prune percentage
+                nextLayerName = self.layersInOrder[self.layersInOrder.index(p[0]) + 1]
+                nextLayerSize = self.layerSizes[nextLayerName]
+                paramsPruned = (pNp.shape[1]*pNp.shape[2]*pNp.shape[3]) 
+                # check if FC layer
+                if len(nextLayerSize) == 2: 
+                    paramsPruned += nextLayerSize[0]
+                else:
+                    paramsPruned += (nextLayerSize[0]*nextLayerSize[2]*nextLayerSize[3]) 
+                incPrunePerc = 100.* paramsPruned / self.totalParams
+                
+                globalRanking += [(layerName, i, x, incPrunePerc) for i,x in enumerate(metric)]
+                localRanking[layerName] = sorted([(i, x, incPrunePerc) for i,x in enumerate(metric)], key=lambda tup:tup[1])
+        #}}}
+                
         globalRanking = sorted(globalRanking, key=lambda i: i[2]) 
 
         self.channelsToPrune = {l:[] for l,m in model.named_modules() if isinstance(m, nn.Conv2d)}
 
         # build dependency list 
+        #{{{
         depLayerNames = [list(localRanking.keys())[0]]
         depLayerNames += [x for x in list(localRanking.keys()) if 'layer' in x and 'conv2' in x]
         groupSizes = list(len(localRanking[k]) for k in depLayerNames)
@@ -493,18 +510,17 @@ class ResNet20PruningDependency(BasicPruning):
                 groupLimits.append(minFilters[i])
                 groupIdx += 1
             prevGs = currGs
+        #}}} 
         
-        currentPruneRate = 0
-        listIdx = 0
-
+        # remove filters
+        #{{{
         def remove_filter(layerName, filterNum):
             if filterNum in self.channelsToPrune[layerName]:
                 return
-
-            for x in self.masks[layerName]:
-                x[filterNum] = 0.
             self.channelsToPrune[layerName].append(filterNum)
         
+        currentPruneRate = 0
+        listIdx = 0
         while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(globalRanking)):
             layerName, filterNum, _, incPrunePerc = globalRanking[listIdx]
 
@@ -532,10 +548,11 @@ class ResNet20PruningDependency(BasicPruning):
                     currentPruneRate += filt[2]
                 
             listIdx += 1
+        #}}}
         
         return self.channelsToPrune
     #}}}
-    
+        
     def write_net(self):
     #{{{
         def fprint(text):
@@ -614,7 +631,6 @@ class ResNet20PruningDependency(BasicPruning):
                     toEdit = self.orderedKeys[self.orderedKeys.index(k + '.bn2') + 2]
                     lineToEdit = linesToWrite[toEdit]
                     modName, module = lineToEdit.split('=',1)
-                    print(modName)
                     module = eval(module)
                     module.in_channels = v[0]
                     linesToWrite[toEdit] = '\t\t{} = nn.{}'.format(modName.strip(), str(module))
