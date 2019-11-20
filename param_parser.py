@@ -10,6 +10,9 @@ class Params(ppSrc.Params) :
     def __init__(self, config_file) : 
         super().__init__(config_file)
         
+        self.plotType = config_file.get('pruning_hyperparameters', 'plot_type', fallback='joint')
+        assert (self.plotType == 'number' or self.plotType == 'hamming' or self.plotType == 'joint'), 'Plot Type must be number, hamming or joint - provided {}'.format(self.plotType)
+        
         self.plotChannels = config_file.get('pruning_hyperparameters', 'plot_channels', fallback='').split()
         self.getGops = config_file.getboolean('pruning_hyperparameters', 'get_gops')
         self.subsetName = config_file.get('pruning_hyperparameters', 'sub_name', fallback='subset1')

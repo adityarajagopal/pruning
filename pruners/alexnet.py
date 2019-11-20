@@ -27,7 +27,7 @@ class AlexNetPruning(BasicPruning):
         
         super().__init__(params, model)
     #}}} 
-    
+
     def structured_l1_weight(self, model):
     #{{{
         localRanking = {} 
@@ -49,19 +49,8 @@ class AlexNetPruning(BasicPruning):
                 metric = np.absolute(pNp).reshape(pNp.shape[0], -1).sum(axis=1)
                 metric /= (pNp.shape[1]*pNp.shape[2]*pNp.shape[3])
 
-                # calculate incremental prune percentage
-                nextLayerName = self.layersInOrder[self.layersInOrder.index(p[0]) + 1]
-                nextLayerSize = self.layerSizes[nextLayerName]
-                paramsPruned = pNp.shape[1]*pNp.shape[2]*pNp.shape[3]
-                # check if FC layer
-                if len(nextLayerSize) == 2: 
-                    paramsPruned += nextLayerSize[0]
-                else:
-                    paramsPruned += (nextLayerSize[0]*nextLayerSize[2]*nextLayerSize[3])
-                incPrunePerc = 100.* paramsPruned / self.totalParams
-                
-                globalRanking += [(layerName, i, x, incPrunePerc) for i,x in enumerate(metric)]
-                localRanking[layerName] = sorted([(i, x, incPrunePerc) for i,x in enumerate(metric)], key=lambda tup:tup[1])
+                globalRanking += [(layerName, i, x) for i,x in enumerate(metric)]
+                localRanking[layerName] = sorted([(i, x) for i,x in enumerate(metric)], key=lambda tup:tup[1])
         #}}}
                 
         globalRanking = sorted(globalRanking, key=lambda i: i[2]) 
@@ -72,13 +61,15 @@ class AlexNetPruning(BasicPruning):
         currentPruneRate = 0
         listIdx = 0
         while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(globalRanking)):
-            layerName, filterNum, _, incPrunePerc = globalRanking[listIdx]
+            layerName, filterNum, _  = globalRanking[listIdx]
             
             if len(localRanking[layerName]) <= 2:
                 listIdx += 1
                 continue
             localRanking[layerName].pop(0)
-            
+
+            incPrunePerc = self.inc_prune_rate(layerName)
+
             self.channelsToPrune[layerName].append(filterNum)
             currentPruneRate += incPrunePerc
                 

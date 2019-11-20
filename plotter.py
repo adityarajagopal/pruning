@@ -14,17 +14,19 @@ class ChannelPlotter(object):
         self.params = params
         self.model = model
         
-        if 'resnet' in self.params.arch:
-            self.net = str(self.params.arch) + str(self.params.depth)
-        else:
-            self.net = str(self.params.arch)
+        # if 'resnet' in self.params.arch:
+        #     self.net = str(self.params.arch) + str(self.params.depth)
+        # else:
+        #     self.net = str(self.params.arch)
+        self.net = str(self.params.arch)
         
         self.subsets = ['entire_dataset', 'subset1', 'aquatic']
         
-        if 'mobilenet' in self.net:
-            self.logDir = '/mnt/users/ar4414/pruning_logs/' + self.net +'/cifar100/{}/l1_prune'
-        else:
-            self.logDir = '/home/ar4414/pytorch_training/src/ar4414/pruning/logs/' + self.net +'/cifar100/{}/l1_prune'
+        # if 'mobilenet' in self.net:
+        #     self.logDir = '/mnt/users/ar4414/pruning_logs/' + self.net +'/cifar100/{}/l1_prune'
+        # else:
+        #     self.logDir = '/home/ar4414/pytorch_training/src/ar4414/pruning/logs/' + self.net +'/cifar100/{}/l1_prune'
+        self.logDir = '/home/ar4414/pytorch_training/src/ar4414/pruning/logs/' + self.net +'/cifar100/{}/l1_prune'
     #}}}
 
     def save_fig(self, plt, plotType=''):
@@ -72,8 +74,21 @@ class ChannelPlotter(object):
             self.pivotDict[self.subsets[i%3]] = {'grad':allChannelsByLayer, 'pp':self.prunePerc}
             
             if (i+1)%3 == 0:
-                self.plot_hamming()
-                # self.plot_num_pruned()
+                if self.params.plotType == 'number':
+                    fig, ax = plt.subplots(figsize=(10,5))
+                    self.plot_num_pruned(ax)
+                
+                elif self.params.plotType == 'hamming':
+                    fig, ax = plt.subplots(figsize=(10,5))
+                    self.plot_hamming(ax)
+                
+                else:
+                    fig, axs = plt.subplots(2,1,figsize=(20,10))
+                    self.plot_num_pruned(axs[0])
+                    self.plot_hamming(axs[1])
+                
+                self.save_fig(plt, self.params.plotType)
+                
                 self.pivotDict = {}
     #}}}        
 
@@ -125,7 +140,7 @@ class ChannelPlotter(object):
         plt.savefig(fig, format='png') 
     #}}} 
 
-    def plot_hamming(self):
+    def plot_hamming(self, axes):
     #{{{
         channels = {}
 
@@ -142,8 +157,6 @@ class ChannelPlotter(object):
                 hamming[key] = {} if key not in list(hamming.keys()) else hamming[key]
                 hamming[key][layer] = distance.hamming(v[comb[0]], v[comb[1]])
         
-        fig, axes = plt.subplots()
-
         width = 0.3
         starts = [-width,0,width]
         for i,(k,v) in enumerate(hamming.items()):
@@ -157,12 +170,9 @@ class ChannelPlotter(object):
         axes.set_xticklabels(layers, rotation=45, ha='right')
         axes.set_ylabel('Hamming')
         axes.legend()
-        fig.tight_layout()
-
-        self.save_fig(plt, 'hamming')
     #}}}
     
-    def plot_num_pruned(self):
+    def plot_num_pruned(self, axes):
     #{{{
         channels = {}
 
@@ -177,8 +187,6 @@ class ChannelPlotter(object):
                 numPruned[key] = {} if key not in list(numPruned.keys()) else numPruned[key]
                 numPruned[key][layer] = np.count_nonzero(v[key]) 
         
-        fig, axes = plt.subplots()
-
         width = 0.3
         starts = [-width,0,width]
         for i,(k,v) in enumerate(numPruned.items()):
@@ -190,8 +198,6 @@ class ChannelPlotter(object):
         axes.set_title('Num channels pruned per layer for {:.2f}% pruning'.format(int(self.prunePerc)))
         axes.set_xticks(ind)
         axes.set_xticklabels(layers, rotation=45, ha='right')
-        axes.set_ylabel('Hamming')
+        axes.set_ylabel('Number of Channels Pruned')
         axes.legend()
-
-        self.save_fig(plt, 'num_pruned')
     #}}}

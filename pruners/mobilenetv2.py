@@ -210,6 +210,27 @@ class MobileNetV2PruningDependency(BasicPruning):
         super().__init__(params, model)
     #}}}
     
+    def inc_prune_rate(self, layerName):
+    #{{{
+        lParam = str(layerName) + '.weight'
+        self.layerSizes[lParam][0] -= 1 
+
+        nextLayerName = self.layersInOrder[self.layersInOrder.index(lParam) + 1]
+        nextLayerSize = self.layerSizes[nextLayerName]
+        currLayerSize = self.layerSizes[lParam]
+        paramsPruned = currLayerSize[1]*currLayerSize[2]*currLayerSize[3]
+        # check if FC layer
+        if len(nextLayerSize) == 2: 
+            paramsPruned += nextLayerSize[0]
+        elif ('layers' in nextLayerName) and ('conv2' in nextLayerName):
+            paramsPruned += nextLayerSize[2]*nextLayerSize[3]
+        else:
+            paramsPruned += nextLayerSize[0]*nextLayerSize[2]*nextLayerSize[3]
+            self.layerSizes[nextLayerName][1] -= 1
+        
+        return (100.* paramsPruned / self.totalParams)
+    #}}}
+    
     def structured_l1_weight(self, model):
     #{{{
         localRanking = {} 
@@ -230,22 +251,8 @@ class MobileNetV2PruningDependency(BasicPruning):
                 metric = np.absolute(pNp).reshape(pNp.shape[0], -1).sum(axis=1)
                 metric /= (pNp.shape[1]*pNp.shape[2]*pNp.shape[3])
 
-                # calculate incremental prune percentage
-                nextLayerName = self.layersInOrder[self.layersInOrder.index(p[0]) + 1]
-                nextLayerSize = self.layerSizes[nextLayerName]
-                paramsPruned = (pNp.shape[1]*pNp.shape[2]*pNp.shape[3]) 
-                # check if FC layer
-                if len(nextLayerSize) == 2: 
-                    paramsPruned += nextLayerSize[0]
-                # check if grouped conv
-                elif ('layers' in nextLayerName) and ('conv2' in nextLayerName):
-                    paramsPruned += nextLayerSize[2]*nextLayerSize[3]
-                else:
-                    paramsPruned += (nextLayerSize[0]*nextLayerSize[2]*nextLayerSize[3]) 
-                incPrunePerc = 100.* paramsPruned / self.totalParams
-                
-                globalRanking += [(layerName, i, x, incPrunePerc) for i,x in enumerate(metric)]
-                localRanking[layerName] = sorted([(i, x, incPrunePerc) for i,x in enumerate(metric)], key=lambda tup:tup[1])
+                globalRanking += [(layerName, i, x) for i,x in enumerate(metric)]
+                localRanking[layerName] = sorted([(i, x) for i,x in enumerate(metric)], key=lambda tup:tup[1])
         #}}}
         
         globalRanking = sorted(globalRanking, key=lambda i: i[2]) 
@@ -287,13 +294,16 @@ class MobileNetV2PruningDependency(BasicPruning):
         #{{{
         def remove_filter(layerName, filterNum):
             if filterNum in self.channelsToPrune[layerName]:
-                return
-            self.channelsToPrune[layerName].append(filterNum)
+                return 0 
+            filt = localRanking[layerName].pop(0)
+            toPrune = filt[0] if filterNum is None else filterNum
+            self.channelsToPrune[layerName].append(toPrune)
+            return self.inc_prune_rate(layerName)
         
         currentPruneRate = 0
         listIdx = 0
         while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(globalRanking)):
-            layerName, filterNum, _, incPrunePerc = globalRanking[listIdx]
+            layerName, filterNum, _ = globalRanking[listIdx]
 
             depLayers = []
             limit = 2
@@ -310,17 +320,13 @@ class MobileNetV2PruningDependency(BasicPruning):
                 if len(localRanking[layerName]) <= 2:
                     listIdx += 1
                     continue
-                localRanking[layerName].pop(0)
-                remove_filter(layerName, filterNum)
-                currentPruneRate += incPrunePerc
+                currentPruneRate += remove_filter(layerName, filterNum)
             else: 
                 for layerName in depLayers:
                     if len(localRanking[layerName]) <= limit:
                         listIdx += 1
                         continue
-                    filt = localRanking[layerName].pop(0)
-                    remove_filter(layerName, filt[0])
-                    currentPruneRate += filt[2]
+                    currentPruneRate += remove_filter(layerName, None)
                 
             listIdx += 1
         #}}}

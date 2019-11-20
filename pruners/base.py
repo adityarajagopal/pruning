@@ -144,6 +144,25 @@ class BasicPruning(ABC):
         minIdx = np.argmin(array[np.nonzero(array)]) 
         return (minIdx, array[minIdx])     
     
+    def inc_prune_rate(self, layerName):
+    #{{{
+        lParam = str(layerName) + '.weight'
+        self.layerSizes[lParam][0] -= 1 
+
+        nextLayerName = self.layersInOrder[self.layersInOrder.index(lParam) + 1]
+        nextLayerSize = self.layerSizes[nextLayerName]
+        currLayerSize = self.layerSizes[lParam]
+        paramsPruned = currLayerSize[1]*currLayerSize[2]*currLayerSize[3]
+        # check if FC layer
+        if len(nextLayerSize) == 2: 
+            paramsPruned += nextLayerSize[0]
+        else:
+            paramsPruned += nextLayerSize[0]*nextLayerSize[2]*nextLayerSize[3]
+            self.layerSizes[nextLayerName][1] -= 1
+        
+        return (100.* paramsPruned / self.totalParams)
+    #}}}
+    
     def prune_rate(self, pModel):
     #{{{
         prunedParams = 0
@@ -165,7 +184,7 @@ class BasicPruning(ABC):
             self.totalParams += paramsInLayer
             
             if self.convs_and_fcs(p[0]):
-                self.layerSizes[p[0]] = p[1].size()
+                self.layerSizes[p[0]] = list(p[1].size())
         
         self.layersInOrder = list(self.layerSizes.keys())
     #}}}

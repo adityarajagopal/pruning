@@ -29,6 +29,27 @@ class SqueezeNetPruning(BasicPruning):
         super().__init__(params, model, layerSkip)
     #}}}
     
+    def inc_prune_rate(self, layerName):
+    #{{{
+        lParam = str(layerName) + '.weight'
+        self.layerSizes[lParam][0] -= 1 
+
+        nextLayerName = self.layersInOrder[lParam]
+        nextLayerSize = [self.layerSizes[n] for n in nextLayerName]
+        currLayerSize = self.layerSizes[lParam]
+        paramsPruned = currLayerSize[1]*currLayerSize[2]*currLayerSize[3]
+        # check if FC layer
+        if nextLayerName == ['module.conv2.weight']: 
+            paramsPruned += nextLayerSize[0][0]
+        else:
+            for i,nLS in enumerate(nextLayerSize):
+                paramsPruned += nLS[0]*nLS[2]*nLS[3] 
+                nLN = nextLayerName[i]
+                self.layerSizes[nLN][1] -= 1
+        
+        return (100.* paramsPruned / self.totalParams)
+    #}}}
+    
     def get_layer_params(self):
     #{{{
         for p in self.model.named_parameters():
@@ -38,7 +59,7 @@ class SqueezeNetPruning(BasicPruning):
             self.totalParams += paramsInLayer
             
             if self.convs_and_fcs(p[0]):
-                self.layerSizes[p[0]] = p[1].size()
+                self.layerSizes[p[0]] = list(p[1].size())
         
         # construct layers in order to have the fire.conv1 as next layer after both fire.conv2 and fire.conv3
         # since concatenation occurs 
@@ -78,21 +99,9 @@ class SqueezeNetPruning(BasicPruning):
                 #l1-norm
                 metric = np.absolute(pNp).reshape(pNp.shape[0], -1).sum(axis=1)
                 metric /= (pNp.shape[1]*pNp.shape[2]*pNp.shape[3])
-
-                # calculate incremental prune percentage
-                nextLayerName = self.layersInOrder[p[0]]
-                nextLayerSize = [self.layerSizes[n] for n in nextLayerName]
-                paramsPruned = pNp.shape[1]*pNp.shape[2]*pNp.shape[3]
-                # check if FC layer
-                if nextLayerName == ['module.conv2.weight']: 
-                    paramsPruned += nextLayerSize[0][0]
-                else:
-                    for nLS in nextLayerSize:
-                        paramsPruned += nLS[0]*nLS[2]*nLS[3] 
-                incPrunePerc = 100.* paramsPruned / self.totalParams
                 
-                globalRanking += [(layerName, i, x, incPrunePerc) for i,x in enumerate(metric)]
-                localRanking[layerName] = sorted([(i, x, incPrunePerc) for i,x in enumerate(metric)], key=lambda tup:tup[1])
+                globalRanking += [(layerName, i, x) for i,x in enumerate(metric)]
+                localRanking[layerName] = sorted([(i, x) for i,x in enumerate(metric)], key=lambda tup:tup[1])
         #}}}
 
         globalRanking = sorted(globalRanking, key=lambda tup:tup[2])
@@ -103,7 +112,7 @@ class SqueezeNetPruning(BasicPruning):
         currentPruneRate = 0
         listIdx = 0
         while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(globalRanking)):
-            layerName, filterNum, metric, incPrunePerc = globalRanking[listIdx]
+            layerName, filterNum, metric = globalRanking[listIdx]
 
             if len(localRanking[layerName]) <= 2:
                 listIdx += 1
@@ -112,7 +121,7 @@ class SqueezeNetPruning(BasicPruning):
             localRanking[layerName].pop(0)
             self.channelsToPrune[layerName].append(filterNum)
 
-            currentPruneRate += incPrunePerc
+            currentPruneRate += self.inc_prune_rate(layerName)
             listIdx += 1
         #}}}
             

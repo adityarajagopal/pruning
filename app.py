@@ -32,6 +32,7 @@ import torch.cuda
 import torch.nn as nn
 
 import matplotlib.pyplot as plt
+import matplotlib
 import math
 import numpy as np
 import pandas as pd
@@ -46,12 +47,16 @@ class Application(appSrc.Application):
         if self.params.pruneFilters:
             if 'alexnet' in self.params.arch:
                 self.pruner = AlexNetPruning(self.params, self.model)
+                self.netName = 'AlexNet'
             elif 'resnet' in self.params.arch:
                 self.pruner = ResNetPruning(self.params, self.model)
+                self.netName = 'ResNet{}'.format(self.params.depth)
             elif 'mobilenet' in self.params.arch:
                 self.pruner = MobileNetV2Pruning(self.params, self.model)
+                self.netName = 'MobileNetv2'
             elif 'squeezenet' in self.params.arch:
                 self.pruner = SqueezeNetPruning(self.params, self.model)
+                self.netName = 'SqueezeNet'
             else:
                 raise ValueError("Pruning not implemented for architecture ({})".format(self.params.arch))
 
@@ -62,7 +67,7 @@ class Application(appSrc.Application):
                 if self.params.finetune:
                 #{{{
                     fig, axes = plt.subplots(1,1)
-                    listPrunePercs = [0,5,10,25,50,65,80]
+                    listPrunePercs = [0,5,10,25,50,60,75,85,95]
                     
                     for i, logFile in enumerate(self.params.logFiles):
                         logDir = os.path.join(self.params.logDir, logFile)
@@ -140,7 +145,7 @@ class Application(appSrc.Application):
                     
                     axes.set_ylabel('Top1 Test Accuracy')
                     axes.set_xlabel('GOps')
-                    axes.set_title('Cost of performing finetuning in GOps [{}]'.format(self.params.subsetName))
+                    axes.set_title('Cost of finetuning ({}) in GOps [{}]'.format(self.netName, self.params.subsetName))
                     axes.legend()
                     plt.show()
                 #}}}
@@ -279,7 +284,27 @@ class Application(appSrc.Application):
             print('==========================')
             
             if self.params.finetune == True:
+            #{{{
+                # adjust lr based on pruning percentage
+                initLr = self.params.lr_schedule[self.params.lr_schedule.index(self.params.pruneAfter) - 1]
+                initPrunedLrIdx = self.params.lr_schedule.index(self.params.pruneAfter) + 1
+                
+                if self.params.pruningPerc <= 25.0:
+                    initPrunedLr = initLr
+                    listEnd = initPrunedLrIdx + 1
+                # elif self.params.pruningPerc > 25.0 and self.params.pruningPerc <= 50.0:
+                #     initPrunedLr = initLr / (self.params.gamma)
+                #     listEnd = initPrunedLrIdx + 3
+                else:
+                    initPrunedLr = initLr / (self.params.gamma * self.params.gamma)
+                    listEnd = initPrunedLrIdx + 5
+                
+                self.params.lr_schedule[initPrunedLrIdx] = initPrunedLr
+                self.params.lr_schedule = self.params.lr_schedule[:listEnd]
+                
+                # run finetuning
                 self.run_finetune()
+            #}}}
             
             else:
             #{{{
