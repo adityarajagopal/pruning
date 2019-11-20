@@ -32,7 +32,7 @@ class ChannelPlotter(object):
     def save_fig(self, plt, plotType=''):
     #{{{
         plt.tight_layout()
-        
+
         # plt.show()
         
         folder = os.path.join('/home/ar4414/remote_copy/channels/', self.net, plotType)

@@ -66,10 +66,11 @@ class Application(appSrc.Application):
             #{{{
                 if self.params.finetune:
                 #{{{
-                    fig, axes = plt.subplots(1,1)
+                    fig, axes = plt.subplots(1,1,figsize=(10,5))
                     listPrunePercs = [0,5,10,25,50,60,75,85,95]
                     
                     for i, logFile in enumerate(self.params.logFiles):
+                    #{{{
                         logDir = os.path.join(self.params.logDir, logFile)
                         
                         try:
@@ -142,12 +143,21 @@ class Application(appSrc.Application):
                         print(log)
 
                         log.plot(x='Gops', y='Test_Top1', ax=axes, label="{:.2f}%,{:.2f}MB".format(prunePerc, totalPrunedParams))
+                    #}}}
                     
                     axes.set_ylabel('Top1 Test Accuracy')
                     axes.set_xlabel('GOps')
                     axes.set_title('Cost of finetuning ({}) in GOps [{}]'.format(self.netName, self.params.subsetName))
                     axes.legend()
+                    
                     plt.show()
+                    
+                    folder = os.path.join('/home/ar4414/remote_copy/gop_graphs/')
+                    figName = os.path.join(folder, '{}_{}.png'.format(self.params.arch, self.params.subsetName))
+                    cmd = 'mkdir -p {}'.format(folder)
+                    subprocess.check_call(cmd, shell=True)
+                    print('Saving - {}'.format(figName))
+                    fig.savefig(figName, format='png') 
                 #}}}
                 
                 else:
