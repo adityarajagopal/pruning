@@ -64,19 +64,18 @@ class FBSPruning(object):
 
 class BasicPruning(ABC):
 #{{{
-    def __init__(self, params, model, layerSkip=(lambda lName : False)):
+    def __init__(self, params, model):
         #{{{
         self.params = params
         self.model = model
-        
+    
         self.metricValues = []
         self.channelsToPrune = {}
         self.gpu_list = [int(x) for x in self.params.gpu_id.split(',')]
         
-        self.layerSkip = layerSkip
-
         self.totalParams = 0
         self.layerSizes = {}
+        
         self.get_layer_params()
 
         # create model directory and file
@@ -89,6 +88,20 @@ class BasicPruning(ABC):
         
         self.importPath = 'src.ar4414.pruning.{}.{}'.format('.'.join(dirName.split('/')), self.fileName.split('.')[0])
         #}}} 
+    
+    def get_layer_params(self):
+    #{{{
+        for p in self.model.named_parameters():
+            paramsInLayer = 1
+            for dim in p[1].size():
+                paramsInLayer *= dim
+            self.totalParams += paramsInLayer
+            
+            if self.is_conv_or_fc(p[0]):
+                self.layerSizes[p[0]] = list(p[1].size())
+        
+        self.layersInOrder = list(self.layerSizes.keys())
+    #}}}
 
     def log_pruned_channels(self, rootFolder, params, totalPrunedPerc, channelsPruned): 
         #{{{
@@ -116,7 +129,7 @@ class BasicPruning(ABC):
     #}}}
     
     def prune_model(self, model):
-        #{{{
+    #{{{
         if self.params.pruneFilters == True: 
             # pruning based on l1 norm of weights
             if self.params.pruningMetric == 'weights':
@@ -138,7 +151,7 @@ class BasicPruning(ABC):
             if self.params.pruningMetric == 'activations':
                 tqdm.write("Pruning filters - Mean Activation")
                 return self.structured_activations(model)
-        #}}}
+     #}}}
         
     def non_zero_argmin(self, array): 
         minIdx = np.argmin(array[np.nonzero(array)]) 
@@ -147,6 +160,7 @@ class BasicPruning(ABC):
     def inc_prune_rate(self, layerName):
     #{{{
         lParam = str(layerName) + '.weight'
+        # remove 1 output filter from current layer
         self.layerSizes[lParam][0] -= 1 
 
         nextLayerName = self.layersInOrder[self.layersInOrder.index(lParam) + 1]
@@ -158,6 +172,7 @@ class BasicPruning(ABC):
             paramsPruned += nextLayerSize[0]
         else:
             paramsPruned += nextLayerSize[0]*nextLayerSize[2]*nextLayerSize[3]
+            # remove 1 input activation from next layer
             self.layerSizes[nextLayerName][1] -= 1
         
         return (100.* paramsPruned / self.totalParams)
@@ -174,20 +189,63 @@ class BasicPruning(ABC):
         
         return 100.*((self.totalParams - prunedParams) / self.totalParams), (prunedParams * 4) / 1e6, (self.totalParams * 4)/1e6
     #}}}        
-
-    def get_layer_params(self):
+    
+    def calculate_metric(self, param):
     #{{{
-        for p in self.model.named_parameters():
-            paramsInLayer = 1
-            for dim in p[1].size():
-                paramsInLayer *= dim
-            self.totalParams += paramsInLayer
-            
-            if self.convs_and_fcs(p[0]):
-                self.layerSizes[p[0]] = list(p[1].size())
-        
-        self.layersInOrder = list(self.layerSizes.keys())
+        #l1-norm
+        metric = np.absolute(param).reshape(param.shape[0], -1).sum(axis=1)
+        metric /= (param.shape[1]*param.shape[2]*param.shape[3])
+        return metric
     #}}}
+
+    def rank_filters(self, model):
+    #{{{
+        localRanking = {} 
+        globalRanking = []
+        
+        # create global ranking
+        for p in model.named_parameters():
+        #{{{
+            if self.prune_layer(p[0]):
+                layerName = '.'.join(p[0].split('.')[:-1])
+                if self.skip_layer(layerName):
+                    continue
+            
+                pNp = p[1].data.cpu().numpy()
+            
+                # calculate metric
+                metric = self.calculate_metric(pNp)
+
+                globalRanking += [(layerName, i, x) for i,x in enumerate(metric)]
+                localRanking[layerName] = sorted([(i, x) for i,x in enumerate(metric)], key=lambda tup:tup[1])
+        #}}}
+        
+        globalRanking = sorted(globalRanking, key=lambda i: i[2]) 
+        self.channelsToPrune = {l:[] for l,m in model.named_modules() if isinstance(m, nn.Conv2d)}
+
+        return localRanking, globalRanking
+    #}}}
+
+    # selects only convs and fc layers 
+    # used in get_layer_params to get sizes of only convs and fcs 
+    # lParam is from loop over named_parameters()
+    @abstractmethod
+    def is_conv_or_fc(self, lParam): 
+        pass
+
+    # function that selects all the layers to be pruned (currently only convs)
+    # used in structure_l1_weight to go through layers that are to be pruned
+    # lParam is from loop over named_parameters()
+    @abstractmethod
+    def prune_layer(self, lParam):
+        pass
+        
+    # function that specifies conv layers to skip when pruning
+    # used in structure_l1_weight
+    # lName here is module name, so doesn't have 'weight'/'bias' keyword
+    @abstractmethod
+    def skip_layer(self, lName):
+        pass
     
     @abstractmethod
     def structured_l1_weight(self, model):

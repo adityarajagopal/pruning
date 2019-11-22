@@ -21,12 +21,16 @@ class SqueezeNetPruning(BasicPruning):
     #{{{
         self.fileName = 'squeezenet_{}.py'.format(int(params.pruningPerc))
         self.netName = 'SqueezeNet'
-        layerSkip = lambda lName : True if 'conv2' in lName and 'fire' not in lName else False
 
-        # selects only convs and fc layers  
+        # selects only convs and fc layers 
+        # used in get_layer_params to get sizes of only convs and fcs 
         self.convs_and_fcs = lambda lName : True if ('conv' in lName and 'weight' in lName) else False
+        
+        # function that specifies conv layers to skip when pruning
+        # used in structure_l1_weight
+        self.layerSkip = lambda lName : True if 'conv2' in lName and 'fire' not in lName else False
 
-        super().__init__(params, model, layerSkip)
+        super().__init__(params, model)
     #}}}
     
     def inc_prune_rate(self, layerName):
@@ -79,33 +83,34 @@ class SqueezeNetPruning(BasicPruning):
         
         self.layersInOrder = newOrder
     #}}}
-    
+
+    def is_conv_or_fc(self, lParam):
+    #{{{
+        if 'conv' in lParam and 'weight' in lParam: 
+            return True
+        else:
+            return False
+    #}}}
+
+    def prune_layer(self, lParam):
+    #{{{
+        if 'conv' in lParam and 'weight' in lParam:
+            return True
+        else:
+            return False
+    #}}}
+
+    def skip_layer(self, lName):
+    #{{{
+        if 'conv2' in lName and 'fire' not in lName:
+            return True
+        else:
+            return False
+    #}}} 
+        
     def structured_l1_weight(self, model):
     #{{{
-        localRanking = {}        
-        globalRanking = []
-        namedParams = dict(model.named_parameters())
-        
-        for p in model.named_parameters():
-        #{{{
-            if 'conv' in p[0] and 'weight' in p[0]:
-                layerName = '.'.join(p[0].split('.')[:-1])
-                if self.layerSkip(layerName):
-                    continue
-            
-                pNp = p[1].data.cpu().numpy()
-            
-                # calculate metric
-                #l1-norm
-                metric = np.absolute(pNp).reshape(pNp.shape[0], -1).sum(axis=1)
-                metric /= (pNp.shape[1]*pNp.shape[2]*pNp.shape[3])
-                
-                globalRanking += [(layerName, i, x) for i,x in enumerate(metric)]
-                localRanking[layerName] = sorted([(i, x) for i,x in enumerate(metric)], key=lambda tup:tup[1])
-        #}}}
-
-        globalRanking = sorted(globalRanking, key=lambda tup:tup[2])
-        self.channelsToPrune = {l:[] for l,m in model.named_modules() if isinstance(m, nn.Conv2d)}
+        localRanking, globalRanking = self.rank_filters(model)
 
         # remove filters
         #{{{

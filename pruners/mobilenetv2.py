@@ -204,9 +204,6 @@ class MobileNetV2PruningDependency(BasicPruning):
         self.fileName = 'mobilenetv2_{}.py'.format(int(params.pruningPerc))
         self.netName = 'MobileNetV2'
         
-        # selects only convs and fc layers  
-        self.convs_and_fcs = lambda lName : True if ('conv' in lName or 'linear' in lName) and ('weight' in lName) else False
-        
         super().__init__(params, model)
     #}}}
     
@@ -230,33 +227,31 @@ class MobileNetV2PruningDependency(BasicPruning):
         
         return (100.* paramsPruned / self.totalParams)
     #}}}
+
+    def prune_layer(self, lParam):
+    #{{{   
+        if 'conv' in lParam:
+            return True
+        else:
+            return False
+    #}}}
+
+    def is_conv_or_fc(self, lParam):
+    #{{{
+        if ('conv' in lParam or 'linear' in lParam) and ('weight' in lParam):
+            return True
+        else:
+            return False
+    #}}}
+
+    def skip_layer(self, lName):
+    #{{{
+        return False
+    #}}}
     
     def structured_l1_weight(self, model):
     #{{{
-        localRanking = {} 
-        globalRanking = []
-        namedParams = dict(model.named_parameters())
-
-        for p in model.named_parameters():
-        #{{{
-            if 'conv' in p[0]:
-                layerName = '.'.join(p[0].split('.')[:-1])
-                if self.layerSkip(layerName):
-                    continue
-            
-                pNp = p[1].data.cpu().numpy()
-            
-                # calculate metric
-                #l1-norm
-                metric = np.absolute(pNp).reshape(pNp.shape[0], -1).sum(axis=1)
-                metric /= (pNp.shape[1]*pNp.shape[2]*pNp.shape[3])
-
-                globalRanking += [(layerName, i, x) for i,x in enumerate(metric)]
-                localRanking[layerName] = sorted([(i, x) for i,x in enumerate(metric)], key=lambda tup:tup[1])
-        #}}}
-        
-        globalRanking = sorted(globalRanking, key=lambda i: i[2]) 
-        self.channelsToPrune = {l:[] for l,m in model.named_modules() if isinstance(m, nn.Conv2d)}
+        localRanking, globalRanking = self.rank_filters(model) 
 
         # build dependency lists
         #{{{

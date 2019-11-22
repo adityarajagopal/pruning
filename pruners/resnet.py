@@ -442,42 +442,40 @@ class ResNet20PruningDependency(BasicPruning):
         self.fileName = 'resnet{}_{}.py'.format(int(params.depth), int(params.pruningPerc))
         self.netName = 'ResNet{}'.format(int(params.depth))
         
-        # selects only convs and fc layers  
-        self.convs_and_fcs = lambda lName : True if ('conv' in lName or 'fc' in lName) and ('weight' in lName) else False
-        
         super().__init__(params, model)
+    #}}}
+    
+    def is_conv_or_fc(self, lParam):
+    #{{{
+        if ('conv' in lParam or 'fc' in lParam) and ('weight' in lParam):
+            return True
+        else:
+            return False
+    #}}}
+
+    def prune_layer(self, lParam):
+    #{{{
+        if 'conv' in lParam:
+            return True
+        else:
+            return False
+    #}}}
+
+    def skip_layer(self, lName):
+    #{{{
+        return False
     #}}}
 
     def structured_l1_weight(self, model):
     #{{{
-        localRanking = {} 
-        globalRanking = []
-        namedParams = dict(model.named_parameters())
+        localRanking, globalRanking = self.rank_filters(model)
 
-        # create global ranking
-        for p in model.named_parameters():
-        #{{{
-            if 'conv' in p[0]:
-                layerName = '.'.join(p[0].split('.')[:-1])
-                if self.layerSkip(layerName):
-                    continue
-            
-                pNp = p[1].data.cpu().numpy()
-            
-                # calculate metric
-                #l1-norm
-                metric = np.absolute(pNp).reshape(pNp.shape[0], -1).sum(axis=1)
-                metric /= (pNp.shape[1]*pNp.shape[2]*pNp.shape[3])
-
-                globalRanking += [(layerName, i, x) for i,x in enumerate(metric)]
-                localRanking[layerName] = sorted([(i, x) for i,x in enumerate(metric)], key=lambda tup:tup[1])
-        #}}}
-        
-        globalRanking = sorted(globalRanking, key=lambda i: i[2]) 
-
-        self.channelsToPrune = {l:[] for l,m in model.named_modules() if isinstance(m, nn.Conv2d)}
-
-        # build dependency list 
+        # ------------------------------ build dependency list ----------------------
+        # dependencies for resnet are between all conv2s in residual blocks (pruning one should prune all)
+        # this way the output of one residual can be added together as they have the same number of channels 
+        # resnet20 has multiple groups where the number of output channels from conv2 are the same
+        # inbetween groups there is a downsampling connection to increase the number of channels 
+        # the dependency mentioned above only exists within a group, across groups the conv2s can be pruned differently
         #{{{
         depLayerNames = [list(localRanking.keys())[0]]
         depLayerNames += [x for x in list(localRanking.keys()) if 'layer' in x and 'conv2' in x]
@@ -504,6 +502,7 @@ class ResNet20PruningDependency(BasicPruning):
         # remove filters
         #{{{
         def remove_filter(layerName, filterNum):
+            # if already pruned ignore (this can happen as dependencies exist)
             if filterNum in self.channelsToPrune[layerName]:
                 return 0 
             filt = localRanking[layerName].pop(0)
@@ -537,7 +536,7 @@ class ResNet20PruningDependency(BasicPruning):
                 
             listIdx += 1
         #}}}
-        
+
         return self.channelsToPrune
     #}}}
         
