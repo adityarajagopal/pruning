@@ -253,7 +253,10 @@ class MobileNetV2PruningDependency(BasicPruning):
     #{{{
         localRanking, globalRanking = self.rank_filters(model) 
 
-        # build dependency lists
+        # ------------------------------- build dependency lists -------------------------------------
+        # mobilenet has 2 dependency sets, 1 for the depthwise layers and another for the residuals
+        # the dw layer dependency is how much ever is pruned in conv1, should also be pruned in conv2 (dwconv) in the block
+        # for the residuals, the same logic applies as in resnet
         #{{{
         dwDepLayers = [] 
         groupIdx = 0
@@ -263,11 +266,15 @@ class MobileNetV2PruningDependency(BasicPruning):
                 dwDepLayers[groupIdx] += [n+'.conv1', n+'.conv2']
                 groupIdx += 1
         
+        # the first block of mobilenet has residuals hence added into the list initially
         resDepLayers = [[list(localRanking.keys())[0]]]
         groupIdx = 0
         pruneLimit = []
         for n,m in model.named_modules():
             if 'layers.' in n and len(m._modules) != 0 and 'shortcut' not in n:
+                # if there are downsampling modules or it is a stride 2 dw conv, neither need dependencies
+                # so if we only have 1 layer with a dependency at the moment, just replace it with the current
+                # if we have more than one, start a new group 
                 if len(m.shortcut._modules) > 0 or m.conv2.stride[0] > 1:
                     if len(resDepLayers[groupIdx]) == 1:
                         resDepLayers[groupIdx][0] = n+'.conv3'
@@ -275,6 +282,7 @@ class MobileNetV2PruningDependency(BasicPruning):
                         resDepLayers.append([n+'.conv3'])
                         pruneLimit.append(len(localRanking[resDepLayers[groupIdx][0]]))
                         groupIdx += 1
+                # add a dependency if no downsampling or if stride is 2 (no residual)
                 else:
                     resDepLayers[groupIdx] += [n+'.conv3']
         resDepLayers.pop(-1)        
@@ -287,14 +295,6 @@ class MobileNetV2PruningDependency(BasicPruning):
 
         #remove filters
         #{{{
-        def remove_filter(layerName, filterNum):
-            if filterNum in self.channelsToPrune[layerName]:
-                return 0 
-            filt = localRanking[layerName].pop(0)
-            toPrune = filt[0] if filterNum is None else filterNum
-            self.channelsToPrune[layerName].append(toPrune)
-            return self.inc_prune_rate(layerName)
-        
         currentPruneRate = 0
         listIdx = 0
         while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(globalRanking)):
@@ -306,22 +306,26 @@ class MobileNetV2PruningDependency(BasicPruning):
             for i, group in enumerate(dependencies):
                 if layerName in group:            
                     depLayers = group
+                    # update limit if residual group as in resnet pruning 
                     if 'layers' in layerName and 'conv3' in layerName:
                         groupIdx = i
                         limit = groupLimits[groupIdx]
                     break
             
-            if depLayers == []: 
-                if len(localRanking[layerName]) <= 2:
+            depLayers = [layerName] if depLayers == [] else depLayers
+            for layerName in depLayers:
+                if len(localRanking[layerName]) <= limit:
                     listIdx += 1
                     continue
-                currentPruneRate += remove_filter(layerName, filterNum)
-            else: 
-                for layerName in depLayers:
-                    if len(localRanking[layerName]) <= limit:
-                        listIdx += 1
-                        continue
-                    currentPruneRate += remove_filter(layerName, None)
+            
+                if filterNum in self.channelsToPrune[layerName]:
+                    listIdx += 1
+                    continue
+                
+                localRanking[layerName].pop(0)
+                self.channelsToPrune[layerName].append(filterNum)
+                
+                currentPruneRate += self.inc_prune_rate(layerName) 
                 
             listIdx += 1
         #}}}

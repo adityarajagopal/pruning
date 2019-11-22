@@ -501,15 +501,6 @@ class ResNet20PruningDependency(BasicPruning):
         
         # remove filters
         #{{{
-        def remove_filter(layerName, filterNum):
-            # if already pruned ignore (this can happen as dependencies exist)
-            if filterNum in self.channelsToPrune[layerName]:
-                return 0 
-            filt = localRanking[layerName].pop(0)
-            toPrune = filt[0] if filterNum is None else filterNum
-            self.channelsToPrune[layerName].append(toPrune)
-            return self.inc_prune_rate(layerName)
-        
         currentPruneRate = 0
         listIdx = 0
         while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(globalRanking)):
@@ -522,18 +513,25 @@ class ResNet20PruningDependency(BasicPruning):
                     groupIdx = i
                     break
             
-            if depLayers == []: 
-                if len(localRanking[layerName]) <= 2:
+            # if layer not in group, just remove filter from layer 
+            # if layer is in a dependent group remove corresponding filter from each layer
+            depLayers = [layerName] if depLayers == [] else depLayers
+            for layerName in depLayers:
+                if len(localRanking[layerName]) <= groupLimits[groupIdx]:
                     listIdx += 1
                     continue
-                currentPruneRate += remove_filter(layerName, filterNum)
-            else: 
-                for layerName in depLayers:
-                    if len(localRanking[layerName]) <= groupLimits[groupIdx]:
-                        listIdx += 1
-                        continue
-                    currentPruneRate += remove_filter(layerName, None)
+            
+                # if filter has already been pruned, continue
+                # could happen to due to dependencies
+                if filterNum in self.channelsToPrune[layerName]:
+                    listIdx += 1
+                    continue 
                 
+                localRanking[layerName].pop(0)
+                self.channelsToPrune[layerName].append(filterNum)
+                
+                currentPruneRate += self.inc_prune_rate(layerName) 
+            
             listIdx += 1
         #}}}
 
