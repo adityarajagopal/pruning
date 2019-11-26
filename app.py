@@ -292,7 +292,7 @@ class Application(appSrc.Application):
             print('=========Baseline Accuracy==========')
             testStats = self.run_inference()
             print('==========================')
-            
+
             if self.params.finetune == True:
             #{{{
                 # adjust lr based on pruning percentage
@@ -302,9 +302,6 @@ class Application(appSrc.Application):
                 if self.params.pruningPerc <= 25.0:
                     initPrunedLr = initLr
                     listEnd = initPrunedLrIdx + 1
-                # elif self.params.pruningPerc > 25.0 and self.params.pruningPerc <= 50.0:
-                #     initPrunedLr = initLr / (self.params.gamma)
-                #     listEnd = initPrunedLrIdx + 3
                 else:
                     initPrunedLr = initLr / (self.params.gamma * self.params.gamma)
                     listEnd = initPrunedLrIdx + 5
@@ -315,7 +312,21 @@ class Application(appSrc.Application):
                 # run finetuning
                 self.run_finetune()
             #}}}
-            
+
+            elif self.params.retrain:
+            #{{{
+                with open(self.params.channelsPruned, 'r') as jFile:
+                    channelsPruned = json.load(jFile)
+                channelsPruned = list(channelsPruned.values())[0]
+                channelsPruned.pop('prunePerc')
+                self.pruner.channelsToPrune = channelsPruned
+                self.pruner.write_net()
+                prunedModel = self.pruner.import_pruned_model()
+                self.optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
+                self.model = prunedModel
+                self.run_training()
+            #}}}
+
             else:
             #{{{
                 channelsPruned, prunedModel, optimiser = self.pruner.prune_model(self.model)

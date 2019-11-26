@@ -65,7 +65,7 @@ class FBSPruning(object):
 class BasicPruning(ABC):
 #{{{
     def __init__(self, params, model):
-        #{{{
+    #{{{
         self.params = params
         self.model = model
     
@@ -87,7 +87,7 @@ class BasicPruning(ABC):
         subprocess.check_call(cmd, shell=True)
         
         self.importPath = 'src.ar4414.pruning.{}.{}'.format('.'.join(dirName.split('/')), self.fileName.split('.')[0])
-        #}}} 
+    #}}} 
     
     def get_layer_params(self):
     #{{{
@@ -124,11 +124,10 @@ class BasicPruning(ABC):
         pModel = importlib.import_module(self.importPath).__dict__[self.netName]
         prunedModel = pModel(num_classes=100)
         prunedModel = torch.nn.DataParallel(prunedModel, self.gpu_list).cuda()
-
         return prunedModel
     #}}}
     
-    def prune_model(self, model):
+    def prune_model(self, model, transferWeights=True):
     #{{{
         if self.params.pruneFilters == True: 
             # pruning based on l1 norm of weights
@@ -137,12 +136,12 @@ class BasicPruning(ABC):
                 channelsPruned = self.structured_l1_weight(model)
 
                 # perform pruning by writing out pruned network
-                self.gpu = 'cuda:{}'.format(self.gpu_list[0])
                 self.write_net()
                 
                 prunedModel = self.import_pruned_model()
                 
                 prunedModel = self.transfer_weights(model, prunedModel)
+                
                 optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
 
                 return channelsPruned, prunedModel, optimiser

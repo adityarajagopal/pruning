@@ -1,4 +1,5 @@
 import sys
+import os
 
 import torch.nn
 import torch.backends
@@ -7,9 +8,9 @@ import torchvision
 import src.model_creator as mcSrc
 
 class ModelCreator(mcSrc.ModelCreator):
-    
+#{{{
     def read_model(self, params):
-        
+    #{{{
         if params.dataset == 'cifar10' : 
             import src.ar4414.pruning.models.cifar as models 
             num_classes = 10
@@ -32,13 +33,15 @@ class ModelCreator(mcSrc.ModelCreator):
             model = models.__dict__[params.arch](num_classes=num_classes)
 
         return model
+    #}}}
     
     def load_pretrained(self, params, model):
-        if params.resume == True or params.branch == True or params.entropy == True or params.pruneFilters == True: 
+    #{{{
+        if params.resume or params.branch or params.entropy or params.pruneFilters: 
             checkpoint = torch.load(params.pretrained)
             model.load_state_dict(checkpoint)
 
-        elif params.fbsPruning == True:
+        elif params.fbsPruning:
             device_id = params.gpu_list[0]
             location = 'cuda:'+str(device_id)
             checkpoint = torch.load(params.pretrained, map_location=location)
@@ -50,7 +53,7 @@ class ModelCreator(mcSrc.ModelCreator):
                 checkpoint = {k.replace('module.','') : v for k,v in checkpoint.items()}
                 model.module.load_state_dict(checkpoint, initialise=True)
             
-        elif params.finetune == True or params.getGops == True:
+        elif params.finetune or params.getGops:
             device_id = params.gpu_list[0]
             location = 'cuda:'+str(device_id)
             checkpoint = torch.load(params.pretrained, map_location=location)
@@ -64,7 +67,7 @@ class ModelCreator(mcSrc.ModelCreator):
             # model.module.load_state_dict(checkpoint)
             model.load_state_dict(checkpoint)
     
-        elif params.evaluate == True : 
+        elif params.evaluate: 
             device_id = params.gpu_list[0]
             location = 'cuda:'+str(device_id)
             checkpoint = torch.load(params.pretrained, map_location=location)
@@ -75,3 +78,5 @@ class ModelCreator(mcSrc.ModelCreator):
         print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
 
         return model
+    #}}}
+#}}}

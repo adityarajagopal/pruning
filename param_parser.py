@@ -18,6 +18,9 @@ class Params(ppSrc.Params) :
         self.subsetName = config_file.get('pruning_hyperparameters', 'sub_name', fallback='subset1')
         self.sub_classes = config_file.get('pruning_hyperparameters', 'sub_classes').split() 
         
+        self.retrain = config_file.getboolean('pruning_hyperparameters', 'retrain', fallback=False)
+        self.channelsPruned = config_file.get('pruning_hyperparameters', 'channels_pruned', fallback='')
+        
         # --------------------------------  
         self.finetune = config_file.getboolean('pruning_hyperparameters', 'finetune')
         self.thisLayerUp = config_file.getint('pruning_hyperparameters', 'this_layer_up') 
