@@ -104,7 +104,7 @@ class BasicPruning(ABC):
     #}}}
 
     def log_pruned_channels(self, rootFolder, params, totalPrunedPerc, channelsPruned): 
-        #{{{
+    #{{{
         if params.printOnly == True:
             return 
         
@@ -117,11 +117,32 @@ class BasicPruning(ABC):
             json.dump(summary, sumFile)
         
         return summary
-        #}}} 
+    #}}} 
+
+    # requires the channels_pruned value in config to be set to the json file 
+    # that has the channels pruned for that run 
+    # TODO: change logging when finetuning to store model description file as well
+    def get_random_init_model(self, channelsPruned=None, idx=0):    
+    #{{{
+        if channelsPruned is None:
+            with open(self.params.channelsPruned, 'r') as jFile:
+                channelsPruned = json.load(jFile)
+        channelsPruned = list(channelsPruned.values())[0]
+        channelsPruned.pop('prunePerc')
+        self.channelsToPrune = channelsPruned
+        self.write_net()
+        prunedModel = self.import_pruned_model()
+        optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
+        return prunedModel, optimiser
+    #}}}
 
     def import_pruned_model(self):
     #{{{
-        pModel = importlib.import_module(self.importPath).__dict__[self.netName]
+        module = importlib.import_module(self.importPath)
+        if self.importPath in sys.modules:
+            pModel = importlib.reload(module).__dict__[self.netName]
+        else:
+            pModel = module.__dict__[self.netName]
         prunedModel = pModel(num_classes=100)
         prunedModel = torch.nn.DataParallel(prunedModel, self.gpu_list).cuda()
         return prunedModel
@@ -258,17 +279,3 @@ class BasicPruning(ABC):
     def transfer_weights(self, oModel, pModel): 
         pass
 #}}}
-
-
-
-
-
-
-
-
-
-
-
-
-
-

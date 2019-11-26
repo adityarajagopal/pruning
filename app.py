@@ -202,6 +202,53 @@ class Application(appSrc.Application):
                 plotter.plot_channels()
         #}}}
 
+        elif self.params.plotInferenceGops:
+        #{{{
+            logCsv = pd.read_csv(self.params.inferenceLogs, header=None)            
+            path = '/'.join(self.params.inferenceLogs.split('/')[:-1])
+            accGopData = {'Inference GOps':[], 'Finetune Test Accuracy':[], 'Retrain Test Accuracy':[]}  
+            for idx, log in logCsv.iterrows():
+                randInitPath = os.path.join(path, log[0])
+                finetunePath = os.path.join(path, log[1])
+                # get inference gops for pruned model
+                with open(os.path.join(finetunePath, 'pruned_channels.json'),'r') as jFile:
+                    channelsPruned = json.load(jFile)
+                self.model, self.optimiser = self.pruner.get_random_init_model(channelsPruned, idx)
+                infGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
+                infGopCalc.register_hooks()
+                self.run_gop_calc()
+                infGopCalc.remove_hooks()
+                _, tfg, _, _ = infGopCalc.get_gops()
+            
+                # get best test accuracy for both pruned and unpruned models
+                randLog = os.path.join(randInitPath, 'log.csv')
+                ftLog = os.path.join(finetunePath, 'log.csv')
+                randLog = pd.read_csv(randLog, delimiter=',\t', engine='python')
+                ftLog = pd.read_csv(ftLog, delimiter=',\t', engine='python')
+
+                randTest = randLog['Test_Top1'].dropna()
+                randVal = randLog['Val_Top1'].dropna()
+                ftTest = ftLog['Test_Top1'].dropna()
+                ftVal = ftLog['Val_Top1'].dropna()
+                bestRand = randTest[randVal.idxmax()]
+                bestFt = ftTest[ftVal.idxmax()]
+                
+                accGopData['Inference GOps'].append(tfg)
+                accGopData['Finetune Test Accuracy'].append(bestFt)
+                accGopData['Retrain Test Accuracy'].append(bestRand)
+             
+            cols = ['Inference GOps', 'Retrain Test Accuracy', 'Finetune Test Accuracy']
+            accGopData = pd.DataFrame(accGopData)
+
+            fig, axis = plt.subplots(1,1)
+            accGopData.plot(x='Inference GOps', y='Finetune Test Accuracy', ax=axis, kind='scatter', color='r', label='Finetune')
+            accGopData.plot(x='Inference GOps', y='Retrain Test Accuracy', ax=axis, kind='scatter', color='b', label='Retrain')
+            plt.title('Best Test Accuracy vs. Inference GOps for {} [{}]'.format(self.netName, self.params.subsetName))
+            plt.y_label('Best Test Accuracy (%)')
+            plt.legend()
+            plt.show()
+        #}}}
+
         elif self.params.entropy == True:
         #{{{
             print('=========Baseline Accuracy==========')
@@ -315,15 +362,7 @@ class Application(appSrc.Application):
 
             elif self.params.retrain:
             #{{{
-                with open(self.params.channelsPruned, 'r') as jFile:
-                    channelsPruned = json.load(jFile)
-                channelsPruned = list(channelsPruned.values())[0]
-                channelsPruned.pop('prunePerc')
-                self.pruner.channelsToPrune = channelsPruned
-                self.pruner.write_net()
-                prunedModel = self.pruner.import_pruned_model()
-                self.optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
-                self.model = prunedModel
+                self.model, self.optimiser = self.pruner.get_random_init_model()
                 self.run_training()
             #}}}
 

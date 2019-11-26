@@ -193,17 +193,3 @@ class AlexNetPruning(BasicPruning):
         return pModel
     #}}}
 #}}}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
