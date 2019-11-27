@@ -108,29 +108,31 @@ class BasicPruning(ABC):
         if params.printOnly == True:
             return 
         
+        # write pruned channels as json to log folder
         jsonName = os.path.join(rootFolder, 'pruned_channels.json')
         channelsPruned['prunePerc'] = totalPrunedPerc
         summary = {}
         summary[str(params.curr_epoch)] = channelsPruned
-
         with open(jsonName, 'w') as sumFile:
             json.dump(summary, sumFile)
         
+        # copy pruned network description to log folder
+        cmd = "cp {} {}/pruned_model.py".format(self.filePath, rootFolder)
+        subprocess.check_call(cmd, shell=True)
+
         return summary
     #}}} 
 
     # requires the channels_pruned value in config to be set to the json file 
     # that has the channels pruned for that run 
     # TODO: change logging when finetuning to store model description file as well
-    def get_random_init_model(self, channelsPruned=None):    
+    def get_random_init_model(self, finetunePath):    
     #{{{
-        if channelsPruned is None:
-            with open(self.params.channelsPruned, 'r') as jFile:
-                channelsPruned = json.load(jFile)
-        channelsPruned = list(channelsPruned.values())[0]
-        channelsPruned.pop('prunePerc')
-        self.channelsToPrune = channelsPruned
-        self.write_net()
+        importPath = finetunePath.split('/')
+        baseIdx = importPath.index('src')
+        importPath = importPath[baseIdx:]
+        importPath.append('pruned_model')
+        self.importPath = '.'.join(importPath)
         prunedModel = self.import_pruned_model()
         optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
         return prunedModel, optimiser
@@ -139,11 +141,7 @@ class BasicPruning(ABC):
     def import_pruned_model(self):
     #{{{
         module = importlib.import_module(self.importPath)
-        if self.importPath in sys.modules:
-            pModel = importlib.reload(module).__dict__[self.netName]
-            time.sleep(0.25)
-        else:
-            pModel = module.__dict__[self.netName]
+        pModel = module.__dict__[self.netName]
         prunedModel = pModel(num_classes=100)
         prunedModel = torch.nn.DataParallel(prunedModel, self.gpu_list).cuda()
         return prunedModel

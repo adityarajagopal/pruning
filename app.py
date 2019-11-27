@@ -215,9 +215,7 @@ class Application(appSrc.Application):
                 finetunePath = os.path.join(path, log[1])
                 
                 # get inference gops for pruned model
-                with open(os.path.join(finetunePath, 'pruned_channels.json'),'r') as jFile:
-                    channelsPruned = json.load(jFile)
-                self.model, self.optimiser = self.pruner.get_random_init_model(channelsPruned)
+                self.model, self.optimiser = self.pruner.get_random_init_model(finetunePath)
                 infGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
                 infGopCalc.register_hooks()
                 self.run_gop_calc()
