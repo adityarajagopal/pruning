@@ -9,6 +9,7 @@ import pickle
 import subprocess
 import importlib
 import math
+import copy
 
 from src.ar4414.pruning.pruners.base import BasicPruning
 
@@ -155,7 +156,8 @@ class SqueezeNetPruning(BasicPruning):
         currentIpChannels = 3
 
         linesToWrite = {}
-        for n,m in self.model.named_modules():
+        prunedModel = copy.deepcopy(self.model)
+        for n,m in prunedModel.named_modules():
         #{{{
             if not m._modules:
                 if n in channelsPruned.keys():
@@ -309,17 +311,3 @@ class SqueezeNetPruning(BasicPruning):
         return pModel
     #}}}
 #}}}
-
-
-
-
-
-
-
-
-
-
-
-
-
-

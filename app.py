@@ -22,6 +22,7 @@ import random
 import sys
 import json
 import subprocess
+import time
 
 import configparser as cp
 
@@ -204,16 +205,19 @@ class Application(appSrc.Application):
 
         elif self.params.plotInferenceGops:
         #{{{
-            logCsv = pd.read_csv(self.params.inferenceLogs, header=None)            
-            path = '/'.join(self.params.inferenceLogs.split('/')[:-1])
+            inferenceLogs = self.params.inferenceLogs
+            logCsv = pd.read_csv(inferenceLogs, header=None)            
+            path = '/'.join(inferenceLogs.split('/')[:-1])
             accGopData = {'Inference GOps':[], 'Finetune Test Accuracy':[], 'Retrain Test Accuracy':[]}  
+            
             for idx, log in logCsv.iterrows():
                 randInitPath = os.path.join(path, log[0])
                 finetunePath = os.path.join(path, log[1])
+                
                 # get inference gops for pruned model
                 with open(os.path.join(finetunePath, 'pruned_channels.json'),'r') as jFile:
                     channelsPruned = json.load(jFile)
-                self.model, self.optimiser = self.pruner.get_random_init_model(channelsPruned, idx)
+                self.model, self.optimiser = self.pruner.get_random_init_model(channelsPruned)
                 infGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
                 infGopCalc.register_hooks()
                 self.run_gop_calc()
@@ -238,13 +242,14 @@ class Application(appSrc.Application):
                 accGopData['Retrain Test Accuracy'].append(bestRand)
              
             cols = ['Inference GOps', 'Retrain Test Accuracy', 'Finetune Test Accuracy']
+            subsetName = path.split('/')[-1]
             accGopData = pd.DataFrame(accGopData)
 
             fig, axis = plt.subplots(1,1)
             accGopData.plot(x='Inference GOps', y='Finetune Test Accuracy', ax=axis, kind='scatter', color='r', label='Finetune')
             accGopData.plot(x='Inference GOps', y='Retrain Test Accuracy', ax=axis, kind='scatter', color='b', label='Retrain')
-            plt.title('Best Test Accuracy vs. Inference GOps for {} [{}]'.format(self.netName, self.params.subsetName))
-            plt.y_label('Best Test Accuracy (%)')
+            plt.title('Best Test Accuracy vs. Inference GOps for {} [{}]'.format(self.netName, subsetName))
+            plt.ylabel('Best Test Accuracy (%)')
             plt.legend()
             plt.show()
         #}}}
@@ -417,8 +422,8 @@ class Application(appSrc.Application):
             print('==> Performing Activation Entropy Pruning Finetune')
             self.trainer.finetune_entropy(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
         elif self.params.pruneFilters:
-            print('==> Performing l2-weight Pruning Finetune')
-            self.trainer.finetune_l2_weights(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
+            print('==> Performing l1-weight Pruning Finetune')
+            self.trainer.finetune_l1_weights(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
     #}}}
     
     def setup_param_checkpoint(self, configFile):

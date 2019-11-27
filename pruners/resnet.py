@@ -9,6 +9,7 @@ import pickle
 import subprocess
 import importlib
 import math
+import copy
 
 import torch
 import torch.nn as nn
@@ -551,7 +552,6 @@ class ResNet20PruningDependency(BasicPruning):
         fprint('import torch.nn.functional as F')
     
         fprint('')
-        # fprint('class ResNet_{}(nn.Module):'.format(self.params.pruningPerc))
         fprint('class {}(nn.Module):'.format(self.netName))
         fprint('\tdef __init__(self, num_classes=10):')
         fprint('\t\tsuper().__init__()')
@@ -562,7 +562,8 @@ class ResNet20PruningDependency(BasicPruning):
         currentIpChannels = 3
         
         linesToWrite = {}
-        for n,m in self.model.named_modules():
+        prunedModel = copy.deepcopy(self.model) 
+        for n,m in prunedModel.named_modules():
         #{{{
             if not m._modules:
                 if 'downsample' not in n:
@@ -587,7 +588,7 @@ class ResNet20PruningDependency(BasicPruning):
 
         #{{{
         blockInChannels = {}
-        for n,m in self.model.named_modules():
+        for n,m in prunedModel.named_modules():
             if 'layer' in n and len(n.split('.')) == 3:
                 blockInChannels[n] = [m._modules['conv1'].in_channels, m._modules['conv2'].out_channels, m._modules['conv1'].stride]
         
@@ -801,18 +802,3 @@ class ResNet20PruningDependency(BasicPruning):
         return pModel
     #}}}
 #}}}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

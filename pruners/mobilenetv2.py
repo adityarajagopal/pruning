@@ -9,6 +9,7 @@ import pickle
 import subprocess
 import importlib
 import math
+import copy
 
 from src.ar4414.pruning.pruners.base import BasicPruning
 
@@ -355,7 +356,8 @@ class MobileNetV2PruningDependency(BasicPruning):
         currentIpChannels = 3
 
         linesToWrite = {}
-        for n,m in self.model.named_modules():
+        prunedModel = copy.deepcopy(self.model)
+        for n,m in prunedModel.named_modules():
         #{{{
             if not m._modules:
                 if 'shortcut' not in n:
@@ -379,7 +381,7 @@ class MobileNetV2PruningDependency(BasicPruning):
 
         #{{{
         blockInChannels = {}
-        for n,m in self.model.named_modules():
+        for n,m in prunedModel.named_modules():
             if 'layers' in n and len(n.split('.')) == 3:
                 if m._modules['conv2'].stride[0] == 1:
                     blockInChannels[n] = (m._modules['conv1'].in_channels, m._modules['conv3'].out_channels)
@@ -556,17 +558,3 @@ class MobileNetV2PruningDependency(BasicPruning):
         return pModel
     #}}}
 #}}}
-
-
-
-
-
-
-
-
-
-
-
-
-
-

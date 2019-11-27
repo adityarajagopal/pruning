@@ -122,7 +122,7 @@ class BasicPruning(ABC):
     # requires the channels_pruned value in config to be set to the json file 
     # that has the channels pruned for that run 
     # TODO: change logging when finetuning to store model description file as well
-    def get_random_init_model(self, channelsPruned=None, idx=0):    
+    def get_random_init_model(self, channelsPruned=None):    
     #{{{
         if channelsPruned is None:
             with open(self.params.channelsPruned, 'r') as jFile:
@@ -141,6 +141,7 @@ class BasicPruning(ABC):
         module = importlib.import_module(self.importPath)
         if self.importPath in sys.modules:
             pModel = importlib.reload(module).__dict__[self.netName]
+            time.sleep(0.25)
         else:
             pModel = module.__dict__[self.netName]
         prunedModel = pModel(num_classes=100)
@@ -279,3 +280,4 @@ class BasicPruning(ABC):
     def transfer_weights(self, oModel, pModel): 
         pass
 #}}}
+
