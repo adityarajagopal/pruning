@@ -12,7 +12,7 @@ from src.ar4414.pruning.pruners.resnet import ResNet20PruningDependency as ResNe
 from src.ar4414.pruning.pruners.mobilenetv2 import MobileNetV2PruningDependency as MobileNetV2Pruning 
 from src.ar4414.pruning.pruners.squeezenet import SqueezeNetPruning 
 
-from src.ar4414.pruning.plotter import ChannelPlotter
+from src.ar4414.pruning.plotter import ChannelPlotter, RetrainPlotter
 
 import src.app as appSrc
 import src.input_preprocessor as preprocSrc
@@ -208,7 +208,8 @@ class Application(appSrc.Application):
             inferenceLogs = self.params.inferenceLogs
             logCsv = pd.read_csv(inferenceLogs, header=None)            
             path = '/'.join(inferenceLogs.split('/')[:-1])
-            accGopData = {'Inference GOps':[], 'Finetune Test Accuracy':[], 'Retrain Test Accuracy':[]}  
+            
+            plotter = RetrainPlotter()
             
             for idx, log in logCsv.iterrows():
                 randInitPath = os.path.join(path, log[0])
@@ -225,31 +226,15 @@ class Application(appSrc.Application):
                 # get best test accuracy for both pruned and unpruned models
                 randLog = os.path.join(randInitPath, 'log.csv')
                 ftLog = os.path.join(finetunePath, 'log.csv')
-                randLog = pd.read_csv(randLog, delimiter=',\t', engine='python')
-                ftLog = pd.read_csv(ftLog, delimiter=',\t', engine='python')
+                bestRand = plotter.get_best_test_acc(randLog)
+                bestFt = plotter.get_best_test_acc(ftLog) 
 
-                randTest = randLog['Test_Top1'].dropna()
-                randVal = randLog['Val_Top1'].dropna()
-                ftTest = ftLog['Test_Top1'].dropna()
-                ftVal = ftLog['Val_Top1'].dropna()
-                bestRand = randTest[randVal.idxmax()]
-                bestFt = ftTest[ftVal.idxmax()]
-                
-                accGopData['Inference GOps'].append(tfg)
-                accGopData['Finetune Test Accuracy'].append(bestFt)
-                accGopData['Retrain Test Accuracy'].append(bestRand)
-             
-            cols = ['Inference GOps', 'Retrain Test Accuracy', 'Finetune Test Accuracy']
+                plotter.update_stats(tfg, bestRand, bestFt)
+
             subsetName = path.split('/')[-1]
-            accGopData = pd.DataFrame(accGopData)
-
-            fig, axis = plt.subplots(1,1)
-            accGopData.plot(x='Inference GOps', y='Finetune Test Accuracy', ax=axis, kind='scatter', color='r', label='Finetune')
-            accGopData.plot(x='Inference GOps', y='Retrain Test Accuracy', ax=axis, kind='scatter', color='b', label='Retrain')
-            plt.title('Best Test Accuracy vs. Inference GOps for {} [{}]'.format(self.netName, subsetName))
-            plt.ylabel('Best Test Accuracy (%)')
-            plt.legend()
-            plt.show()
+            title = 'Best Test Accuracy vs. Inference GOps for {} [{}]'.format(self.netName, subsetName)
+            logFile = '/home/ar4414/remote_copy/retrain/{}/{}.png'.format(self.netName, subsetName)
+            plotter.plot(title=title, logFile=logFile) 
         #}}}
 
         elif self.params.entropy == True:
