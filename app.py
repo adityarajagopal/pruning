@@ -6,16 +6,15 @@ import src.ar4414.pruning.model_creator as mcSrc
 import src.ar4414.pruning.inference as inferenceSrc
 import src.ar4414.pruning.checkpointing as checkpointingSrc
 import src.ar4414.pruning.training as trainingSrc
-
 from src.ar4414.pruning.pruners.alexnet import AlexNetPruning
 from src.ar4414.pruning.pruners.resnet import ResNet20PruningDependency as ResNetPruning
 from src.ar4414.pruning.pruners.mobilenetv2 import MobileNetV2PruningDependency as MobileNetV2Pruning 
 from src.ar4414.pruning.pruners.squeezenet import SqueezeNetPruning 
-
 from src.ar4414.pruning.plotter import ChannelPlotter
 
 import src.app as appSrc
 import src.input_preprocessor as preprocSrc
+from src.ar4414.pruning.rbo import *
 
 import os
 import random
@@ -213,7 +212,7 @@ class Application(appSrc.Application):
             for idx, log in logCsv.iterrows():
                 randInitPath = os.path.join(path, log[0])
                 finetunePath = os.path.join(path, log[1])
-                
+
                 # get inference gops for pruned model
                 self.model, self.optimiser = self.pruner.get_random_init_model(finetunePath)
                 infGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
@@ -233,15 +232,16 @@ class Application(appSrc.Application):
                 ftTest = ftLog['Test_Top1'].dropna()
                 ftVal = ftLog['Val_Top1'].dropna()
                 bestRand = randTest[randVal.idxmax()]
-                bestFt = ftTest[ftVal.idxmax()]
+                bestFt = ftTest[ftVal[5:].idxmax()]
                 
                 accGopData['Inference GOps'].append(tfg)
                 accGopData['Finetune Test Accuracy'].append(bestFt)
                 accGopData['Retrain Test Accuracy'].append(bestRand)
-             
+            
             cols = ['Inference GOps', 'Retrain Test Accuracy', 'Finetune Test Accuracy']
             subsetName = path.split('/')[-1]
             accGopData = pd.DataFrame(accGopData)
+            print(accGopData)
 
             fig, axis = plt.subplots(1,1)
             accGopData.plot(x='Inference GOps', y='Finetune Test Accuracy', ax=axis, kind='scatter', color='r', label='Finetune')
@@ -250,6 +250,28 @@ class Application(appSrc.Application):
             plt.ylabel('Best Test Accuracy (%)')
             plt.legend()
             plt.show()
+        #}}}
+
+        elif self.params.changeInRanking:
+        #{{{
+            # _, globalRank = self.pruner.rank_filters(self.model)
+            preFtChannelsPruned = self.pruner.structured_l1_weight(self.model)
+            
+            log = [x for x in self.params.logFiles if 'pp_{}'.format(str(int(self.params.pruningPerc))) in x][0]
+            logFile = os.path.join(self.params.logDir, log, 'pruned_channels.json')
+            with open(logFile, 'r') as jFile:
+                postFtChannelsPruned = json.load(jFile)    
+            postFtChannelsPruned = list(postFtChannelsPruned.values())[0]
+            postFtChannelsPruned.pop('prunePerc')
+            
+            for k,v in postFtChannelsPruned.items():
+                print(k)
+                print(v)
+                print(preFtChannelsPruned[k])
+                if len(v) != 0 and len(preFtChannelsPruned[k]) != 0:
+                    print(rbo(v, preFtChannelsPruned[k], p=0.7))
+                print('----------------------------------')
+                breakpoint()
         #}}}
 
         elif self.params.entropy == True:

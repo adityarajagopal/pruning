@@ -18,6 +18,8 @@ class Params(ppSrc.Params) :
         self.plotType = config_file.get('pruning_hyperparameters', 'plot_type', fallback='joint')
         assert (self.plotType == 'number' or self.plotType == 'hamming' or self.plotType == 'joint'), 'Plot Type must be number, hamming or joint - provided {}'.format(self.plotType)
         self.plotChannels = config_file.get('pruning_hyperparameters', 'plot_channels', fallback='').split()
+
+        self.changeInRanking = config_file.getboolean('pruning_hyperparameters', 'change_in_rank', fallback=False)
         
         self.subsetName = config_file.get('pruning_hyperparameters', 'sub_name', fallback='subset1')
         self.sub_classes = config_file.get('pruning_hyperparameters', 'sub_classes').split() 
