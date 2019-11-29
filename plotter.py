@@ -7,8 +7,10 @@ import numpy as np
 import subprocess
 import itertools
 from scipy.spatial import distance
+import pandas as pd
 
 class ChannelPlotter(object):
+#{{{
     def __init__(self, params, model):
     #{{{
         self.params = params
@@ -201,3 +203,58 @@ class ChannelPlotter(object):
         axes.set_ylabel('Number of Channels Pruned')
         axes.legend()
     #}}}
+#}}}
+
+class RetrainPlotter(object):
+#{{{
+    def __init__(self):
+        self.accGopData = {'Inference GOps':[], 'Finetune Test Accuracy':[], 'Retrain Test Accuracy':[]}  
+        self.fig, self.axis = plt.subplots(1,1,figsize=(10,5))
+
+    @staticmethod
+    def get_best_test_acc(logCsv):
+    #{{{
+        log = pd.read_csv(logCsv, delimiter=',\t', engine='python')
+        test = log['Test_Top1'].dropna()
+        val = log['Val_Top1'].dropna()
+        
+        return test[val.idxmax()]
+    #}}}
+
+    # tfg : total forward gops
+    # bestRand : best test accuracy for random initalisation
+    # bestFt : best test accuracy for finetuning
+    def update_stats(self, tfg, bestRand, bestFt):
+    #{{{
+        self.accGopData['Inference GOps'].append(tfg)
+        self.accGopData['Finetune Test Accuracy'].append(bestFt)
+        self.accGopData['Retrain Test Accuracy'].append(bestRand)
+    #}}}
+
+    def plot(self, title, logFile=None):
+    #{{{
+        accGopData = pd.DataFrame(self.accGopData)
+        
+        accGopData.plot(x='Inference GOps', y='Finetune Test Accuracy', ax=self.axis, kind='scatter', color='r', label='Finetune')
+        accGopData.plot(x='Inference GOps', y='Retrain Test Accuracy', ax=self.axis, kind='scatter', color='b', label='Retrain')
+        
+        plt.title(title)
+        plt.ylabel('Best Test Accuracy (%)')
+        plt.legend()
+        plt.tight_layout()
+        
+        if logFile is not None:
+            split = logFile.lower().split('/')
+            folder = '/'.join(split[:-1])
+            figName = logFile.lower()
+        else:
+            folder = '/home/ar4414/remote_copy/tmp/'
+            figName = os.path.join(folder, 'recent.png')
+        
+        cmd = 'mkdir -p {}'.format(folder)
+        subprocess.check_call(cmd, shell=True)
+        
+        print('Saving - {}'.format(figName))
+        plt.savefig(figName, format='png') 
+    #}}}
+#}}}
