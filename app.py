@@ -225,13 +225,13 @@ class Application(appSrc.Application):
                 # get best test accuracy for both pruned and unpruned models
                 randLog = os.path.join(randInitPath, 'log.csv')
                 ftLog = os.path.join(finetunePath, 'log.csv')
-                bestRand = plotter.get_best_test_acc(randLog)
-                bestFt = plotter.get_best_test_acc(ftLog) 
+                rBest = plotter.get_best_acc(randLog)
+                fBest = plotter.get_best_acc(ftLog, fromEpoch=self.params.pruneAfter) 
 
-                plotter.update_stats(tfg, bestRand, bestFt)
-
+                plotter.update_stats(tfg, rBest, fBest)
+            
             subsetName = path.split('/')[-1]
-            title = 'Best Test Accuracy vs. Inference GOps for {} [{}]'.format(self.netName, subsetName)
+            title = 'Best Acheived Accuracy vs. Inference GOps for {} [{}]'.format(self.netName, subsetName)
             logFile = '/home/ar4414/remote_copy/retrain/{}/{}.png'.format(self.netName, subsetName)
             plotter.plot(title=title, logFile=logFile) 
         #}}}
@@ -427,7 +427,8 @@ class Application(appSrc.Application):
             self.trainer.finetune_entropy(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
         elif self.params.pruneFilters:
             print('==> Performing l1-weight Pruning Finetune')
-            self.trainer.finetune_l1_weights(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
+            # self.trainer.finetune_l1_weights(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
+            self.trainer.validation_finetune_l1_weights(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
     #}}}
     
     def setup_param_checkpoint(self, configFile):

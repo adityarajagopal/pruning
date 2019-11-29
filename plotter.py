@@ -208,17 +208,24 @@ class ChannelPlotter(object):
 class RetrainPlotter(object):
 #{{{
     def __init__(self):
-        self.accGopData = {'Inference GOps':[], 'Finetune Test Accuracy':[], 'Retrain Test Accuracy':[]}  
+        self.accGopData = {
+            'Inference GOps':[],
+            'Finetune Train Accuracy':[],'Finetune Val Accuracy':[], 'Finetune Test Accuracy':[], 
+            'Retrain Train Accuracy':[], 'Retrain Val Accuracy':[], 'Retrain Test Accuracy':[]
+        }  
         self.fig, self.axis = plt.subplots(1,1,figsize=(10,5))
 
     @staticmethod
-    def get_best_test_acc(logCsv):
+    def get_best_acc(logCsv, fromEpoch=0):
     #{{{
         log = pd.read_csv(logCsv, delimiter=',\t', engine='python')
         test = log['Test_Top1'].dropna()
         val = log['Val_Top1'].dropna()
+        train = log['Train_Top1'].dropna()
+
+        bestValIdx = val[fromEpoch:].idxmax()
         
-        return test[val.idxmax()]
+        return (train[bestValIdx], val[bestValIdx], test[bestValIdx])
     #}}}
 
     # tfg : total forward gops
@@ -227,19 +234,29 @@ class RetrainPlotter(object):
     def update_stats(self, tfg, bestRand, bestFt):
     #{{{
         self.accGopData['Inference GOps'].append(tfg)
-        self.accGopData['Finetune Test Accuracy'].append(bestFt)
-        self.accGopData['Retrain Test Accuracy'].append(bestRand)
+        self.accGopData['Finetune Train Accuracy'].append(bestFt[0])
+        self.accGopData['Finetune Val Accuracy'].append(bestFt[1])
+        self.accGopData['Finetune Test Accuracy'].append(bestFt[2])
+        self.accGopData['Retrain Train Accuracy'].append(bestRand[0])
+        self.accGopData['Retrain Val Accuracy'].append(bestRand[1])
+        self.accGopData['Retrain Test Accuracy'].append(bestRand[2])
     #}}}
 
-    def plot(self, title, logFile=None):
+    def plot(self, title, logFile=None, save=False):
     #{{{
         accGopData = pd.DataFrame(self.accGopData)
         
-        accGopData.plot(x='Inference GOps', y='Finetune Test Accuracy', ax=self.axis, kind='scatter', color='r', label='Finetune')
-        accGopData.plot(x='Inference GOps', y='Retrain Test Accuracy', ax=self.axis, kind='scatter', color='b', label='Retrain')
+        accGopData.plot(x='Inference GOps', y='Finetune Train Accuracy', ax=self.axis, kind='scatter', color='r', label='Finetune_Train', marker=".")
+        accGopData.plot(x='Inference GOps', y='Retrain Train Accuracy', ax=self.axis, kind='scatter', color='b', label='Retrain_Train', marker=".")
+        
+        accGopData.plot(x='Inference GOps', y='Finetune Val Accuracy', ax=self.axis, kind='scatter', color='r', label='Finetune_Val', marker="+")
+        accGopData.plot(x='Inference GOps', y='Retrain Val Accuracy', ax=self.axis, kind='scatter', color='b', label='Retrain_Val', marker="+")
+        
+        accGopData.plot(x='Inference GOps', y='Finetune Test Accuracy', ax=self.axis, kind='scatter', color='r', label='Finetune_Test', marker="x")
+        accGopData.plot(x='Inference GOps', y='Retrain Test Accuracy', ax=self.axis, kind='scatter', color='b', label='Retrain_Test', marker="x")
         
         plt.title(title)
-        plt.ylabel('Best Test Accuracy (%)')
+        plt.ylabel('Best Accuracy (%)')
         plt.legend()
         plt.tight_layout()
         
@@ -251,10 +268,12 @@ class RetrainPlotter(object):
             folder = '/home/ar4414/remote_copy/tmp/'
             figName = os.path.join(folder, 'recent.png')
         
-        cmd = 'mkdir -p {}'.format(folder)
-        subprocess.check_call(cmd, shell=True)
-        
-        print('Saving - {}'.format(figName))
-        plt.savefig(figName, format='png') 
+        if save:
+            cmd = 'mkdir -p {}'.format(folder)
+            subprocess.check_call(cmd, shell=True)
+            print('Saving - {}'.format(figName))
+            plt.savefig(figName, format='png') 
+        else:
+            plt.show()
     #}}}
 #}}}

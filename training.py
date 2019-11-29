@@ -55,16 +55,86 @@ class Trainer(trainingSrc.Trainer):
                 return
     #}}}
     
-    def finetune_l1_weights(self, params, pruner, checkpointer, train_loader, test_loader, valLoader, model, criterion, optimiser, inferer):  
+    def static_finetune_l1_weights(self, params, pruner, checkpointer, train_loader, test_loader, valLoader, model, criterion, optimiser, inferer):  
     #{{{
         print('Epoch,\tLR,\tTrain_Loss,\tTrain_Top1,\tTrain_Top5,\tTest_Loss,\tTest_Top1,\tTest_Top5,\tVal_Loss,\tVal_Top1,\tVal_Top5')
         
         for epoch in tqdm(range(params.start_epoch, params.finetuneBudget), desc='training', leave=False) : 
             params.curr_epoch = epoch
             state = self.update_lr(params, optimiser)
-            
+
             # perform pruning 
             if params.pruneFilters == True and epoch == params.pruneAfter: 
+                tqdm.write('Pruning Network')
+                channelsPruned, model, optimiser = pruner.prune_model(model)
+                totalPrunedPerc, _, _ = pruner.prune_rate(model)
+                tqdm.write('Pruned Percentage = {:.2f}%'.format(totalPrunedPerc))
+                summary = pruner.log_pruned_channels(checkpointer.root, params, totalPrunedPerc, channelsPruned)
+                
+            losses = utils.AverageMeter()
+            top1 = utils.AverageMeter()
+            top5 = utils.AverageMeter()
+
+            self.batch_iter(model, criterion, optimiser, train_loader, params, losses, top1, top5)
+
+            params.train_loss = losses.avg        
+            params.train_top1 = top1.avg        
+            params.train_top5 = top5.avg        
+            
+            # get test loss
+            params.test_loss, params.test_top1, params.test_top5 = inferer.test_network(params, test_loader, model, criterion, optimiser, verbose=False)
+            params.val_loss, params.val_top1, params.val_top5 = inferer.test_network(params, valLoader, model, criterion, optimiser, verbose=False)
+
+            checkpointer.save_checkpoint(model.state_dict(), optimiser.state_dict(), params)
+            
+            tqdm.write("{},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f}".format(epoch, params.lr, params.train_loss, params.train_top1, params.train_top5, params.test_loss, params.test_top1, params.test_top5, params.val_loss, params.val_top1, params.val_top5))
+    #}}} 
+
+    def perform_pruning(self, epoch, params):
+    #{{{
+        if epoch == 0:
+            self.trainLossHist = 0.
+            self.valLossHist = 0.
+            self.overfitCount = 0
+            return False    
+        elif epoch == 1:
+            self.trainLossHist = params.train_loss.data        
+            self.valLossHist = params.val_loss
+            return False
+        else:
+            currTrainLoss = params.train_loss.data
+            currValLoss = params.val_loss
+            
+            tChange = currTrainLoss - self.trainLossHist
+            tEps = 0.1*currTrainLoss
+            vChange = currValLoss - self.valLossHist
+            vEps = 0.1*currValLoss
+            if tChange <= 0 and tChange >= -tEps and vChange >= 0 and vChange <= vEps: 
+                self.overfitCount += 1
+            else:
+                self.overfitCount = 0 
+            
+            tqdm.write("Train - {:10.5f}/{:10.5f},\tVal - {:10.5f}/{:10.5f},\tOC - {:10.5f}".format(tChange, tEps, vChange, vEps, self.overfitCount))
+            
+            self.trainLossHist = currTrainLoss
+            self.valLossHist = currValLoss
+            if self.overfitCount == 3:
+                return True
+            else:
+                return False
+    #}}}
+    
+    def validation_finetune_l1_weights(self, params, pruner, checkpointer, train_loader, test_loader, valLoader, model, criterion, optimiser, inferer):  
+    #{{{
+        print('Epoch,\tLR,\tTrain_Loss,\tTrain_Top1,\tTrain_Top5,\tTest_Loss,\tTest_Top1,\tTest_Top5,\tVal_Loss,\tVal_Top1,\tVal_Top5')
+        
+        for epoch in tqdm(range(params.start_epoch, params.finetuneBudget), desc='training', leave=False) : 
+            params.curr_epoch = epoch
+            state = self.update_lr(params, optimiser)
+
+            # perform pruning 
+            if self.perform_pruning(epoch, params): 
+                breakpoint()
                 tqdm.write('Pruning Network')
                 channelsPruned, model, optimiser = pruner.prune_model(model)
                 totalPrunedPerc, _, _ = pruner.prune_rate(model)
