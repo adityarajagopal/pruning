@@ -29,11 +29,13 @@ class Params(ppSrc.Params) :
         
         # --------------------------------  
         self.finetune = config_file.getboolean('pruning_hyperparameters', 'finetune')
+        self.static = config_file.getboolean('pruning_hyperparameters', 'static', fallback=True)
         self.thisLayerUp = config_file.getint('pruning_hyperparameters', 'this_layer_up') 
         self.pruningPerc = config_file.getfloat('pruning_hyperparameters', 'pruning_perc')
         self.prunePercIncrement = config_file.getint('pruning_hyperparameters', 'iterative_pruning_increment') 
         self.iterPruneInc = config_file.getint('pruning_hyperparameters', 'iterative_pruning_increment') 
-        self.pruneAfter = config_file.getint('pruning_hyperparameters', 'prune_after') 
+        if self.static:
+            self.pruneAfter = config_file.getint('pruning_hyperparameters', 'prune_after', fallback=-2) 
         self.finetuneBudget = config_file.getint('pruning_hyperparameters', 'finetune_budget', fallback=0) 
        
         self.pruneWeights = config_file.getboolean('pruning_hyperparameters', 'prune_weights')

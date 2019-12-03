@@ -92,55 +92,65 @@ class Trainer(trainingSrc.Trainer):
 
     def perform_pruning(self, epoch, params):
     #{{{
-        if epoch == 0:
-            self.trainLossHist = 0.
-            self.valLossHist = 0.
-            self.overfitCount = 0
-            return False    
-        elif epoch == 1:
-            self.trainLossHist = params.train_loss.data        
-            self.valLossHist = params.val_loss
+        if self.networkPruned:
             return False
+
+        if epoch == 15: 
+            return True
+        
+        if epoch < 2:
+            self.overfitCount = 0
+        elif epoch == 2: 
+            self.overfitCount = 0
+            self.diff = params.val_loss - params.train_loss.data 
         else:
-            currTrainLoss = params.train_loss.data
-            currValLoss = params.val_loss
-            
-            tChange = currTrainLoss - self.trainLossHist
-            tEps = 0.1*currTrainLoss
-            vChange = currValLoss - self.valLossHist
-            vEps = 0.1*currValLoss
-            if tChange <= 0 and tChange >= -tEps and vChange >= 0 and vChange <= vEps: 
+            currDiff = params.val_loss - params.train_loss.data
+            threshold = self.diff
+            if currDiff > threshold:
                 self.overfitCount += 1
             else:
-                self.overfitCount = 0 
-            
-            tqdm.write("Train - {:10.5f}/{:10.5f},\tVal - {:10.5f}/{:10.5f},\tOC - {:10.5f}".format(tChange, tEps, vChange, vEps, self.overfitCount))
-            
-            self.trainLossHist = currTrainLoss
-            self.valLossHist = currValLoss
-            if self.overfitCount == 3:
-                return True
-            else:
-                return False
+                self.overfitCount = 0
+            tqdm.write("diff_thresh {:10.5f}, curr_diff {:10.5f}, oc {}".format(threshold, currDiff, self.overfitCount))
+        
+        if self.overfitCount == 3:
+            return True
+        else:
+            return False
     #}}}
     
     def validation_finetune_l1_weights(self, params, pruner, checkpointer, train_loader, test_loader, valLoader, model, criterion, optimiser, inferer):  
     #{{{
         print('Epoch,\tLR,\tTrain_Loss,\tTrain_Top1,\tTrain_Top5,\tTest_Loss,\tTest_Top1,\tTest_Top5,\tVal_Loss,\tVal_Top1,\tVal_Top5')
-        
-        for epoch in tqdm(range(params.start_epoch, params.finetuneBudget), desc='training', leave=False) : 
-            params.curr_epoch = epoch
-            state = self.update_lr(params, optimiser)
 
+        self.networkPruned = False        
+        totalFinetuneEpochs = params.epochs
+        for epoch in tqdm(range(params.start_epoch, params.epochs), desc='training', leave=False) : 
+            params.curr_epoch = epoch
+
+            if epoch == totalFinetuneEpochs:
+                break
+            
             # perform pruning 
             if self.perform_pruning(epoch, params): 
-                breakpoint()
                 tqdm.write('Pruning Network')
                 channelsPruned, model, optimiser = pruner.prune_model(model)
                 totalPrunedPerc, _, _ = pruner.prune_rate(model)
                 tqdm.write('Pruned Percentage = {:.2f}%'.format(totalPrunedPerc))
                 summary = pruner.log_pruned_channels(checkpointer.root, params, totalPrunedPerc, channelsPruned)
-                
+                self.networkPruned = True
+
+                # update lr-schedule with epoch at which pruning occured before calling update_lr
+                lrChangeInterval = params.finetuneBudget / 3
+                params.lr_schedule[2] = epoch
+                if len(params.lr_schedule) > 4:
+                    params.lr_schedule[4] = int(epoch + lrChangeInterval)
+                    params.lr_schedule[6] = int(epoch + 2 * lrChangeInterval)
+                totalFinetuneEpochs = int(epoch + params.finetuneBudget)
+
+                tqdm.write(" ".join([str(x) for x in params.lr_schedule]))
+
+            state = self.update_lr(params, optimiser)
+           
             losses = utils.AverageMeter()
             top1 = utils.AverageMeter()
             top5 = utils.AverageMeter()

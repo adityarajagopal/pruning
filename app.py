@@ -48,15 +48,19 @@ class Application(appSrc.Application):
             if 'alexnet' in self.params.arch:
                 self.pruner = AlexNetPruning(self.params, self.model)
                 self.netName = 'AlexNet'
+                self.trainableLayers = ['classifier']
             elif 'resnet' in self.params.arch:
                 self.pruner = ResNetPruning(self.params, self.model)
                 self.netName = 'ResNet{}'.format(self.params.depth)
+                self.trainableLayers = ['fc']
             elif 'mobilenet' in self.params.arch:
                 self.pruner = MobileNetV2Pruning(self.params, self.model)
                 self.netName = 'MobileNetv2'
+                self.trainableLayers = ['linear']
             elif 'squeezenet' in self.params.arch:
                 self.pruner = SqueezeNetPruning(self.params, self.model)
                 self.netName = 'SqueezeNet'
+                self.trainableLayers = ['module.conv2']
             else:
                 raise ValueError("Pruning not implemented for architecture ({})".format(self.params.arch))
 
@@ -349,21 +353,9 @@ class Application(appSrc.Application):
             testStats = self.run_inference()
             print('==========================')
 
-            if self.params.finetune == True:
+            if self.params.finetune:
             #{{{
-                # adjust lr based on pruning percentage
-                initLr = self.params.lr_schedule[self.params.lr_schedule.index(self.params.pruneAfter) - 1]
-                initPrunedLrIdx = self.params.lr_schedule.index(self.params.pruneAfter) + 1
-                
-                if self.params.pruningPerc <= 25.0:
-                    initPrunedLr = initLr
-                    listEnd = initPrunedLrIdx + 1
-                else:
-                    initPrunedLr = initLr / (self.params.gamma * self.params.gamma)
-                    listEnd = initPrunedLrIdx + 5
-                
-                self.params.lr_schedule[initPrunedLrIdx] = initPrunedLr
-                self.params.lr_schedule = self.params.lr_schedule[:listEnd]
+                self.setup_lr_schedule()
                 
                 # run finetuning
                 self.run_finetune()
@@ -419,7 +411,42 @@ class Application(appSrc.Application):
 
         else : 
             self.run_training()
-
+    
+    def setup_lr_schedule(self):
+    #{{{
+        # adjust lr based on pruning percentage
+        if self.params.static:
+        #{{{
+            initLr = self.params.lr_schedule[self.params.lr_schedule.index(self.params.pruneAfter) - 1]
+            initPrunedLrIdx = self.params.lr_schedule.index(self.params.pruneAfter) + 1
+            
+            if self.params.pruningPerc <= 25.0:
+                initPrunedLr = initLr
+                listEnd = initPrunedLrIdx + 1
+            else:
+                initPrunedLr = initLr / (self.params.gamma * self.params.gamma)
+                listEnd = initPrunedLrIdx + 5
+            
+            self.params.lr_schedule[initPrunedLrIdx] = initPrunedLr
+            self.params.lr_schedule = self.params.lr_schedule[:listEnd]
+        #}}}
+        else:
+        #{{{
+            initLr = self.params.lr_schedule[1]
+            initPrunedLrIdx = 3
+            
+            if self.params.pruningPerc <= 25.0:
+                initPrunedLr = initLr
+                listEnd = initPrunedLrIdx + 1
+            else:
+                initPrunedLr = initLr / (self.params.gamma * self.params.gamma)
+                listEnd = initPrunedLrIdx + 5
+            
+            self.params.lr_schedule[initPrunedLrIdx] = initPrunedLr
+            self.params.lr_schedule = self.params.lr_schedule[:listEnd]
+        #}}}
+    #}}}
+    
     def run_finetune(self):
     #{{{
         if self.params.entropy and self.params.entropyGlobalPruning:
@@ -427,8 +454,10 @@ class Application(appSrc.Application):
             self.trainer.finetune_entropy(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
         elif self.params.pruneFilters:
             print('==> Performing l1-weight Pruning Finetune')
-            # self.trainer.finetune_l1_weights(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
-            self.trainer.validation_finetune_l1_weights(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
+            if self.params.static:
+                self.trainer.static_finetune_l1_weights(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
+            else:
+                self.trainer.validation_finetune_l1_weights(self.params, self.pruner, self.checkpointer, self.train_loader, self.test_loader, self.valLoader, self.model, self.criterion, self.optimiser, self.inferer) 
     #}}}
     
     def setup_param_checkpoint(self, configFile):
