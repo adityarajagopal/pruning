@@ -10,7 +10,7 @@ from src.ar4414.pruning.pruners.alexnet import AlexNetPruning
 from src.ar4414.pruning.pruners.resnet import ResNet20PruningDependency as ResNetPruning
 from src.ar4414.pruning.pruners.mobilenetv2 import MobileNetV2PruningDependency as MobileNetV2Pruning 
 from src.ar4414.pruning.pruners.squeezenet import SqueezeNetPruning 
-from src.ar4414.pruning.plotter import ChannelPlotter, RetrainPlotter
+from src.ar4414.pruning.plotter import *
 
 import src.app as appSrc
 import src.input_preprocessor as preprocSrc
@@ -39,30 +39,14 @@ import pandas as pd
 
 class Application(appSrc.Application):
     def main(self):
+    #{{{
         self.setup_dataset()
         self.setup_model()
         self.setup_tee_printing()
         
         # done here as within both get gops and 
         if self.params.pruneFilters:
-            if 'alexnet' in self.params.arch:
-                self.pruner = AlexNetPruning(self.params, self.model)
-                self.netName = 'AlexNet'
-                self.trainableLayers = ['classifier']
-            elif 'resnet' in self.params.arch:
-                self.pruner = ResNetPruning(self.params, self.model)
-                self.netName = 'ResNet{}'.format(self.params.depth)
-                self.trainableLayers = ['fc']
-            elif 'mobilenet' in self.params.arch:
-                self.pruner = MobileNetV2Pruning(self.params, self.model)
-                self.netName = 'MobileNetv2'
-                self.trainableLayers = ['linear']
-            elif 'squeezenet' in self.params.arch:
-                self.pruner = SqueezeNetPruning(self.params, self.model)
-                self.netName = 'SqueezeNet'
-                self.trainableLayers = ['module.conv2']
-            else:
-                raise ValueError("Pruning not implemented for architecture ({})".format(self.params.arch))
+            self.setup_pruners()
 
         if self.params.getGops:
         #{{{
@@ -242,24 +226,74 @@ class Application(appSrc.Application):
 
         elif self.params.changeInRanking:
         #{{{
-            # _, globalRank = self.pruner.rank_filters(self.model)
-            preFtChannelsPruned = self.pruner.structured_l1_weight(self.model)
-            
             log = [x for x in self.params.logFiles if 'pp_{}'.format(str(int(self.params.pruningPerc))) in x][0]
-            logFile = os.path.join(self.params.logDir, log, 'pruned_channels.json')
-            with open(logFile, 'r') as jFile:
-                postFtChannelsPruned = json.load(jFile)    
-            postFtChannelsPruned = list(postFtChannelsPruned.values())[0]
-            postFtChannelsPruned.pop('prunePerc')
+            changeByLayers = {}
+            prunePercs = []
+            changeByPrunePerc = [] 
             
-            for k,v in postFtChannelsPruned.items():
-                print(k)
-                print(v)
-                print(preFtChannelsPruned[k])
-                if len(v) != 0 and len(preFtChannelsPruned[k]) != 0:
-                    print(rbo(v, preFtChannelsPruned[k], p=0.7))
-                print('----------------------------------')
-                breakpoint()
+            for log in self.params.logFiles:
+                ppStr = log.split('/')[0]
+                pp = float(ppStr.split('_')[1])
+                self.params.pruningPerc = pp 
+                
+                if pp == 0.:
+                    continue
+                
+                print("=========== Prune Perc = {}% ===========".format(pp))
+                self.setup_pruners()
+                preFtChannelsPruned = self.pruner.structured_l1_weight(self.model)
+                
+                logFile = os.path.join(self.params.logDir, log, 'pruned_channels.json')
+                with open(logFile, 'r') as jFile:
+                    postFtChannelsPruned = json.load(jFile)    
+                postFtChannelsPruned = list(postFtChannelsPruned.values())[0]
+                postFtChannelsPruned.pop('prunePerc')
+            
+                layerNames = list(postFtChannelsPruned.keys())
+
+                numChanChanged = []
+                totChannelsPruned = 0
+                totOverlap = 0
+                for k,currChannelsPruned in postFtChannelsPruned.items(): 
+                    origChannelsPruned = preFtChannelsPruned[k]
+
+                    numChanPruned = len(list(set(currChannelsPruned) | set(origChannelsPruned)))
+                    overlap = len(list(set(currChannelsPruned) & set(origChannelsPruned)))
+                    totChannelsPruned += numChanPruned
+                    totOverlap += overlap  
+
+                    if numChanPruned != 0:
+                        pDiff = 1.0 - (overlap / numChanPruned)
+                        # print("For layer {}, percentage of channels pruned that were different = {}".format(k,pDiff))
+                    else:
+                        pDiff = 0
+                    
+                    numChanChanged.append(pDiff)      
+                
+                changeByLayers[ppStr] = numChanChanged
+            
+                pDiffGlobal = 1. - (totOverlap / totChannelsPruned)
+                print("Across network, percentage of channels that were different = {}".format(pDiffGlobal))
+                prunePercs.append("{}-%".format(pp))
+                changeByPrunePerc.append(pDiffGlobal)  
+            
+            ############ comment in if need to store in order to use scripts/plot_channels.py
+            ############ to plot a cross network comparison graph of global pruning difference
+            toStore = {'pp':prunePercs, '%-diff':changeByPrunePerc}
+            torch.save(toStore, 'prunedChannels/{}.pth.tar'.format(self.params.arch))
+            
+            ############ plots for each level of pruning globally what is the difference in the 
+            ############ channels selected
+            # title = 'Percent difference in channels pruned globally by percentage of network pruned \n ({})'.format(self.params.subsetName)
+            # xlabel = "Percentage of network pruned"
+            # ylabel = 'Percentage of channels pruned differently'
+            # plot_channel_difference({'%-diff':changeByPrunePerc}, prunePercs, title, xlabel, ylabel) 
+
+            ########### plots by layer what is the difference for the different levels of purning
+            # title='Percentage difference in channels pruned after finetuning \n ({})'.format(self.params.subsetName)
+            # xlabel = '{} - Layer Name'.format(self.params.arch.capitalize())
+            # ylabel = 'Percentage of channels pruned differently'
+            # plot_channel_difference(changeByLayers, layerNames, title, xlabel, ylabel) 
         #}}}
 
         elif self.params.entropy == True:
@@ -411,7 +445,30 @@ class Application(appSrc.Application):
 
         else : 
             self.run_training()
+    #}}} 
     
+    def setup_pruners(self):
+    #{{{
+        if 'alexnet' in self.params.arch:
+            self.pruner = AlexNetPruning(self.params, self.model)
+            self.netName = 'AlexNet'
+            self.trainableLayers = ['classifier']
+        elif 'resnet' in self.params.arch:
+            self.pruner = ResNetPruning(self.params, self.model)
+            self.netName = 'ResNet{}'.format(self.params.depth)
+            self.trainableLayers = ['fc']
+        elif 'mobilenet' in self.params.arch:
+            self.pruner = MobileNetV2Pruning(self.params, self.model)
+            self.netName = 'MobileNetv2'
+            self.trainableLayers = ['linear']
+        elif 'squeezenet' in self.params.arch:
+            self.pruner = SqueezeNetPruning(self.params, self.model)
+            self.netName = 'SqueezeNet'
+            self.trainableLayers = ['module.conv2']
+        else:
+            raise ValueError("Pruning not implemented for architecture ({})".format(self.params.arch))
+    #}}}
+
     def setup_lr_schedule(self):
     #{{{
         # adjust lr based on pruning percentage

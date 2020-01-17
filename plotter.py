@@ -9,6 +9,17 @@ import itertools
 from scipy.spatial import distance
 import pandas as pd
 
+def plot_channel_difference(data, indices, title, xlab, ylab):
+#{{{
+    df = pd.DataFrame(data, index=indices)
+    ax = df.plot.bar(title = title)
+    ax.set_xlabel(xlab)
+    ax.set_ylabel(ylab)
+    ax.set_xticklabels(indices, rotation=45, ha='right')
+    plt.tight_layout()
+    plt.show() 
+#}}}
+
 class ChannelPlotter(object):
 #{{{
     def __init__(self, params, model):
@@ -277,3 +288,4 @@ class RetrainPlotter(object):
             plt.show()
     #}}}
 #}}}
+

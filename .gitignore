@@ -10,3 +10,4 @@ configs/baseline_tests
 configs/random_init_tests
 configs/validation_prune
 gop_graphs/
+prunedChannels/
