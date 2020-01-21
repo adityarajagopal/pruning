@@ -1,4 +1,5 @@
 import sys
+import itertools
 import torch
 import matplotlib.pyplot as plt
 import os
@@ -10,63 +11,93 @@ import itertools
 from scipy.spatial import distance
 import pandas as pd
 
-# basePath = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/mobilenetv2/cifar100/entire_dataset/l1_prune"
-# logA = "pp_60/2020-01-20-17-58-34/orig"
-# logB = "pp_60/2019-11-22-23-45-13/orig" 
-# basePath = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/resnet/cifar100/entire_dataset/l1_prune"
-# logA = "pp_60/2020-01-20-23-04-18/orig"
-# logB = "pp_60/2019-11-22-21-00-12/orig" 
+from logs import logs
 
-# basePath = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/mobilenetv2/cifar100/subset1/l1_prune"
-# logA = "pp_60/2020-01-20-18-07-15/orig"
-# logB = "pp_60/2019-11-22-21-57-37/orig" 
-# basePath = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/resnet/cifar100/subset1/l1_prune"
-# logA = "pp_60/2020-01-20-19-52-50/orig"
-# logB = "pp_60/2019-11-22-19-50-10/orig" 
-
-# basePath = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/mobilenetv2/cifar100/aquatic/l1_prune"
-# logA = "pp_60/2020-01-20-15-48-28/orig"
-# logB = "pp_60/2019-11-22-22-30-19/orig" 
-# basePath = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/resnet/cifar100/aquatic/l1_prune"
-# logA = "pp_60/2020-01-20-21-00-22/orig"
-# logB = "pp_60/2019-11-22-20-14-06/orig" 
-
-# logFile = '/home/ar4414/pytorch_training/src/ar4414/pruning/prunedChannels/mobilenetv2/pre_ft_pp_60.pth.tar'
-# postFtChannelsPruned = torch.load(logFile)
-                
-logFile = os.path.join(basePath, logA, 'pruned_channels.json')
-with open(logFile, 'r') as jFile:
-    preFtChannelsPruned = json.load(jFile)    
-preFtChannelsPruned = list(preFtChannelsPruned.values())[0]
-preFtChannelsPruned.pop('prunePerc')
-
-logFile = os.path.join(basePath, logB, 'pruned_channels.json')
-with open(logFile, 'r') as jFile:
-    postFtChannelsPruned = json.load(jFile)    
-postFtChannelsPruned = list(postFtChannelsPruned.values())[0]
-postFtChannelsPruned.pop('prunePerc')
-
-layerNames = list(postFtChannelsPruned.keys())
-
-numChanChanged = []
-totChannelsPruned = 0
-totOverlap = 0
-for k,currChannelsPruned in postFtChannelsPruned.items(): 
-    origChannelsPruned = preFtChannelsPruned[k]
-
-    numChanPruned = len(list(set(currChannelsPruned) | set(origChannelsPruned)))
-    overlap = len(list(set(currChannelsPruned) & set(origChannelsPruned)))
-    totChannelsPruned += numChanPruned
-    totOverlap += overlap  
-
-    if numChanPruned != 0:
-        pDiff = 1.0 - (overlap / numChanPruned)
-        # print("For layer {}, percentage of channels pruned that were different = {}".format(k,pDiff))
-    else:
-        pDiff = 0
+def calc_perc_diff(preFtChannelsPruned, postFtChannelsPruned):
+#{{{
+    totChannelsPruned = 0
+    totOverlap = 0
+    for k,currChannelsPruned in postFtChannelsPruned.items(): 
+        origChannelsPruned = preFtChannelsPruned[k]
     
-    numChanChanged.append(pDiff)      
+        numChanPruned = len(list(set(currChannelsPruned) | set(origChannelsPruned)))
+        overlap = len(list(set(currChannelsPruned) & set(origChannelsPruned)))
+        totChannelsPruned += numChanPruned
+        totOverlap += overlap  
+    
+        if numChanPruned != 0:
+            pDiff = 1.0 - (overlap / numChanPruned)
+        else:
+            pDiff = 0
+        
+    pDiffGlobal = 1. - (totOverlap / totChannelsPruned)
+    return pDiffGlobal
+#}}}
 
-pDiffGlobal = 1. - (totOverlap / totChannelsPruned)
-print("Across network, percentage of channels that were different = {}".format(pDiffGlobal))
+networks = ['mobilenetv2', 'resnet']
+datasets = ['entire_dataset', 'subset1', 'aquatic']
+prunePercs = ['5', '10', '25', '50', '60', '75', '85', '95']
+prettyPrint = False
 
+data = {'Network':[], 'Dataset':[], 'PrunePerc':[], 'AvgTestAcc':[], 'StdTestAcc':[], 'PreFtDiff':[], 'PostFtDiff':[]}
+for network in networks:
+#{{{
+    for dataset in datasets:
+        if prettyPrint:
+            print("============ For {} on {} ============ ".format(network, dataset))
+            print("\tPruning Perc (%)\t|\tPerc Diff to PreFt (%)\t|\tPerc Diff between PostFt (%)\t|\tAverage Test Acc (%)\t|")
+            print("============================================================================================================================================")
+        for pp in prunePercs:
+            preFt = '/home/ar4414/pytorch_training/src/ar4414/pruning/prunedChannels/{}/pre_ft_pp_{}.pth.tar'.format(network,pp)
+            preFtChannelsPruned = torch.load(preFt)
+            basePath = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/{}/cifar100/{}/l1_prune".format(network, dataset)
+
+            runs = logs[network][dataset][pp] 
+            tmpPruned = []
+            tmpAcc = []
+            for run in runs: 
+                log = 'pp_{}/{}/orig'.format(pp, run)
+                
+                # extract pruned channels 
+                logFile = os.path.join(basePath, log, 'pruned_channels.json')
+                with open(logFile, 'r') as jFile:
+                    channelsPruned = json.load(jFile)    
+                channelsPruned = list(channelsPruned.values())[0]
+                channelsPruned.pop('prunePerc')
+                tmpPruned.append(channelsPruned)
+
+                # extract accuracy 
+                accFile = os.path.join(basePath, log, 'log.csv')
+                accFile = pd.read_csv(accFile, delimiter=',\t', engine='python')
+                
+                trainTop1 = accFile['Train_Top1'].dropna()
+                testTop1 = accFile['Test_Top1'].dropna()
+                valTop1 = accFile['Val_Top1'].dropna()
+
+                if len(valTop1) <= 5: 
+                    continue
+
+                bestValIdx = valTop1[5:].idxmax()
+                bestTest = testTop1[bestValIdx]
+
+                tmpAcc.append(bestTest)
+
+            pDiffPerRun = [calc_perc_diff(preFtChannelsPruned, postFtChannelsPruned) for postFtChannelsPruned in tmpPruned]
+            pDiffBetweenRuns = [calc_perc_diff(x[0],x[1]) for x in list(itertools.combinations(tmpPruned,2))]
+            avgTestAcc = np.mean(tmpAcc) 
+            stdTestAcc = np.std(tmpAcc)
+            
+            data['Network'].append(network)
+            data['Dataset'].append(dataset)
+            data['PrunePerc'].append(pp)
+            data['AvgTestAcc'].append(avgTestAcc)
+            data['StdTestAcc'].append(stdTestAcc)
+            data['PreFtDiff'].append(np.mean(pDiffPerRun))
+            data['PostFtDiff'].append(np.mean(pDiffBetweenRuns))
+
+            if prettyPrint:
+                print("\t\t{}\t\t|\t\t{:3f}\t|\t\t{:3f}\t\t|\t{:3f} pm {:3f}\t|".format(pp, np.mean(pDiffPerRun), np.mean(pDiffBetweenRuns), avgTestAcc, stdTestAcc))
+#}}}
+
+df = pd.DataFrame(data)
+print(df)
