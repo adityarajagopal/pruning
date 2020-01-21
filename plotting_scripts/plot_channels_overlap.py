@@ -89,7 +89,7 @@ for network in networks:
             
             data['Network'].append(network)
             data['Dataset'].append(dataset)
-            data['PrunePerc'].append(pp)
+            data['PrunePerc'].append(int(pp))
             data['AvgTestAcc'].append(avgTestAcc)
             data['StdTestAcc'].append(stdTestAcc)
             data['PreFtDiff'].append(np.mean(pDiffPerRun))
@@ -100,16 +100,24 @@ for network in networks:
 #}}}
 
 df = pd.DataFrame(data)
-df.groupby(['Dataset', 'Network']).plot.bar(x='PrunePerc', y=['PreFtDiff', 'PostFtDiff'])
 
-dfD = df.groupby(['Dataset'])
-ax = plt.subplots(3,1)
-for data, net in dfD:
-    if 'entire_dataset' in data:
-        net.groupby('Network').plot(x='PrunePerc', y='AvgTestAcc', ax=ax[1][0])
-    elif 'subset1' in data:
-        net.groupby('Network').plot(x='PrunePerc', y='AvgTestAcc', ax=ax[1][1])
-    elif 'aquatic' in data:
-        net.groupby('Network').plot(x='PrunePerc', y='AvgTestAcc', ax=ax[1][2])
+for (dataset, net), data in df.groupby(['Dataset', 'Network']):
+    ax = data.plot.bar(x='PrunePerc', y=['PreFtDiff', 'PostFtDiff'], title='Difference in Channels Pruned for {} on {}'.format(net, dataset))
+    ax.set_xlabel('Pruning Percentage (%)')
+    ax.set_ylabel('Percentage Difference in Channels Pruned (%)')
+
+#subplots returns fig,ax tuple
+axAccs = [plt.subplots(1,1)[1] for i in range(3)]
+for (dataset, net), data in df.groupby(['Dataset', 'Network']):
+    colour = 'red' if 'mobilenetv2' in net else 'blue'
+    if 'entire_dataset' in dataset:
+        ax = data.plot.scatter(x='PrunePerc', y='AvgTestAcc', ax=axAccs[0], c=colour, label=net, title='Test Accuracy (%) on subset {}'.format(dataset))
+    elif 'subset1' in dataset:
+        ax = data.plot.scatter(x='PrunePerc', y='AvgTestAcc', ax=axAccs[1], c=colour, label=net, title='Test Accuracy (%) on subset {}'.format(dataset))
+    elif 'aquatic' in dataset:
+        ax = data.plot.scatter(x='PrunePerc', y='AvgTestAcc', ax=axAccs[2], c=colour, label=net, title='Test Accuracy (%) on subset {}'.format(dataset))
+    
+    ax.set_xlabel('Pruning Percentage (%)')
+    ax.set_ylabel('Test Accuracy (%)')
 
 plt.show()
