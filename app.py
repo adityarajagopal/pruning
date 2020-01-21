@@ -191,15 +191,16 @@ class Application(appSrc.Application):
 
         elif self.params.plotInferenceGops:
         #{{{
-            inferenceLogs = self.params.inferenceLogs
-            logCsv = pd.read_csv(inferenceLogs, header=None)            
-            path = '/'.join(inferenceLogs.split('/')[:-1])
+            logs = self.params.inferenceLogs
+            with open(logs, 'r') as jFile:
+                logs = json.load(jFile)    
+            log = logs[self.params.arch][self.params.subsetName]
             
-            plotter = RetrainPlotter()
-            
-            for idx, log in logCsv.iterrows():
-                randInitPath = os.path.join(path, log[0])
-                finetunePath = os.path.join(path, log[1])
+            prunedPercs = list(log.keys())
+            prunedPercs.remove('base_path')
+
+            for pp in prunedPercs:
+                finetunePath = os.path.join(log['base_path'], "pp_{}/{}/orig".format(pp, log[pp][1]))
 
                 # get inference gops for pruned model
                 self.model, self.optimiser = self.pruner.get_random_init_model(finetunePath)
@@ -208,19 +209,41 @@ class Application(appSrc.Application):
                 self.run_gop_calc()
                 infGopCalc.remove_hooks()
                 _, tfg, _, _ = infGopCalc.get_gops()
-            
-                # get best test accuracy for both pruned and unpruned models
-                randLog = os.path.join(randInitPath, 'log.csv')
-                ftLog = os.path.join(finetunePath, 'log.csv')
-                rBest = plotter.get_best_acc(randLog)
-                fBest = plotter.get_best_acc(ftLog, fromEpoch=self.params.pruneAfter) 
 
-                plotter.update_stats(tfg, rBest, fBest)
-            
-            subsetName = path.split('/')[-1]
-            title = 'Best Acheived Accuracy vs. Inference GOps for {} [{}]'.format(self.netName, subsetName)
-            logFile = '/home/ar4414/remote_copy/retrain/{}/{}.png'.format(self.netName, subsetName)
-            plotter.plot(title=title, logFile=logFile) 
+                print(pp, tfg)
+
+            #{{{
+            # inferenceLogs = self.params.inferenceLogs
+            # logCsv = pd.read_csv(inferenceLogs, header=None)            
+            # path = '/'.join(inferenceLogs.split('/')[:-1])
+            # plotter = RetrainPlotter()
+            # 
+            # for idx, log in logCsv.iterrows():
+            #     randInitPath = os.path.join(path, log[0])
+            #     finetunePath = os.path.join(path, log[1])
+
+            #     # get inference gops for pruned model
+            #     self.model, self.optimiser = self.pruner.get_random_init_model(finetunePath)
+            #     infGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
+            #     infGopCalc.register_hooks()
+            #     self.run_gop_calc()
+            #     infGopCalc.remove_hooks()
+            #     _, tfg, _, _ = infGopCalc.get_gops()
+            # 
+            #     # get best test accuracy for both pruned and unpruned models
+            #     randLog = os.path.join(randInitPath, 'log.csv')
+            #     ftLog = os.path.join(finetunePath, 'log.csv')
+            #     rBest = plotter.get_best_acc(randLog)
+            #     fBest = plotter.get_best_acc(ftLog, fromEpoch=self.params.pruneAfter) 
+
+            #     plotter.update_stats(tfg, rBest, fBest)
+            # 
+            # subsetName = path.split('/')[-1]
+            # title = 'Best Acheived Accuracy vs. Inference GOps for {} [{}]'.format(self.netName, subsetName)
+            # logFile = '/home/ar4414/remote_copy/retrain/{}/{}.png'.format(self.netName, subsetName)
+            # plotter.plot(title=title, logFile=logFile) 
+            #}}}
+
         #}}}
 
         elif self.params.changeInRanking:

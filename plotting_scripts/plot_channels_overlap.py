@@ -11,8 +11,6 @@ import itertools
 from scipy.spatial import distance
 import pandas as pd
 
-from logs import logs
-
 def calc_perc_diff(preFtChannelsPruned, postFtChannelsPruned):
 #{{{
     totChannelsPruned = 0
@@ -34,6 +32,9 @@ def calc_perc_diff(preFtChannelsPruned, postFtChannelsPruned):
     return pDiffGlobal
 #}}}
 
+with open('/home/ar4414/pytorch_training/src/ar4414/pruning/plotting_scripts/logs.json', 'r') as jFile:
+    logs = json.load(jFile)
+
 networks = ['mobilenetv2', 'resnet']
 datasets = ['entire_dataset', 'subset1', 'aquatic']
 prunePercs = ['5', '10', '25', '50', '60', '75', '85', '95']
@@ -51,6 +52,10 @@ for network in networks:
             preFt = '/home/ar4414/pytorch_training/src/ar4414/pruning/prunedChannels/{}/pre_ft_pp_{}.pth.tar'.format(network,pp)
             preFtChannelsPruned = torch.load(preFt)
             basePath = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/{}/cifar100/{}/l1_prune".format(network, dataset)
+
+            # logs[network][dataset]['base_path'] = basePath
+            # with open('/home/ar4414/pytorch_training/src/ar4414/pruning/plotting_scripts/logs_new.json', 'w') as jFile:
+            #     json.dump(logs, jFile, indent=2)
 
             runs = logs[network][dataset][pp] 
             tmpPruned = []
