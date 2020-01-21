@@ -18,6 +18,26 @@ class Checkpointer(cpSrc.Checkpointer) :
                        params.train_top1.item(), params.train_top5.item(), params.test_loss, \
                        params.test_top1, params.test_top5, params.val_loss, \
                        params.val_top1, params.val_top5]
+
+    def save_model_only(self, model_dict, printOnly, tag='default'):
+    #{{{
+        if printOnly:
+            return
+        
+        # create directory if not done already, this way empty directory is never created
+        if self.created_dir == False : 
+            self.__create_dir(self.root)
+            self.__create_log(self.root)
+        
+        # copy config file into root dir
+        cmd = 'cp ' + self.configFile + ' ' + self.root
+        subprocess.check_call(cmd, shell=True)         
+
+        # store model only 
+        modelPath = os.path.join(self.root, tag + '.pth.tar')
+        print(modelPath)
+        torch.save(model_dict, modelPath) 
+    #}}}
     
     def save_checkpoint(self, model_dict, optimiser_dict, params) : 
     #{{{

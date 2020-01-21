@@ -65,12 +65,13 @@ class Trainer(trainingSrc.Trainer):
 
             # perform pruning 
             if params.pruneFilters == True and epoch == params.pruneAfter: 
+                checkpointer.save_model_only(model.state_dict(), params.printOnly, 'pre_pruning')
                 tqdm.write('Pruning Network')
                 channelsPruned, model, optimiser = pruner.prune_model(model)
                 totalPrunedPerc, _, _ = pruner.prune_rate(model)
                 tqdm.write('Pruned Percentage = {:.2f}%'.format(totalPrunedPerc))
                 summary = pruner.log_pruned_channels(checkpointer.root, params, totalPrunedPerc, channelsPruned)
-                
+
             losses = utils.AverageMeter()
             top1 = utils.AverageMeter()
             top5 = utils.AverageMeter()

@@ -44,7 +44,6 @@ class Application(appSrc.Application):
         self.setup_model()
         self.setup_tee_printing()
         
-        # done here as within both get gops and 
         if self.params.pruneFilters:
             self.setup_pruners()
 
@@ -230,6 +229,8 @@ class Application(appSrc.Application):
             changeByLayers = {}
             prunePercs = []
             changeByPrunePerc = [] 
+
+            basePP = {}
             
             for log in self.params.logFiles:
                 ppStr = log.split('/')[0]
@@ -242,6 +243,9 @@ class Application(appSrc.Application):
                 print("=========== Prune Perc = {}% ===========".format(pp))
                 self.setup_pruners()
                 preFtChannelsPruned = self.pruner.structured_l1_weight(self.model)
+    
+                # torch.save(preFtChannelsPruned, 'prunedChannels/{}/pre_ft_pp_{}.pth.tar'.format(self.params.arch, int(pp)))
+                # continue
                 
                 logFile = os.path.join(self.params.logDir, log, 'pruned_channels.json')
                 with open(logFile, 'r') as jFile:

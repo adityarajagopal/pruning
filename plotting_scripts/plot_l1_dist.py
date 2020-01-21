@@ -34,23 +34,41 @@ def calc_l1(model):
     return l1Norms
 #}}}
 
-subsets = ['entire_dataset', 'subset1', 'aquatic']
-
 nets = ['alexnet', 'resnet', 'mobilenetv2', 'squeezenet']
+subsets = ['entire_dataset', 'subset1', 'aquatic']
+logs = {'mobilenetv2':['pp_0/2020-01-20-10-10-47/orig', 'pp_0/2020-01-20-11-21-06/orig', 'pp_0/2020-01-20-13-49-12/orig']}
+
+baseModelFile = {'mobilenetv2':'/mnt/users/ar4414/pruning_logs/mobilenetv2/cifar100/baseline/2019-10-07-15-17-32/orig/111-model.pth.tar'}
+
 net = nets[2]
-subset = subsets[0]
-log = 'pp_5/2019-11-22-22-53-17/orig' 
-basePath = '/home/ar4414/pytorch_training/src/ar4414/pruning/logs/{}/cifar100/{}/l1_prune'.format(net, subset)
 
-baseModelFile = '/mnt/users/ar4414/pruning_logs/mobilenetv2/cifar100/baseline/2019-10-07-15-17-32/orig/111-model.pth.tar'
-modelFile = os.path.join(basePath, log, 'best-model.pth.tar') 
+data = {}
 
-baseModel = torch.load(baseModelFile)
-newModel = torch.load(modelFile)
+baseModel = torch.load(baseModelFile[net])
 basel1Norms = calc_l1(baseModel) 
-newl1Norms = calc_l1(newModel)
+# data['base'] = basel1Norms
 
-data = {'base':basel1Norms[:len(newl1Norms)], 'new':newl1Norms}
+for i in [0,1,2]:
+    subset = subsets[i]
+    log = logs[net][i]
+    basePath = '/home/ar4414/pytorch_training/src/ar4414/pruning/logs/{}/cifar100/{}/l1_prune'.format(net, subset)
+    
+    modelFile = os.path.join(basePath, log, 'pre_pruning.pth.tar') 
+    newModel = torch.load(modelFile)
+    newl1Norms = calc_l1(newModel)
+
+    # data[subset] = newl1Norms
+
+    diff = np.array(basel1Norms) - np.array(newl1Norms)
+    diff = [x/basel1Norms[i] for i,x in enumerate(diff)]
+
+    data[subset] = diff
+
 df = pd.DataFrame(data)
-df.plot.hist(bins=int(math.sqrt(len(newl1Norms))), alpha=0.5)
-plt.show()
+
+for plot in subsets:
+    ax = df.plot(title='Difference in l1-norm before and after finetuning by filter', y=plot)
+    ax.set_xlabel('Filter Number')
+    ax.set_ylabel('Difference in l1-norm')
+    plt.tight_layout()
+    plt.show()
