@@ -100,4 +100,16 @@ for network in networks:
 #}}}
 
 df = pd.DataFrame(data)
-print(df)
+df.groupby(['Dataset', 'Network']).plot.bar(x='PrunePerc', y=['PreFtDiff', 'PostFtDiff'])
+
+dfD = df.groupby(['Dataset'])
+ax = plt.subplots(3,1)
+for data, net in dfD:
+    if 'entire_dataset' in data:
+        net.groupby('Network').plot(x='PrunePerc', y='AvgTestAcc', ax=ax[1][0])
+    elif 'subset1' in data:
+        net.groupby('Network').plot(x='PrunePerc', y='AvgTestAcc', ax=ax[1][1])
+    elif 'aquatic' in data:
+        net.groupby('Network').plot(x='PrunePerc', y='AvgTestAcc', ax=ax[1][2])
+
+plt.show()
