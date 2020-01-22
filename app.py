@@ -200,26 +200,29 @@ class Application(appSrc.Application):
             prunedPercs.remove('base_path')
                 
             for pp in prunedPercs:
-                # change to check if file exists and if so read it back
-                gopsJson = {'inf':0, 'ft':0}
-                
-                finetunePath = os.path.join(log['base_path'], "pp_{}/{}/orig".format(pp, log[pp][1]))
-
-                # get inference gops for pruned model
-                self.model, self.optimiser = self.pruner.get_random_init_model(finetunePath)
-                infGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
-                infGopCalc.register_hooks()
-                self.run_gop_calc()
-                infGopCalc.remove_hooks()
-                _, tfg, _, _ = infGopCalc.get_gops()
-                
-                gopsJson['inf'] = tfg
-                
-                print(pp, tfg)
-            
                 for run in log[pp]:
-                    logPath = os.path.join(log['base_path'], "pp_{}/{}/orig".format(pp, run))
-                    with open(os.path.join(logPath, "gops.json"), 'w') as jFile: 
+                    finetunePath = os.path.join(log['base_path'], "pp_{}/{}/orig".format(pp, run))
+
+                    # get inference gops for pruned model
+                    self.model, self.optimiser = self.pruner.get_random_init_model(finetunePath)
+                    infGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
+                    infGopCalc.register_hooks()
+                    self.run_gop_calc()
+                    infGopCalc.remove_hooks()
+                    _, tfg, _, _ = infGopCalc.get_gops()
+                    
+                    gopsLogFile = os.path.join(finetunePath, "gops.json")
+                    if os.path.isfile(gopsLogFile):
+                        with open(gopsLogFile, 'r') as jFile:
+                            gopsJson = json.load(jFile)
+                    else:
+                        gopsJson = {'inf':0, 'ft':0}
+
+                    gopsJson['inf'] = tfg
+
+                    print(pp, tfg)
+
+                    with open(gopsLogFile, 'w') as jFile: 
                         json.dump(gopsJson, jFile, indent=2)
 
             #{{{

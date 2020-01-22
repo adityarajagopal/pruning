@@ -40,7 +40,7 @@ datasets = ['entire_dataset', 'subset1', 'aquatic']
 prunePercs = ['5', '10', '25', '50', '60', '75', '85', '95']
 prettyPrint = False
 
-data = {'Network':[], 'Dataset':[], 'PrunePerc':[], 'AvgTestAcc':[], 'StdTestAcc':[], 'PreFtDiff':[], 'PostFtDiff':[]}
+data = {'Network':[], 'Dataset':[], 'PrunePerc':[], 'AvgTestAcc':[], 'StdTestAcc':[], 'PreFtDiff':[], 'PostFtDiff':[], 'InferenceGops':[]}
 for network in networks:
 #{{{
     for dataset in datasets:
@@ -60,6 +60,7 @@ for network in networks:
             runs = logs[network][dataset][pp] 
             tmpPruned = []
             tmpAcc = []
+            tmpInfGops = []
             for run in runs: 
                 log = 'pp_{}/{}/orig'.format(pp, run)
                 
@@ -74,18 +75,20 @@ for network in networks:
                 # extract accuracy 
                 accFile = os.path.join(basePath, log, 'log.csv')
                 accFile = pd.read_csv(accFile, delimiter=',\t', engine='python')
-                
                 trainTop1 = accFile['Train_Top1'].dropna()
                 testTop1 = accFile['Test_Top1'].dropna()
                 valTop1 = accFile['Val_Top1'].dropna()
-
                 if len(valTop1) <= 5: 
                     continue
-
                 bestValIdx = valTop1[5:].idxmax()
                 bestTest = testTop1[bestValIdx]
-
                 tmpAcc.append(bestTest)
+
+                #extract inferenceGops
+                gopsFile = os.path.join(basePath, log, 'gops.json')
+                with open(gopsFile, 'r') as jFile:
+                    gops = json.load(jFile)    
+                tmpInfGops.append(gops['inf'])
 
             pDiffPerRun = [calc_perc_diff(preFtChannelsPruned, postFtChannelsPruned) for postFtChannelsPruned in tmpPruned]
             pDiffBetweenRuns = [calc_perc_diff(x[0],x[1]) for x in list(itertools.combinations(tmpPruned,2))]
@@ -99,6 +102,7 @@ for network in networks:
             data['StdTestAcc'].append(stdTestAcc)
             data['PreFtDiff'].append(np.mean(pDiffPerRun))
             data['PostFtDiff'].append(np.mean(pDiffBetweenRuns))
+            data['InferenceGops'].append(np.mean(tmpInfGops))
 
             if prettyPrint:
                 print("\t\t{}\t\t|\t\t{:3f}\t|\t\t{:3f}\t\t|\t{:3f} pm {:3f}\t|".format(pp, np.mean(pDiffPerRun), np.mean(pDiffBetweenRuns), avgTestAcc, stdTestAcc))
@@ -106,23 +110,24 @@ for network in networks:
 
 df = pd.DataFrame(data)
 
+# plot difference in channels pruned by percentage pruned
 for (dataset, net), data in df.groupby(['Dataset', 'Network']):
     ax = data.plot.bar(x='PrunePerc', y=['PreFtDiff', 'PostFtDiff'], title='Difference in Channels Pruned for {} on {}'.format(net, dataset))
     ax.set_xlabel('Pruning Percentage (%)')
     ax.set_ylabel('Percentage Difference in Channels Pruned (%)')
 
-#subplots returns fig,ax tuple
-axAccs = [plt.subplots(1,1)[1] for i in range(3)]
+# plot inference time vs accuracy tradeoff
+axAccs = [plt.subplots(1,1)[1] for i in range(3)] #subplots returns fig,ax tuple
 for (dataset, net), data in df.groupby(['Dataset', 'Network']):
     colour = 'red' if 'mobilenetv2' in net else 'blue'
     if 'entire_dataset' in dataset:
-        ax = data.plot.scatter(x='PrunePerc', y='AvgTestAcc', ax=axAccs[0], c=colour, label=net, title='Test Accuracy (%) on subset {}'.format(dataset))
+        ax = data.plot.scatter(x='InferenceGops', y='AvgTestAcc', ax=axAccs[0], c=colour, label=net, title='Test Accuracy (%) on subset {}'.format(dataset))
     elif 'subset1' in dataset:
-        ax = data.plot.scatter(x='PrunePerc', y='AvgTestAcc', ax=axAccs[1], c=colour, label=net, title='Test Accuracy (%) on subset {}'.format(dataset))
+        ax = data.plot.scatter(x='InferenceGops', y='AvgTestAcc', ax=axAccs[1], c=colour, label=net, title='Test Accuracy (%) on subset {}'.format(dataset))
     elif 'aquatic' in dataset:
-        ax = data.plot.scatter(x='PrunePerc', y='AvgTestAcc', ax=axAccs[2], c=colour, label=net, title='Test Accuracy (%) on subset {}'.format(dataset))
+        ax = data.plot.scatter(x='InferenceGops', y='AvgTestAcc', ax=axAccs[2], c=colour, label=net, title='Test Accuracy (%) on subset {}'.format(dataset))
     
-    ax.set_xlabel('Pruning Percentage (%)')
+    ax.set_xlabel('Inference GOps')
     ax.set_ylabel('Test Accuracy (%)')
 
 plt.show()
