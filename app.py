@@ -198,8 +198,11 @@ class Application(appSrc.Application):
             
             prunedPercs = list(log.keys())
             prunedPercs.remove('base_path')
-
+                
             for pp in prunedPercs:
+                # change to check if file exists and if so read it back
+                gopsJson = {'inf':0, 'ft':0}
+                
                 finetunePath = os.path.join(log['base_path'], "pp_{}/{}/orig".format(pp, log[pp][1]))
 
                 # get inference gops for pruned model
@@ -209,8 +212,15 @@ class Application(appSrc.Application):
                 self.run_gop_calc()
                 infGopCalc.remove_hooks()
                 _, tfg, _, _ = infGopCalc.get_gops()
-
+                
+                gopsJson['inf'] = tfg
+                
                 print(pp, tfg)
+            
+                for run in log[pp]:
+                    logPath = os.path.join(log['base_path'], "pp_{}/{}/orig".format(pp, run))
+                    with open(os.path.join(logPath, "gops.json"), 'w') as jFile: 
+                        json.dump(gopsJson, jFile, indent=2)
 
             #{{{
             # inferenceLogs = self.params.inferenceLogs
