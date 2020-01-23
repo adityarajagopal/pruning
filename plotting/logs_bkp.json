@@ -1,5 +1,6 @@
 {
   "mobilenetv2": {
+    "pre_ft_model": "/mnt/users/ar4414/pruning_logs/mobilenetv2/cifar100/baseline/2019-10-07-15-17-32/orig/111-model.pth.tar",
     "entire_dataset": {
       "5": [
         "2019-11-22-22-53-17",
@@ -158,6 +159,7 @@
     }
   },
   "resnet": {
+    "pre_ft_model": "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/resnet20/cifar100/baseline/2019-08-27-11-58-14/orig/118-model.pth.tar",
     "entire_dataset": {
       "5": [
         "2019-11-22-20-29-34",
