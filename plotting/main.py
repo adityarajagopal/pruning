@@ -50,18 +50,19 @@ if __name__ == '__main__':
     # load json with log file locations
     with open('/home/ar4414/pytorch_training/src/ar4414/pruning/plotting/logs.json', 'r') as jFile:
         logs = json.load(jFile)
-    
     networks = ['mobilenetv2', 'resnet']
     datasets = ['entire_dataset', 'subset1', 'aquatic']
     prunePercs = ['5', '10', '25', '50', '60', '75', '85', '95']
     
     if args.channel_diff or args.inf_gops:
+        print("==> Collecting Accuracy and Gops statistics")
         summaryData = collector.summary_statistics(logs, networks, datasets, prunePercs)
         
         if args.pretty_print:
             print(tabulate(summaryData, headers='keys', tablefmt='psql'))
     
     if args.l1_norm:
+        print("==> L1-Norm Statistics")
         normsDict = collector.l1_norm_statistics(logs, networks, datasets, prunePercs)
         
         if args.pretty_print:
@@ -73,14 +74,17 @@ if __name__ == '__main__':
     
     # plot difference in channels pruned by percentage pruned
     if args.channel_diff:
+        print("==> Plotting Difference in Channels Pruned before and after finetuning")
         mod_channel_diff.plot_channel_diff_by_pp(summaryData)
 
     # plot inference time vs accuracy tradeoff
     if args.inf_gops:
+        print("==> Plotting GOps for inference vs best test top1 accuracy obtained")
         mod_gops.plot_inf_gops_vs_acc(summaryData)
 
     # plot difference in l1-norms and l1-norms 
     if args.l1_norm: 
+        print("==> Plotting l1-norm histograms and histograms in difference in l1-norm before and after finetuning")
         mod_l1_norms.plot_histograms(normsDict)        
     
     plt.show()

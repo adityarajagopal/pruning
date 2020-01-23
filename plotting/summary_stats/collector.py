@@ -69,21 +69,26 @@ def summary_statistics(logs, networks, datasets, prunePercs):
 def l1_norm_statistics(logs, networks, datasets, prunePercs): 
 #{{{
     
-    data = {net:{dataset:None for dataset in datasets} for net in networks}
+    data = {net:{dataset:{pp:None for pp in prunePercs+['stats']} for dataset in datasets} for net in networks}
 
     for network in networks:
         for dataset in datasets:
+            tmpPre = np.array([])
+            tmpPost = np.array([])
+            tmpDiff = np.array([])
+            
             for i,pp in enumerate(prunePercs):
-                 
                 runs = logs[network][dataset][pp] 
                 
-                tmpPre = np.array([])
-                tmpPost = np.array([])
-                tmpDiff = np.array([])
+                tmpCutoff = []
+
                 for j,run in enumerate(runs): 
+                    basePath = logs[network][dataset]['base_path']
                     log = 'pp_{}/{}/orig'.format(pp, run)
                     
-                    preL1Norms, postL1Norms, diffL1Norms = mod_l1_norms.get_l1_norms(logs, network, dataset, pp, run)
+                    channelsPruned = mod_channel_diff.get_pruned_channels(basePath, log)
+                    preL1Norms, postL1Norms, diffL1Norms, layerIndexOffset = mod_l1_norms.get_l1_norms(logs, network, dataset, pp, run)
+                    tmpCutoff.append(mod_l1_norms.get_cutoff_l1_norms(np.array(postL1Norms), channelsPruned, layerIndexOffset))
 
                     if len(tmpPre) == 0:
                         tmpPre = preL1Norms
@@ -93,6 +98,9 @@ def l1_norm_statistics(logs, networks, datasets, prunePercs):
                         tmpPre += preL1Norms
                         tmpPost += postL1Norms
                         tmpDiff += diffL1Norms
+                
+                avgCutoff = np.mean(tmpCutoff)
+                data[network][dataset][pp] = avgCutoff
 
             numRuns = (i+1)*(j+1)
             meanPreFtL1 = tmpPre / numRuns 
@@ -101,7 +109,7 @@ def l1_norm_statistics(logs, networks, datasets, prunePercs):
             
             l1NormStats = pd.DataFrame({'Pre_Ft_L1_Norms':meanPreFtL1, 'Post_Ft_L1_Norms':meanPostFtL1, 'Diff_L1_Norms':meanDiffL1})
 
-            data[network][dataset] = l1NormStats
+            data[network][dataset]['stats'] = l1NormStats
             
     return data
 #}}}
