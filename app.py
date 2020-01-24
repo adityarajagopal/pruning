@@ -6,6 +6,8 @@ import src.ar4414.pruning.model_creator as mcSrc
 import src.ar4414.pruning.inference as inferenceSrc
 import src.ar4414.pruning.checkpointing as checkpointingSrc
 import src.ar4414.pruning.training as trainingSrc
+
+import src.ar4414.pruning.pruners.base as pruningSrc
 from src.ar4414.pruning.pruners.alexnet import AlexNetPruning
 from src.ar4414.pruning.pruners.resnet import ResNet20PruningDependency as ResNetPruning
 from src.ar4414.pruning.pruners.mobilenetv2 import MobileNetV2PruningDependency as MobileNetV2Pruning 
@@ -47,139 +49,57 @@ class Application(appSrc.Application):
         if self.params.pruneFilters:
             self.setup_pruners()
 
-        if self.params.getGops:
+        if self.params.getGops: 
         #{{{
-            if self.params.pruneFilters:
-            #{{{
-                if self.params.finetune:
-                #{{{
-                    fig, axes = plt.subplots(1,1,figsize=(10,5))
-                    listPrunePercs = [0,5,10,25,50,60,75,85,95]
-                    
-                    for i, logFile in enumerate(self.params.logFiles):
-                    #{{{
-                        logDir = os.path.join(self.params.logDir, logFile)
-                        
-                        try:
-                            with open(os.path.join(logDir, 'pruned_channels.json'), 'r') as cpFile:
-                                channelsPruned = json.load(cpFile)
-                        except FileNotFoundError:
-                            print("File : {} does not exist.".format(os.path.join(logDir, 'pruned_channels.json')))
-                            print("Either the log directory is wrong or run finetuning without GetGops to generate file before running this command.")
-                            sys.exit()
-                        
-                        pruneEpoch = int(list(channelsPruned.keys())[0])
-                        numBatches = len(self.train_loader)
-                        channelsPruned = list(channelsPruned.values())[0]
-                        prunePerc = channelsPruned.pop('prunePerc')
-
-                        self.params.pruningPerc = listPrunePercs[i]
-                        newImportPath = self.pruner.importPath.split('.')
-                        newFileName = newImportPath[-1].split('_')
-                        newFileName[-1] = str(listPrunePercs[i])
-                        newFileName = '_'.join(newFileName)
-                        newImportPath[-1] = newFileName
-                        newImportPath = '.'.join(newImportPath)
-                        self.pruner.importPath = newImportPath
-
-                        # get unpruned gops
-                        self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
-                        self.trainGopCalc.register_hooks()
-                        self.trainer.single_forward_backward(self.params, self.model, self.criterion, self.optimiser, self.train_loader)      
-                        self.trainGopCalc.remove_hooks()
-                        _, tfg, _, tbg = self.trainGopCalc.get_gops()
-                        unprunedGops = tfg + tbg
-
-                        totalUnprunedParams = 0
-                        for p in self.model.named_parameters():
-                            paramsInLayer = 1
-                            for dim in p[1].size():
-                                paramsInLayer *= dim
-                            totalUnprunedParams += (paramsInLayer * 4) / 1e6
-
-                        # get pruned gops
-                        prunedModel = self.pruner.import_pruned_model()
-                        optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
-                        self.trainGopCalc = gopSrc.GopCalculator(prunedModel, self.params.arch) 
-                        self.trainGopCalc.register_hooks()
-                        self.trainer.single_forward_backward(self.params, prunedModel, self.criterion, optimiser, self.train_loader)      
-                        self.trainGopCalc.remove_hooks()
-                        _, tfg, _, tbg = self.trainGopCalc.get_gops()
-                        prunedGops = tfg + tbg
-                        
-                        totalPrunedParams = 0
-                        for p in prunedModel.named_parameters():
-                            paramsInLayer = 1
-                            for dim in p[1].size():
-                                paramsInLayer *= dim
-                            totalPrunedParams += (paramsInLayer * 4) / 1e6
-
-                        print('Pruned Percentage = {:.2f}'.format(prunePerc))
-                        print('Total Unpruned GOps = {:.2f}'.format(unprunedGops))
-                        print('Total Unpruned Params = {:.2f}MB'.format(totalUnprunedParams))
-                        print('Total Pruned GOps = {:.2f}'.format(prunedGops))
-                        print('Total Pruned Params = {:.2f}MB'.format(totalPrunedParams))
-
-                        # log = os.path.join(self.params.logDir, 'log.csv')
-                        log = os.path.join(logDir, 'log.csv')
-                        log = pd.read_csv(log, delimiter = ',\t', engine='python')
-
-                        gops = [(numBatches * unprunedGops) if epoch < pruneEpoch else (numBatches * prunedGops) for epoch in log['Epoch']]
-                        log['Gops'] = np.cumsum(gops)
-
-                        print(log)
-
-                        log.plot(x='Gops', y='Test_Top1', ax=axes, label="{:.2f}%,{:.2f}MB".format(prunePerc, totalPrunedParams))
-                    #}}}
-                    
-                    axes.set_ylabel('Top1 Test Accuracy')
-                    axes.set_xlabel('GOps')
-                    axes.set_title('Cost of finetuning ({}) in GOps [{}]'.format(self.netName, self.params.subsetName))
-                    axes.legend()
-                    
-                    plt.show()
-                    
-                    folder = os.path.join('/home/ar4414/remote_copy/gop_graphs/')
-                    figName = os.path.join(folder, '{}_{}.png'.format(self.params.arch, self.params.subsetName))
-                    cmd = 'mkdir -p {}'.format(folder)
-                    subprocess.check_call(cmd, shell=True)
-                    print('Saving - {}'.format(figName))
-                    fig.savefig(figName, format='png') 
-                #}}}
-                
-                else:
-                #{{{
-                    self.trainGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
-                    self.trainGopCalc.register_hooks()
-                    self.trainer.single_forward_backward(self.params, self.model, self.criterion, self.optimiser, self.train_loader)      
-                    self.trainGopCalc.remove_hooks()
-                    _, utfg, _, utbg = self.trainGopCalc.get_gops()
-                    
-                    print('Unpruned Performance ==============')
-                    loss, top1, top5 = self.run_inference()
-                    print('Total Unpruned Forward GOps = {}'.format(utfg))
-                    print('Total Unpruned Backward GOps = {}'.format(utbg))
-                    print('Total Unpruned GOps = {}'.format(utfg + utbg))
-                    
-                    channelsPruned, prunedModel, optimiser = self.pruner.prune_model(self.model)
-                    self.trainGopCalc = gopSrc.GopCalculator(prunedModel, self.params.arch) 
-                    self.trainGopCalc.register_hooks()
-                    self.trainer.single_forward_backward(self.params, prunedModel, self.criterion, optimiser, self.train_loader)      
-                    self.trainGopCalc.remove_hooks()
-                    _, tfg, _, tbg = self.trainGopCalc.get_gops()
-
-                    print('Prune Performance (without finetuning) ============')
-                    self.inferer.test_network(self.params, self.test_loader, prunedModel, self.criterion, optimiser)
-                    pruneRate, _, _ = self.pruner.prune_rate(prunedModel)
-                    print('Pruned Percentage = {:.2f}%'.format(pruneRate))
-                    print('Total Pruned Forward GOps = {}'.format(tfg))
-                    print('Total Pruned Backward GOps = {}'.format(tbg))
-                    print('Total Pruned GOps = {}'.format(tfg + tbg))
-                #}}} 
-            #}}}
+            logs = self.params.logs
+            with open(logs, 'r') as jFile:
+                logs = json.load(jFile)    
+            log = logs[self.params.arch][self.params.subsetName]
+            prunedPercs = list(log.keys())
+            prunedPercs.remove('base_path')
             
+            if self.params.inferenceGops:
+            #{{{
+                for pp in prunedPercs:
+                    for run in log[pp]:
+                        finetunePath = os.path.join(log['base_path'], "pp_{}/{}/orig".format(pp, run))
+                        
+                        # get inference gops for pruned model
+                        self.model, self.optimiser = self.pruner.get_random_init_model(finetunePath)
+                        _,tfg,_,_ = gopSrc.calc_inference_gops(self)
+                        gopSrc.store_gops_json(finetunePath, inf=tfg)                        
+
+                        print("{},{:.3f}".format(finetunePath, tfg))
+            #}}}
+
             else:
-                raise ValueError('Gop calculation not implemented for specified architecture')
+            #{{{
+                for pp in prunedPercs:
+                    for run in log[pp]:
+                        finetunePath = os.path.join(log['base_path'], "pp_{}/{}/orig".format(pp, run))
+                        
+                        #get unpruned training gops
+                        _,tfg,_,tbg = gopSrc.calc_training_gops(self)
+                        unprunedTrainGops = tfg + tbg
+                        unprunedModelMB = mcSrc.get_model_size(self.model)                   
+                        
+                        #get pruned gops
+                        try:
+                            with open(os.path.join(finetunePath, 'pruned_channels.json'), 'r') as jFile:
+                                channelsPruned = json.load(jFile)
+                        except FileNotFoundError:
+                            print("'pruned_channesl.json' does'n exist in log dir {}".format(finetunePath))
+                            print("Check path or run finetuning to generate file")
+                
+                        prunedModel, optimiser = self.pruner.get_random_init_model(finetunePath)
+                        _,tfg,_,tbg = gopSrc.calc_training_gops(self, optimiser, prunedModel)
+                        prunedTrainGops = tfg + tbg
+                        prunedModelMB = mcSrc.get_model_size(prunedModel)        
+
+                        gopSrc.store_gops_json(finetunePath, unpruned=unprunedTrainGops, pruned=prunedTrainGops, memUP=unprunedModelMB, memP=prunedModelMB)
+                        
+                        print("{},{:.3f},{:.3f},{:.3f},{:.3f}".format(finetunePath, unprunedTrainGops, unprunedModelMB, prunedTrainGops, prunedModelMB))
+            #}}}
         #}}}
 
         elif self.params.plotChannels != []:
@@ -187,76 +107,6 @@ class Application(appSrc.Application):
             if self.params.pruneFilters:
                 plotter = ChannelPlotter(self.params, self.model)
                 plotter.plot_channels()
-        #}}}
-
-        elif self.params.plotInferenceGops:
-        #{{{
-            logs = self.params.inferenceLogs
-            with open(logs, 'r') as jFile:
-                logs = json.load(jFile)    
-            log = logs[self.params.arch][self.params.subsetName]
-            
-            prunedPercs = list(log.keys())
-            prunedPercs.remove('base_path')
-                
-            for pp in prunedPercs:
-                for run in log[pp]:
-                    finetunePath = os.path.join(log['base_path'], "pp_{}/{}/orig".format(pp, run))
-
-                    # get inference gops for pruned model
-                    self.model, self.optimiser = self.pruner.get_random_init_model(finetunePath)
-                    infGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
-                    infGopCalc.register_hooks()
-                    self.run_gop_calc()
-                    infGopCalc.remove_hooks()
-                    _, tfg, _, _ = infGopCalc.get_gops()
-                    
-                    gopsLogFile = os.path.join(finetunePath, "gops.json")
-                    if os.path.isfile(gopsLogFile):
-                        with open(gopsLogFile, 'r') as jFile:
-                            gopsJson = json.load(jFile)
-                    else:
-                        gopsJson = {'inf':0, 'ft':0}
-
-                    gopsJson['inf'] = tfg
-
-                    print(pp, tfg)
-
-                    with open(gopsLogFile, 'w') as jFile: 
-                        json.dump(gopsJson, jFile, indent=2)
-
-            #{{{
-            # inferenceLogs = self.params.inferenceLogs
-            # logCsv = pd.read_csv(inferenceLogs, header=None)            
-            # path = '/'.join(inferenceLogs.split('/')[:-1])
-            # plotter = RetrainPlotter()
-            # 
-            # for idx, log in logCsv.iterrows():
-            #     randInitPath = os.path.join(path, log[0])
-            #     finetunePath = os.path.join(path, log[1])
-
-            #     # get inference gops for pruned model
-            #     self.model, self.optimiser = self.pruner.get_random_init_model(finetunePath)
-            #     infGopCalc = gopSrc.GopCalculator(self.model, self.params.arch) 
-            #     infGopCalc.register_hooks()
-            #     self.run_gop_calc()
-            #     infGopCalc.remove_hooks()
-            #     _, tfg, _, _ = infGopCalc.get_gops()
-            # 
-            #     # get best test accuracy for both pruned and unpruned models
-            #     randLog = os.path.join(randInitPath, 'log.csv')
-            #     ftLog = os.path.join(finetunePath, 'log.csv')
-            #     rBest = plotter.get_best_acc(randLog)
-            #     fBest = plotter.get_best_acc(ftLog, fromEpoch=self.params.pruneAfter) 
-
-            #     plotter.update_stats(tfg, rBest, fBest)
-            # 
-            # subsetName = path.split('/')[-1]
-            # title = 'Best Acheived Accuracy vs. Inference GOps for {} [{}]'.format(self.netName, subsetName)
-            # logFile = '/home/ar4414/remote_copy/retrain/{}/{}.png'.format(self.netName, subsetName)
-            # plotter.plot(title=title, logFile=logFile) 
-            #}}}
-
         #}}}
 
         elif self.params.changeInRanking:
@@ -574,11 +424,10 @@ class Application(appSrc.Application):
         self.inferer = inferenceSrc.Inferer()
     #}}}
 
-    def run_gop_calc(self):
-        self.inferer.run_single_minibatch(self.params, self.test_loader, self.model)
-    
     def run_inference(self):
+    #{{{
         # perform inference only
         print('==> Performing Inference')
         return self.inferer.test_network(self.params, self.test_loader, self.model, self.criterion, self.optimiser)
+    #}}}
        

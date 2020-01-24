@@ -80,3 +80,15 @@ class ModelCreator(mcSrc.ModelCreator):
         return model
     #}}}
 #}}}
+
+def get_model_size(model):
+#{{{
+    params = 0
+    for p in model.named_parameters():
+        paramsInLayer = 1
+        for dim in p[1].size():
+            paramsInLayer *= dim
+        params += (paramsInLayer * 4) / 1e6
+
+    return params
+#}}}

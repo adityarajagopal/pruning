@@ -1,6 +1,9 @@
+import os
 import sys
-import torch
+import json
 import math
+
+import torch
 import torch.nn as nn
 
 class GoogleNetGopCalculator(object):
@@ -347,5 +350,66 @@ class GopCalculator(object):
 
         self.backwardGops.append(gops / 1e9)
     #}}}
+#}}}
+
+def calc_inference_gops(app):
+#{{{
+    infGopCalc = GopCalculator(app.model, app.params.arch) 
+    infGopCalc.register_hooks()
+    app.inferer.run_single_minibatch(app.params, app.test_loader, app.model)
+    infGopCalc.remove_hooks()
+    return infGopCalc.get_gops()
+#}}}
+
+def calc_training_gops(app, optimiser=None, model=None):
+#{{{
+    optimiser = app.optimiser if optimiser is None else optimiser    
+    model = app.model if model is None else model 
+    
+    trainGopCalc = GopCalculator(model, app.params.arch) 
+    trainGopCalc.register_hooks()
+    app.trainer.single_forward_backward(app.params, model, app.criterion, optimiser, app.train_loader)      
+    trainGopCalc.remove_hooks()
+    return trainGopCalc.get_gops()
+#}}}
+
+def store_gops_json(logPath, **kwargs):
+#{{{
+    gopsLogFile = os.path.join(logPath, "gops.json")
+    if os.path.isfile(gopsLogFile):
+        with open(gopsLogFile, 'r') as jFile:
+            gopsJson = json.load(jFile)
+    else:
+        gopsJson = {'inf':0, 'ft':{'unpruned':0, 'pruned':0}, 'mem':{'unpruned':0, 'pruned':0}}
+
+    if 'inf' in kwargs.keys():
+        gopsJson['inf'] = kwargs['inf']
+    
+    if 'unpruned' in kwargs.keys():
+        if type(gopsJson['ft']) is not dict:
+            gopsJson['ft'] = {'unpruned':kwargs['unpruned'], 'pruned':0}
+        else:
+            gopsJson['ft']['unpruned'] = kwargs['unpruned']
+    
+    if 'pruned' in kwargs.keys():
+        if type(gopsJson['ft']) is not dict:
+            gopsJson['ft'] = {'unpruned':0, 'pruned':kwargs['pruned']}
+        else:
+            gopsJson['ft']['pruned'] = kwargs['pruned']
+
+    if 'memUP' in kwargs.keys():
+        if 'mem' not in gopsJson.keys(): 
+            gopsJson['mem'] = {'unpruned':kwargs['memUP'], 'pruned':0}
+        else:
+            gopsJson['mem']['unpruned'] = kwargs['memUP']
+    
+    if 'memP' in kwargs.keys():
+        if 'mem' not in gopsJson.keys(): 
+            gopsJson['mem'] = {'unpruned':0, 'pruned':kwargs['memP']}
+        else:
+            gopsJson['mem']['pruned'] = kwargs['memP']
+
+    with open(gopsLogFile, 'w') as jFile: 
+        json.dump(gopsJson, jFile, indent=2)
 #}}}
 

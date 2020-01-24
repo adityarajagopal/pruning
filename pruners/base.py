@@ -279,3 +279,13 @@ class BasicPruning(ABC):
         pass
 #}}}
 
+def get_pruned_model_import_path(logPath):
+#{{{
+    prunedModelDesc = os.path.join(logPath, 'pruned_model.py')
+    tmpModelPath = prunedModelDesc[prunedModelDesc.index('src'):]
+    tmpModelPath = tmpModelPath.replace('/','.')
+    prunedModelPath = tmpModelPath.split('.py')[0]
+
+    return prunedModelPath
+#}}}
+

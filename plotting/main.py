@@ -21,9 +21,9 @@ while childDir != 'src':
 sys.path.append(parentDir[0])
 
 from src.ar4414.pruning.plotting.summary_stats import collector 
-from src.ar4414.pruning.plotting.summary_stats import gops as mod_gops 
-from src.ar4414.pruning.plotting.summary_stats import l1_norms as mod_l1_norms
-from src.ar4414.pruning.plotting.summary_stats import channel_diff as mod_channel_diff
+from src.ar4414.pruning.plotting.summary_stats import gops as gopSrc 
+from src.ar4414.pruning.plotting.summary_stats import l1_norms as l1NormsSrc
+from src.ar4414.pruning.plotting.summary_stats import channel_diff as channeDiffSrc
 
 def parse_arguments():
 #{{{
@@ -75,17 +75,17 @@ if __name__ == '__main__':
     # plot difference in channels pruned by percentage pruned
     if args.channel_diff:
         print("==> Plotting Difference in Channels Pruned before and after finetuning")
-        mod_channel_diff.plot_channel_diff_by_pp(summaryData)
+        channeDiffSrc.plot_channel_diff_by_pp(summaryData)
 
     # plot inference time vs accuracy tradeoff
     if args.inf_gops:
         print("==> Plotting GOps for inference vs best test top1 accuracy obtained")
-        mod_gops.plot_inf_gops_vs_acc(summaryData)
+        gopSrc.plot_inf_gops_vs_acc(summaryData)
 
     # plot difference in l1-norms and l1-norms 
     if args.l1_norm: 
         print("==> Plotting l1-norm histograms and histograms in difference in l1-norm before and after finetuning")
-        mod_l1_norms.plot_histograms(normsDict)        
+        l1NormsSrc.plot_histograms(normsDict)        
     
     plt.show()
 

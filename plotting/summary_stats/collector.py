@@ -11,14 +11,14 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-import src.ar4414.pruning.plotting.summary_stats.acc as mod_acc
-import src.ar4414.pruning.plotting.summary_stats.gops as mod_gops
-import src.ar4414.pruning.plotting.summary_stats.channel_diff as mod_channel_diff
-import src.ar4414.pruning.plotting.summary_stats.l1_norms as mod_l1_norms
+import src.ar4414.pruning.plotting.summary_stats.acc as accSrc
+import src.ar4414.pruning.plotting.summary_stats.gops as gopSrc
+import src.ar4414.pruning.plotting.summary_stats.channel_diff as channeDiffSrc
+import src.ar4414.pruning.plotting.summary_stats.l1_norms as l1NormsSrc
 
 def summary_statistics(logs, networks, datasets, prunePercs):
 #{{{    
-    data = {'Network':[], 'Dataset':[], 'PrunePerc':[], 'AvgTestAcc':[], 'StdTestAcc':[], 'PreFtDiff':[], 'PostFtDiff':[], 'InferenceGops':[]}
+    data = {'Network':[], 'Dataset':[], 'PrunePerc':[], 'AvgTestAcc':[], 'StdTestAcc':[], 'PreFtDiff':[], 'PostFtDiff':[], 'InferenceGops':[], 'FinetuneGops':[], 'Memory(MB)':[]}
     
     for network in networks:
         for dataset in datasets:
@@ -31,24 +31,28 @@ def summary_statistics(logs, networks, datasets, prunePercs):
                 tmpPruned = []
                 tmpAcc = []
                 tmpInfGops = []
+                tmpFtGops = []
+                tmpMem = []
                 for i,run in enumerate(runs): 
                     log = 'pp_{}/{}/orig'.format(pp, run)
     
                    # extract pruned channels 
-                    channelsPruned = mod_channel_diff.get_pruned_channels(basePath, log)
+                    channelsPruned = channeDiffSrc.get_pruned_channels(basePath, log)
                     tmpPruned.append(channelsPruned)
 
                     # extract accuracy 
                     accFile = os.path.join(basePath, log, 'log.csv')
-                    logReader = mod_acc.LogReader(accFile)
+                    logReader = accSrc.LogReader(accFile)
                     bestTest = logReader.get_best_test_acc()
                     tmpAcc.append(bestTest)
     
-                    #extract inferenceGops
-                    gops = mod_gops.get_gops(basePath, log)
-                    tmpInfGops.append(gops['inf'])
+                    #extract gops
+                    infGops, ftGops, modelSize = gopSrc.get_gops(basePath, log)
+                    tmpInfGops.append(infGops)
+                    tmpFtGops.append(ftGops)
+                    tmpMem.append(modelSize)
                 
-                pDiffPerRun, pDiffBetweenRuns = mod_channel_diff.compute_differences(preFtChannelsPruned, tmpPruned)
+                pDiffPerRun, pDiffBetweenRuns = channeDiffSrc.compute_differences(preFtChannelsPruned, tmpPruned)
                 avgTestAcc = np.mean(tmpAcc) 
                 stdTestAcc = np.std(tmpAcc)
                 
@@ -60,6 +64,8 @@ def summary_statistics(logs, networks, datasets, prunePercs):
                 data['PreFtDiff'].append(pDiffPerRun)
                 data['PostFtDiff'].append(pDiffBetweenRuns)
                 data['InferenceGops'].append(np.mean(tmpInfGops))
+                data['FinetuneGops'].append(np.mean(tmpFtGops))
+                data['Memory(MB)'].append(np.mean(tmpMem))
     
     df = pd.DataFrame(data)
 
@@ -86,9 +92,9 @@ def l1_norm_statistics(logs, networks, datasets, prunePercs):
                     basePath = logs[network][dataset]['base_path']
                     log = 'pp_{}/{}/orig'.format(pp, run)
                     
-                    channelsPruned = mod_channel_diff.get_pruned_channels(basePath, log)
-                    preL1Norms, postL1Norms, diffL1Norms, layerIndexOffset = mod_l1_norms.get_l1_norms(logs, network, dataset, pp, run)
-                    tmpCutoff.append(mod_l1_norms.get_cutoff_l1_norms(np.array(postL1Norms), channelsPruned, layerIndexOffset))
+                    channelsPruned = channeDiffSrc.get_pruned_channels(basePath, log)
+                    preL1Norms, postL1Norms, diffL1Norms, layerIndexOffset = l1NormsSrc.get_l1_norms(logs, network, dataset, pp, run)
+                    tmpCutoff.append(l1NormsSrc.get_cutoff_l1_norms(np.array(postL1Norms), channelsPruned, layerIndexOffset))
 
                     if len(tmpPre) == 0:
                         tmpPre = preL1Norms

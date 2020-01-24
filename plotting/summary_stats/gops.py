@@ -1,14 +1,36 @@
 import os
+import glob
 import json
+import math
+
+import configparser as cp
 
 import matplotlib.pyplot as plt
 
 def get_gops(basePath, log):
 #{{{
+    datasetSizes = {'cifar100':{'entire_dataset':50000, 'subset1':20000, 'aquatic':5000}} 
+
     gopsFile = os.path.join(basePath, log, 'gops.json')
     with open(gopsFile, 'r') as jFile:
         gops = json.load(jFile)    
-    return gops
+    
+    config = cp.ConfigParser() 
+    configFile = glob.glob(os.path.join(basePath, log, '*.ini'))[0]
+    config.read(configFile)
+    
+    dataset = config.get('dataset', 'dataset')
+    subset = config.get('pruning_hyperparameters', 'sub_name')
+    batchSize = config.getint('training_hyperparameters', 'train_batch')    
+    pruneAfter = config.getint('pruning_hyperparameters', 'prune_after')
+    epochs = config.getint('pruning_hyperparameters', 'finetune_budget')
+
+    numBatches = math.ceil(datasetSizes[dataset][subset]/batchSize)
+
+    infGops = gops['inf'] / batchSize
+    ftGops = sum([(numBatches * gops['ft']['unpruned']) if epoch < pruneAfter else (numBatches * gops['ft']['pruned']) for epoch in range(epochs)])
+
+    return (infGops, ftGops, gops['mem']['pruned'])
 #}}}
 
 def plot_inf_gops_vs_acc(summaryData):
