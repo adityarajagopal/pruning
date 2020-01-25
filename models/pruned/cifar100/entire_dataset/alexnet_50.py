@@ -8,9 +8,9 @@ class AlexNet(nn.Module):
 
 		self.conv1 = nn.Conv2d(3, 64, kernel_size=(11, 11), stride=(4, 4), padding=(5, 5))
 		self.conv2 = nn.Conv2d(64, 184, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2))
-		self.conv3 = nn.Conv2d(184, 223, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-		self.conv4 = nn.Conv2d(223, 125, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-		self.conv5 = nn.Conv2d(125, 249, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+		self.conv3 = nn.Conv2d(184, 222, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+		self.conv4 = nn.Conv2d(222, 126, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+		self.conv5 = nn.Conv2d(126, 249, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
 		self.maxpool2d = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
 		self.classifier = nn.Linear(in_features=249, out_features=100, bias=True)
 

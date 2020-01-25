@@ -46,8 +46,8 @@ class Application(appSrc.Application):
         self.setup_model()
         self.setup_tee_printing()
         
-        if self.params.pruneFilters:
-            self.setup_pruners()
+        # if self.params.pruneFilters:
+        self.setup_pruners()
 
         if self.params.getGops: 
         #{{{
