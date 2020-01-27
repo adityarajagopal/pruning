@@ -3,8 +3,7 @@ import configparser as cp
 import subprocess
 import sys
 
-# nets = ['resnet', 'mobilenetv2', 'alexnet', 'squeezenet']
-nets = ['resnet', 'alexnet', 'squeezenet']
+nets = ['resnet', 'mobilenetv2', 'alexnet', 'squeezenet']
 pruningPercs = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95]
 subset = ['subset1', 'aquatic', 'entire_dataset']
 sub_classes = ["large_man-made_outdoor_things large_natural_outdoor_scenes vehicles_1 vehicles_2 trees small_mammals people", "aquatic_mammals fish", ""]
@@ -48,11 +47,8 @@ for netCount, net in enumerate(nets):
         config['pytorch_parameters']['checkpoint_path'] = cpRoot.format(net, ss) 
         
         for t in range(2): 
-            if t == 0 and net == 'resnet':
-                continue
-
             config['pruning_hyperparameters']['inference_gops'] = "False" if t == 1 else "True"
-            runFileName = 'runs_gops.sh'
+            runFileName = 'run_gops.sh'
             runFile = os.path.join(runFileBase, runFileName)
 
             testConfig = os.path.join(configPath, str(net) + '_' + str(testCount) + '.ini')

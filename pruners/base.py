@@ -123,9 +123,6 @@ class BasicPruning(ABC):
         return summary
     #}}} 
 
-    # requires the channels_pruned value in config to be set to the json file 
-    # that has the channels pruned for that run 
-    # TODO: change logging when finetuning to store model description file as well
     def get_random_init_model(self, finetunePath):    
     #{{{
         importPath = finetunePath.split('/')

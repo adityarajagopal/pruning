@@ -9,7 +9,7 @@ def add_network(logs, networkName, datasets, baseFolder, preFtModel):
     logs[networkName] = {dataset:{} for dataset in datasets}
     logs[networkName]['pre_ft_model'] = preFtModel
     for dataset in datasets:
-        logs[networkName][dataset]['base_path'] = '/home/ar4414/pytorch_training/src/ar4414/pruning/logs/alexnet/cifar100/{}/{}'.format(dataset, baseFolder)
+        logs[networkName][dataset]['base_path'] = '/home/ar4414/pytorch_training/src/ar4414/pruning/logs/{}/cifar100/{}/{}'.format(networkName, dataset, baseFolder)
 
     return logs
 #}}}
