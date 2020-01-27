@@ -1,6 +1,6 @@
 {
   "mobilenetv2": {
-    "pre_ft_model": "/mnt/users/ar4414/pruning_logs/mobilenetv2/cifar100/baseline/2019-10-07-15-17-32/orig/111-model.pth.tar",
+    "pre_ft_model": "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/mobilenetv2/cifar100/baseline/2019-10-07-15-17-32/orig/111-model.pth.tar",
     "entire_dataset": {
       "5": [
         "2020-01-21-03-30-06",
@@ -35,7 +35,6 @@
         "2020-01-25-20-47-48"
       ],
       "60": [
-        "2020-01-20-17-58-34",
         "2020-01-21-05-54-12",
         "2020-01-21-06-05-55",
         "2020-01-21-06-17-43",
@@ -158,7 +157,6 @@
         "2020-01-25-10-22-56"
       ],
       "60": [
-        "2020-01-20-18-07-15",
         "2020-01-21-01-20-56",
         "2020-01-21-01-26-07",
         "2020-01-21-01-31-27",
@@ -281,7 +279,6 @@
         "2020-01-25-13-55-28"
       ],
       "60": [
-        "2020-01-20-15-48-28",
         "2020-01-21-02-57-18",
         "2020-01-21-03-00-08",
         "2020-01-21-03-02-51",
@@ -372,7 +369,7 @@
     }
   },
   "resnet": {
-    "pre_ft_model": "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/resnet20/cifar100/baseline/2019-08-27-11-58-14/orig/118-model.pth.tar",
+    "pre_ft_model": "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/resnet/cifar100/baseline/2019-08-27-11-58-14/orig/118-model.pth.tar",
     "entire_dataset": {
       "5": [
         "2020-01-20-21-21-20",

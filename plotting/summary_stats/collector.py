@@ -23,7 +23,7 @@ def summary_statistics(logs, networks, datasets, prunePercs):
     for network in networks:
         for dataset in datasets:
             for pp in prunePercs:
-                preFtChannelsPruned = '/home/ar4414/pytorch_training/src/ar4414/pruning/prunedChannels/{}/pre_ft_pp_{}.pth.tar'.format(network,pp)
+                preFtChannelsPruned = '/home/ar4414/pytorch_training/src/ar4414/pruning/logs/{}/{}/baseline/pre_ft_pp_{}.pth.tar'.format(network,'cifar100',pp)
                 preFtChannelsPruned = torch.load(preFtChannelsPruned)
                 basePath = logs[network][dataset]['base_path'] 
 

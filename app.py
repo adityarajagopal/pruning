@@ -109,81 +109,26 @@ class Application(appSrc.Application):
                 plotter.plot_channels()
         #}}}
 
-        elif self.params.changeInRanking:
+        elif self.params.noFtChannelsPruned:
         #{{{
-            log = [x for x in self.params.logFiles if 'pp_{}'.format(str(int(self.params.pruningPerc))) in x][0]
-            changeByLayers = {}
-            prunePercs = []
-            changeByPrunePerc = [] 
+            logs = self.params.logs
+            with open(logs, 'r') as jFile:
+                logs = json.load(jFile)    
+            logs = logs[self.params.arch][self.params.subsetName]
+            prunePercs = list(logs.keys())
+            prunePercs.remove('base_path')
 
-            basePP = {}
-            
-            for log in self.params.logFiles:
-                ppStr = log.split('/')[0]
-                pp = float(ppStr.split('_')[1])
-                self.params.pruningPerc = pp 
-                
+            for pp in prunePercs:
                 if pp == 0.:
                     continue
                 
                 print("=========== Prune Perc = {}% ===========".format(pp))
+                self.params.pruningPerc = int(pp)
                 self.setup_pruners()
                 preFtChannelsPruned = self.pruner.structured_l1_weight(self.model)
     
-                torch.save(preFtChannelsPruned, 'prunedChannels/{}/pre_ft_pp_{}.pth.tar'.format(self.params.arch, int(pp)))
-                continue
-                
-                logFile = os.path.join(self.params.logDir, log, 'pruned_channels.json')
-                with open(logFile, 'r') as jFile:
-                    postFtChannelsPruned = json.load(jFile)    
-                postFtChannelsPruned = list(postFtChannelsPruned.values())[0]
-                postFtChannelsPruned.pop('prunePerc')
-            
-                layerNames = list(postFtChannelsPruned.keys())
-
-                numChanChanged = []
-                totChannelsPruned = 0
-                totOverlap = 0
-                for k,currChannelsPruned in postFtChannelsPruned.items(): 
-                    origChannelsPruned = preFtChannelsPruned[k]
-
-                    numChanPruned = len(list(set(currChannelsPruned) | set(origChannelsPruned)))
-                    overlap = len(list(set(currChannelsPruned) & set(origChannelsPruned)))
-                    totChannelsPruned += numChanPruned
-                    totOverlap += overlap  
-
-                    if numChanPruned != 0:
-                        pDiff = 1.0 - (overlap / numChanPruned)
-                        # print("For layer {}, percentage of channels pruned that were different = {}".format(k,pDiff))
-                    else:
-                        pDiff = 0
-                    
-                    numChanChanged.append(pDiff)      
-                
-                changeByLayers[ppStr] = numChanChanged
-            
-                pDiffGlobal = 1. - (totOverlap / totChannelsPruned)
-                print("Across network, percentage of channels that were different = {}".format(pDiffGlobal))
-                prunePercs.append("{}-%".format(pp))
-                changeByPrunePerc.append(pDiffGlobal)  
-            
-            ############ comment in if need to store in order to use scripts/plot_channels.py
-            ############ to plot a cross network comparison graph of global pruning difference
-            toStore = {'pp':prunePercs, '%-diff':changeByPrunePerc}
-            torch.save(toStore, 'prunedChannels/{}.pth.tar'.format(self.params.arch))
-            
-            ############ plots for each level of pruning globally what is the difference in the 
-            ############ channels selected
-            # title = 'Percent difference in channels pruned globally by percentage of network pruned \n ({})'.format(self.params.subsetName)
-            # xlabel = "Percentage of network pruned"
-            # ylabel = 'Percentage of channels pruned differently'
-            # plot_channel_difference({'%-diff':changeByPrunePerc}, prunePercs, title, xlabel, ylabel) 
-
-            ########### plots by layer what is the difference for the different levels of purning
-            # title='Percentage difference in channels pruned after finetuning \n ({})'.format(self.params.subsetName)
-            # xlabel = '{} - Layer Name'.format(self.params.arch.capitalize())
-            # ylabel = 'Percentage of channels pruned differently'
-            # plot_channel_difference(changeByLayers, layerNames, title, xlabel, ylabel) 
+                logLocation = '/home/ar4414/pytorch_training/src/ar4414/pruning/logs/{}/{}/baseline/pre_ft_pp_{}.pth.tar'.format(self.params.arch, self.params.dataset, int(pp))
+                torch.save(preFtChannelsPruned, logLocation)
         #}}}
 
         elif self.params.entropy == True:

@@ -11,7 +11,6 @@ class Params(ppSrc.Params) :
         super().__init__(config_file)
         
         self.getGops = config_file.getboolean('pruning_hyperparameters', 'get_gops')
-        # self.plotInferenceGops = config_file.getboolean('pruning_hyperparameters', 'plot_inference_gops', fallback=None)
         self.inferenceGops = config_file.getboolean('pruning_hyperparameters', 'inference_gops', fallback=None)
         self.logs = config_file.get('pruning_hyperparameters', 'logs', fallback=None)
         
@@ -19,7 +18,7 @@ class Params(ppSrc.Params) :
         assert (self.plotType == 'number' or self.plotType == 'hamming' or self.plotType == 'joint'), 'Plot Type must be number, hamming or joint - provided {}'.format(self.plotType)
         self.plotChannels = config_file.get('pruning_hyperparameters', 'plot_channels', fallback='').split()
 
-        self.changeInRanking = config_file.getboolean('pruning_hyperparameters', 'change_in_rank', fallback=False)
+        self.noFtChannelsPruned = config_file.getboolean('pruning_hyperparameters', 'no_finetune_channels_pruned', fallback=False)
         
         self.subsetName = config_file.get('pruning_hyperparameters', 'sub_name', fallback='subset1')
         self.sub_classes = config_file.get('pruning_hyperparameters', 'sub_classes').split() 

@@ -20,7 +20,6 @@ while childDir != 'src':
     childDir = parentDir[1]
 sys.path.append(parentDir[0])
 
-
 from src.ar4414.pruning.plotting import log_updater 
 from src.ar4414.pruning.plotting.summary_stats import collector 
 from src.ar4414.pruning.plotting.summary_stats import gops as gopSrc 
@@ -31,9 +30,13 @@ def parse_arguments():
 #{{{
     print('Parsing Arguments')
     parser = argparse.ArgumentParser()
+
+    parser.add_argument('--networks', type=str, nargs='+', default=None, help='name of networks to display')
+    parser.add_argument('--subsets', type=str, nargs='+', default=None, help='name of subsets to display')
     
     parser.add_argument('--channel_diff', action='store_true', help='plot difference in channels before and after finetuning')
     parser.add_argument('--inf_gops', action='store_true', help='plot inference gops vs test accuracy')
+    parser.add_argument('--ft_gops', action='store_true', help='plot finetune gops vs test accuracy')
     parser.add_argument('--l1_norm', action='store_true', help='plot histograms of l1-norms and change in l1-norms before and after finetuning')
     parser.add_argument('--pretty_print', action='store_true', help='pretty print summary data table')
 
@@ -58,9 +61,8 @@ if __name__ == '__main__':
         print('No arguments passed, hence nothing will run')
         sys.exit()
     
-    # networks = ['mobilenetv2', 'resnet']
-    networks = ['alexnet', 'mobilenetv2', 'resnet', 'squeezenet']
-    datasets = ['entire_dataset', 'subset1', 'aquatic']
+    networks = ['alexnet', 'mobilenetv2', 'resnet', 'squeezenet'] if args.networks is None else args.networks
+    datasets = ['entire_dataset', 'subset1', 'aquatic'] if args.subsets is None else args.subsets
     prunePercs = [str(i) for i in range(5,100,5)]
     
     # load json with log file locations
@@ -79,7 +81,7 @@ if __name__ == '__main__':
         with open('/home/ar4414/pytorch_training/src/ar4414/pruning/plotting/logs.json', 'w') as jFile:
             logs = json.dump(logs, jFile, indent=2)
 
-    if args.channel_diff or args.inf_gops:
+    if args.channel_diff or args.inf_gops or args.ft_gops:
         print("==> Collecting Accuracy and Gops statistics")
         summaryData = collector.summary_statistics(logs, networks, datasets, prunePercs)
         
@@ -102,10 +104,15 @@ if __name__ == '__main__':
         print("==> Plotting Difference in Channels Pruned before and after finetuning")
         channeDiffSrc.plot_channel_diff_by_pp(summaryData)
 
-    # plot inference time vs accuracy tradeoff
+    # plot inference gops vs accuracy tradeoff
     if args.inf_gops:
         print("==> Plotting GOps for inference vs best test top1 accuracy obtained")
         gopSrc.plot_inf_gops_vs_acc(summaryData)
+    
+    # plot finetune gops vs accuracy tradeoff 
+    if args.ft_gops:
+        print("==> Plotting GOps for finetuning vs best test top1 accuracy obtained")
+        gopSrc.plot_ft_gops_vs_acc(summaryData)
 
     # plot difference in l1-norms and l1-norms 
     if args.l1_norm: 

@@ -39,9 +39,11 @@ def plot_inf_gops_vs_acc(summaryData):
     xAxis = 'InferenceGops'
     yAxis = 'AvgTestAcc'
 
+    colours = {'mobilenetv2':'red', 'resnet':'blue', 'alexnet':'green', 'squeezenet':'orange'}
+
     for (dataset, net), data in summaryData.groupby(['Dataset', 'Network']):
-        colour = 'red' if 'mobilenetv2' in net else 'blue'
-        title = 'Top1 Test Accuracy (%) on subset {}'.format(dataset.capitalize()) 
+        colour = colours[net]
+        title = 'Top1 Test Accuracy (%) for {} on Subset-{}'.format(net, dataset.capitalize()) 
         
         if 'entire_dataset' in dataset:
             ax = data.plot.scatter(x=xAxis, y=yAxis, ax=axAccs[0], c=colour, label=net, title=title)
@@ -54,7 +56,7 @@ def plot_inf_gops_vs_acc(summaryData):
         ax.set_ylabel('Test Accuracy (%)')
 #}}}
 
-def plot_inf_gops_vs_acc(summaryData):
+def plot_ft_gops_vs_acc(summaryData):
 #{{{
     axAccs = [plt.subplots(1,1)[1] for i in range(3)] #subplots returns fig,ax tuple
     xAxis = 'FinetuneGops'
@@ -62,7 +64,7 @@ def plot_inf_gops_vs_acc(summaryData):
 
     for (dataset, net), data in summaryData.groupby(['Dataset', 'Network']):
         colour = 'red' if 'mobilenetv2' in net else 'blue'
-        title = 'Top1 Test Accuracy (%) on Subset-{}'.format(dataset.capitalize()) 
+        title = 'Top1 Test Accuracy (%) for {} on Subset-{}'.format(net, dataset.capitalize()) 
         
         if 'entire_dataset' in dataset:
             ax = data.plot.scatter(x=xAxis, y=yAxis, ax=axAccs[0], c=colour, label=net, title=title)
