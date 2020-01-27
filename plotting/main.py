@@ -30,19 +30,23 @@ def parse_arguments():
 #{{{
     print('Parsing Arguments')
     parser = argparse.ArgumentParser()
-
+    
+    # plot data for only a subset of networks / datasets
     parser.add_argument('--networks', type=str, nargs='+', default=None, help='name of networks to display')
     parser.add_argument('--subsets', type=str, nargs='+', default=None, help='name of subsets to display')
     
+    # types of plots
     parser.add_argument('--channel_diff', action='store_true', help='plot difference in channels before and after finetuning')
     parser.add_argument('--inf_gops', action='store_true', help='plot inference gops vs test accuracy')
     parser.add_argument('--ft_gops', action='store_true', help='plot finetune gops vs test accuracy')
     parser.add_argument('--l1_norm', action='store_true', help='plot histograms of l1-norms and change in l1-norms before and after finetuning')
     parser.add_argument('--pretty_print', action='store_true', help='pretty print summary data table')
-
+    
+    # update logs.json with timestamps
     parser.add_argument('--update_logs', action='store_true', help='update logs.json file with relevant timestamps')
     parser.add_argument('--as_of', type=str, help='year-month-day including and after which to store the logs')
-    
+   
+    # add network to logs.json
     parser.add_argument('--add_network', action='store_true', help='add a network to logs')
     parser.add_argument('--name', type=str, help='name of network to add')
     parser.add_argument('--pre_ft_path', type=str, help='path to model before finetuning')
