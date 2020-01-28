@@ -39,6 +39,7 @@ def parse_arguments():
     parser.add_argument('--channel_diff', action='store_true', help='plot difference in channels before and after finetuning')
     parser.add_argument('--inf_gops', action='store_true', help='plot inference gops vs test accuracy')
     parser.add_argument('--ft_gops', action='store_true', help='plot finetune gops vs test accuracy')
+    parser.add_argument('--ft_epoch_gops', action='store_true', help='plot finetune gops vs test accuracy')
     parser.add_argument('--l1_norm', action='store_true', help='plot histograms of l1-norms and change in l1-norms before and after finetuning')
     parser.add_argument('--pretty_print', action='store_true', help='pretty print summary data table')
     
@@ -92,6 +93,12 @@ if __name__ == '__main__':
         if args.pretty_print:
             print(tabulate(summaryData, headers='keys', tablefmt='psql'))
     
+    if args.ft_epoch_gops:
+        print("==> Collecting cumulative gops by epoch statistics")
+        gopsByEpochData = collector.per_epoch_statistics(logs, networks, datasets, prunePercs)
+        print("==> Plotting cumulative gops by epoch statistics")
+        gopSrc.plot_ft_gops_by_epoch(gopsByEpochData)
+
     if args.l1_norm:
         print("==> L1-Norm Statistics")
         normsDict = collector.l1_norm_statistics(logs, networks, datasets, prunePercs)

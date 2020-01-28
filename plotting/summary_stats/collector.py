@@ -47,11 +47,11 @@ def summary_statistics(logs, networks, datasets, prunePercs):
                     tmpAcc.append(bestTest)
     
                     #extract gops
-                    infGops, ftGops, modelSize = gopSrc.get_gops(basePath, log)
+                    infGops, totalFtGops, modelSize = gopSrc.get_gops(basePath, log)
                     tmpInfGops.append(infGops)
-                    tmpFtGops.append(ftGops)
+                    tmpFtGops.append(totalFtGops)
                     tmpMem.append(modelSize)
-                
+
                 pDiffPerRun, pDiffBetweenRuns = channeDiffSrc.compute_differences(preFtChannelsPruned, tmpPruned)
                 avgTestAcc = np.mean(tmpAcc) 
                 stdTestAcc = np.std(tmpAcc)
@@ -70,6 +70,41 @@ def summary_statistics(logs, networks, datasets, prunePercs):
     df = pd.DataFrame(data)
 
     return df
+#}}}
+
+def per_epoch_statistics(logs, networks, datasets, prunePercs):
+#{{{
+    data = {net:{subset:{pp:None for pp in prunePercs} for subset in datasets} for net in networks}
+    for network in networks:
+        for dataset in datasets:
+            for pp in prunePercs:
+                basePath = logs[network][dataset]['base_path'] 
+                runs = logs[network][dataset][pp] 
+
+                for i,run in enumerate(runs):
+                    log = 'pp_{}/{}/orig'.format(pp, run)
+                    
+                    #get epochs and acc per epoch
+                    accFile = os.path.join(basePath, log, 'log.csv')
+                    logReader = accSrc.LogReader(accFile)
+                    tmpPerEpochStats = logReader.get_acc_per_epoch()
+
+                    #get gops by epoch
+                    gops, modelSize = gopSrc.get_gops(basePath, log, perEpoch=True)
+                    
+                    tmpPerEpochStats['Ft_Gops'] = gops                                        
+
+                    if i == 0:
+                        perEpochStats = tmpPerEpochStats
+                    else:
+                        perEpochStats = pd.concat((perEpochStats, tmpPerEpochStats))
+                
+                perEpochStats = perEpochStats.groupby(perEpochStats.index).mean()
+                perEpochStats['Epoch'] += 1
+                
+                data[network][dataset][pp] = perEpochStats
+    
+    return data
 #}}}
 
 def l1_norm_statistics(logs, networks, datasets, prunePercs): 
@@ -119,3 +154,4 @@ def l1_norm_statistics(logs, networks, datasets, prunePercs):
             
     return data
 #}}}
+

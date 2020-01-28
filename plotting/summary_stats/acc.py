@@ -14,3 +14,8 @@ class LogReader(object):
         bestTest = self.accFile['Test_Top1'].dropna()[bestValIdx]
         return bestTest
     #}}}
+
+    def get_acc_per_epoch(self):
+    #{{{
+        return self.accFile[['Epoch', 'Train_Top1', 'Val_Top1', 'Test_Top1']].dropna()
+    #}}}
