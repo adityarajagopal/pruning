@@ -46,7 +46,6 @@ class Application(appSrc.Application):
         self.setup_model()
         self.setup_tee_printing()
         
-        # if self.params.pruneFilters:
         self.setup_pruners()
 
         if self.params.getGops: 
@@ -102,11 +101,22 @@ class Application(appSrc.Application):
             #}}}
         #}}}
 
-        elif self.params.plotChannels != []:
+        elif self.params.unprunedTestAcc: 
         #{{{
-            if self.params.pruneFilters:
-                plotter = ChannelPlotter(self.params, self.model)
-                plotter.plot_channels()
+            logs = self.params.logs
+            with open(logs, 'r') as jFile:
+                logJson = json.load(jFile)    
+            
+            _,tfg,_,_ = gopSrc.calc_inference_gops(self)
+            infGopsPerImage = tfg / self.params.test_batch
+
+            logNetSub = logJson[self.params.arch][self.params.subsetName]
+            loss, top1, top5 = self.run_inference()
+            
+            logNetSub['unpruned_inference'] = {'test_top1':top1, 'gops':infGopsPerImage}
+            
+            with open(logs, 'w') as jFile: 
+                json.dump(logJson, jFile, indent=2)
         #}}}
 
         elif self.params.noFtChannelsPruned:

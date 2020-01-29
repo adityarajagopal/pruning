@@ -18,6 +18,7 @@ import src.ar4414.pruning.plotting.summary_stats.l1_norms as l1NormsSrc
 
 def summary_statistics(logs, networks, datasets, prunePercs):
 #{{{    
+    # data refers to runs that have been pruned based on finetuning on the dataset
     data = {'Network':[], 'Dataset':[], 'PrunePerc':[], 'AvgTestAcc':[], 'StdTestAcc':[], 'PreFtDiff':[], 'PostFtDiff':[], 'InferenceGops':[], 'FinetuneGops':[], 'Memory(MB)':[]}
     
     for network in networks:
@@ -69,6 +70,24 @@ def summary_statistics(logs, networks, datasets, prunePercs):
     
     df = pd.DataFrame(data)
 
+    return df
+#}}}
+
+def subset_agnostic_summary_statistics(logs, networks, datasets, prunePercs):
+#{{{
+    # data refers to runs that have not been pruned or pruned without finetuning on the subset 
+    data = {'Network':[], 'Subset':[], 'PrunePerc':[], 'TestAcc':[], 'InferenceGops':[]}
+    
+    for network in networks:
+        for subset in datasets:
+            pp = 0
+            data['Network'].append(network)
+            data['Subset'].append(subset)
+            data['PrunePerc'].append(pp)
+            data['TestAcc'].append(logs[network][subset]['unpruned_inference']['test_top1'])
+            data['InferenceGops'].append(logs[network][subset]['unpruned_inference']['gops'])
+    
+    df = pd.DataFrame(data)
     return df
 #}}}
 
@@ -154,4 +173,5 @@ def l1_norm_statistics(logs, networks, datasets, prunePercs):
             
     return data
 #}}}
+
 

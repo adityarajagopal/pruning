@@ -10,18 +10,16 @@ class Params(ppSrc.Params) :
     def __init__(self, config_file) : 
         super().__init__(config_file)
         
-        self.getGops = config_file.getboolean('pruning_hyperparameters', 'get_gops')
-        self.inferenceGops = config_file.getboolean('pruning_hyperparameters', 'inference_gops', fallback=None)
-        self.logs = config_file.get('pruning_hyperparameters', 'logs', fallback=None)
-        
-        self.plotType = config_file.get('pruning_hyperparameters', 'plot_type', fallback='joint')
-        assert (self.plotType == 'number' or self.plotType == 'hamming' or self.plotType == 'joint'), 'Plot Type must be number, hamming or joint - provided {}'.format(self.plotType)
-        self.plotChannels = config_file.get('pruning_hyperparameters', 'plot_channels', fallback='').split()
-
-        self.noFtChannelsPruned = config_file.getboolean('pruning_hyperparameters', 'no_finetune_channels_pruned', fallback=False)
-        
         self.subsetName = config_file.get('pruning_hyperparameters', 'sub_name', fallback='subset1')
         self.sub_classes = config_file.get('pruning_hyperparameters', 'sub_classes').split() 
+        self.logs = config_file.get('pruning_hyperparameters', 'logs', fallback=None)
+        
+        self.getGops = config_file.getboolean('pruning_hyperparameters', 'get_gops')
+        self.inferenceGops = config_file.getboolean('pruning_hyperparameters', 'inference_gops', fallback=None)
+
+        self.unprunedTestAcc = config_file.getboolean('pruning_hyperparameters', 'unpruned_test_acc', fallback=None) 
+        
+        self.noFtChannelsPruned = config_file.getboolean('pruning_hyperparameters', 'no_finetune_channels_pruned', fallback=False)
         
         self.retrain = config_file.getboolean('pruning_hyperparameters', 'retrain', fallback=False)
         self.channelsPruned = config_file.get('pruning_hyperparameters', 'channels_pruned', fallback='')

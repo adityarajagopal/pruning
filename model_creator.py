@@ -67,12 +67,11 @@ class ModelCreator(mcSrc.ModelCreator):
             # model.module.load_state_dict(checkpoint)
             model.load_state_dict(checkpoint)
     
-        elif params.evaluate: 
+        elif params.evaluate or params.unprunedTestAcc: 
             device_id = params.gpu_list[0]
             location = 'cuda:'+str(device_id)
             checkpoint = torch.load(params.pretrained, map_location=location)
             model.load_state_dict(checkpoint)
-            # model.load_state_dict(checkpoint['state_dict'])
             
         torch.backends.cudnn.benchmark = True
         print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))

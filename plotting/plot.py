@@ -39,9 +39,12 @@ def parse_arguments():
     parser.add_argument('--channel_diff', action='store_true', help='plot difference in channels before and after finetuning')
     parser.add_argument('--inf_gops', action='store_true', help='plot inference gops vs test accuracy')
     parser.add_argument('--ft_gops', action='store_true', help='plot finetune gops vs test accuracy')
-    parser.add_argument('--ft_epoch_gops', action='store_true', help='plot finetune gops vs test accuracy')
     parser.add_argument('--l1_norm', action='store_true', help='plot histograms of l1-norms and change in l1-norms before and after finetuning')
     parser.add_argument('--pretty_print', action='store_true', help='pretty print summary data table')
+    
+    parser.add_argument('--ft_epoch_gops', action='store_true', help='plot finetune gops vs test accuracy')
+    parser.add_argument('--plot_as_line', type=str, nargs='+', default=None, help='pruning percentages to plot as a line')
+    parser.add_argument('--acc_metric', type=str, default='Test_Top1', help='y-axis metric : one of (Train_Top1, Test_Top1 and Val_Top1')
     
     # update logs.json with timestamps
     parser.add_argument('--update_logs', action='store_true', help='update logs.json file with relevant timestamps')
@@ -69,35 +72,38 @@ if __name__ == '__main__':
     networks = ['alexnet', 'mobilenetv2', 'resnet', 'squeezenet'] if args.networks is None else args.networks
     datasets = ['entire_dataset', 'subset1', 'aquatic'] if args.subsets is None else args.subsets
     prunePercs = [str(i) for i in range(5,100,5)]
+    logsJson = '/home/ar4414/pytorch_training/src/ar4414/pruning/logs/logs.json'
     
     # load json with log file locations
-    with open('/home/ar4414/pytorch_training/src/ar4414/pruning/plotting/logs.json', 'r') as jFile:
+    with open(logsJson, 'r') as jFile:
         logs = json.load(jFile)
 
     if args.add_network:
         print("==> Updating json with new network")
         logs = log_updater.add_network(logs, args.name, datasets, args.base_folder, args.pre_ft_path)
-        with open('/home/ar4414/pytorch_training/src/ar4414/pruning/plotting/logs.json', 'w') as jFile:
+        with open(logsJson, 'w') as jFile:
             logs = json.dump(logs, jFile, indent=2)
 
     if args.update_logs: 
         print("==> Updating logs.json with new timestamps")
         logs = log_updater.update_timestamps(logs, networks, datasets, prunePercs, asOf=args.as_of)
-        with open('/home/ar4414/pytorch_training/src/ar4414/pruning/plotting/logs.json', 'w') as jFile:
+        with open(logsJson, 'w') as jFile:
             logs = json.dump(logs, jFile, indent=2)
 
     if args.channel_diff or args.inf_gops or args.ft_gops:
         print("==> Collecting Accuracy and Gops statistics")
         summaryData = collector.summary_statistics(logs, networks, datasets, prunePercs)
-        
+        subsetAgnosticSummaryData = collector.subset_agnostic_summary_statistics(logs, networks, datasets, prunePercs)
+
         if args.pretty_print:
             print(tabulate(summaryData, headers='keys', tablefmt='psql'))
+            print(tabulate(subsetAgnosticSummaryData, headers='keys', tablefmt='psql'))
     
     if args.ft_epoch_gops:
         print("==> Collecting cumulative gops by epoch statistics")
         gopsByEpochData = collector.per_epoch_statistics(logs, networks, datasets, prunePercs)
         print("==> Plotting cumulative gops by epoch statistics")
-        gopSrc.plot_ft_gops_by_epoch(gopsByEpochData)
+        gopSrc.plot_ft_gops_by_epoch(gopsByEpochData, args.plot_as_line, args.acc_metric)
 
     if args.l1_norm:
         print("==> L1-Norm Statistics")
@@ -118,7 +124,7 @@ if __name__ == '__main__':
     # plot inference gops vs accuracy tradeoff
     if args.inf_gops:
         print("==> Plotting GOps for inference vs best test top1 accuracy obtained")
-        gopSrc.plot_inf_gops_vs_acc(summaryData)
+        gopSrc.plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData)
     
     # plot finetune gops vs accuracy tradeoff 
     if args.ft_gops:
@@ -129,6 +135,6 @@ if __name__ == '__main__':
     if args.l1_norm: 
         print("==> Plotting l1-norm histograms and histograms in difference in l1-norm before and after finetuning")
         l1NormsSrc.plot_histograms(normsDict)        
-    
+     
     plt.show()
 
