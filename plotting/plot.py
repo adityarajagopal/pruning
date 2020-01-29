@@ -46,6 +46,8 @@ def parse_arguments():
     parser.add_argument('--plot_as_line', type=str, nargs='+', default=None, help='pruning percentages to plot as a line')
     parser.add_argument('--acc_metric', type=str, default='Test_Top1', help='y-axis metric : one of (Train_Top1, Test_Top1 and Val_Top1')
     
+    parser.add_argument('--bin_search_cost', action='store_true', help='plot cost of binary search')
+    
     # update logs.json with timestamps
     parser.add_argument('--update_logs', action='store_true', help='update logs.json file with relevant timestamps')
     parser.add_argument('--as_of', type=str, help='year-month-day including and after which to store the logs')
@@ -104,6 +106,10 @@ if __name__ == '__main__':
         gopsByEpochData = collector.per_epoch_statistics(logs, networks, datasets, prunePercs)
         print("==> Plotting cumulative gops by epoch statistics")
         gopSrc.plot_ft_gops_by_epoch(gopsByEpochData, args.plot_as_line, args.acc_metric)
+
+    if args.bin_search_cost:
+        print("==> Performing binary search to get pruning percentage that gives no accuracy loss")
+        binSearchCost = collector.bin_search_cost(logs, networks, datasets, prunePercs)
 
     if args.l1_norm:
         print("==> L1-Norm Statistics")
