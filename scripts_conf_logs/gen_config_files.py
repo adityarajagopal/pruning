@@ -5,28 +5,27 @@ import sys
 
 nets = ['resnet', 'mobilenetv2', 'alexnet', 'squeezenet']
 pruningPercs = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95]
-subset = ['subset1', 'aquatic', 'entire_dataset']
-sub_classes = ["large_man-made_outdoor_things large_natural_outdoor_scenes vehicles_1 vehicles_2 trees small_mammals people", "aquatic_mammals fish", ""]
+subset = ['subset1', 'aquatic']
+sub_classes = ["large_man-made_outdoor_things large_natural_outdoor_scenes vehicles_1 vehicles_2 trees small_mammals people", "aquatic_mammals fish"]
 batchSize = []
 ftBudget = []
 lrSchedule = []
-configPath = '/home/ar4414/pytorch_training/src/ar4414/pruning/configs/l1_prune'
-# runFile = '/home/ar4414/pytorch_training/src/ar4414/pruning/scripts_conf_logs/run.sh'
-runFileBase = '/home/ar4414/pytorch_training/src/ar4414/pruning/scripts_conf_logs/'
 config = cp.ConfigParser()
+
+configPath = '/home/ar4414/pytorch_training/src/ar4414/pruning/configs/l1_prune'
+runFileBase = '/home/ar4414/pytorch_training/src/ar4414/pruning/scripts_conf_logs/'
+cpRoot = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/{}/cifar100/{}/v1_l1_prune"
 
 cmd = 'mkdir -p ' + configPath
 subprocess.check_call(cmd, shell=True)
-
-cpRoot = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/{}/cifar100/{}/l1_prune"
 
 for netCount, net in enumerate(nets):
     testCount = 0
     configFile = '/home/ar4414/pytorch_training/src/ar4414/pruning/configs/' + str(net) + '.ini'
     config.read(configFile)
             
-    repeats = 3 if net == 'mobilenetv2' or net == 'resnet' else 5
-    gpu = "0" if net == 'mobilenetv2' or net == 'resnet' else "1"
+    repeats = 5
+    gpu = "0" if (net == 'mobilenetv2' or net == 'resnet') else "1"
     runFile = os.path.join(runFileBase, 'run_{}.sh'.format(gpu))
     
     config['training_hyperparameters']['print_only'] = "False"

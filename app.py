@@ -234,8 +234,6 @@ class Application(appSrc.Application):
 
             if self.params.finetune:
             #{{{
-                self.setup_lr_schedule()
-                
                 # run finetuning
                 self.run_finetune()
             #}}}
@@ -319,15 +317,13 @@ class Application(appSrc.Application):
         # adjust lr based on pruning percentage
         if self.params.static:
         #{{{
-            initLr = self.params.lr_schedule[self.params.lr_schedule.index(self.params.pruneAfter) - 1]
+            initLrIdx = self.params.lr_schedule.index(self.params.pruneAfter)
+            initLrIdx = initLrIdx-1 if initLrIdx != 0 else initLrIdx+1
+            initLr = self.params.lr_schedule[initLrIdx]
             initPrunedLrIdx = self.params.lr_schedule.index(self.params.pruneAfter) + 1
-            
-            if self.params.pruningPerc <= 25.0:
-                initPrunedLr = initLr
-                listEnd = initPrunedLrIdx + 1
-            else:
-                initPrunedLr = initLr / (self.params.gamma * self.params.gamma)
-                listEnd = initPrunedLrIdx + 5
+
+            initPrunedLr = initLr / (self.params.gamma)
+            listEnd = initPrunedLrIdx + 5
             
             self.params.lr_schedule[initPrunedLrIdx] = initPrunedLr
             self.params.lr_schedule = self.params.lr_schedule[:listEnd]

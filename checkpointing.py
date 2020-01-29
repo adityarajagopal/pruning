@@ -62,8 +62,8 @@ class Checkpointer(cpSrc.Checkpointer) :
             f.write(line)
 
         # store best model separately 
-        if params.test_top1 >= params.bestValidLoss:
-            params.bestValidLoss = params.test_top1
+        if params.val_top1 >= params.bestValidAcc:
+            params.bestValidAcc = params.val_top1
             bestModelPath = os.path.join(self.root, 'best-model' + '.pth.tar')
             bestStatePath = os.path.join(self.root, 'best-state' + '.pth.tar')
             torch.save(model_dict, bestModelPath) 
