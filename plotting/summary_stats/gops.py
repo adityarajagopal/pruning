@@ -60,11 +60,12 @@ def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData):
         ax.set_ylabel('Test Accuracy (%)')
     
     for (subset, net), data in subsetAgnosticSummaryData.groupby(['Subset', 'Network']):
-        for pp, points in data.groupby(['PrunePerc']):
-            label = 'Subset Agnostic Unpruned' if pp == 0 else 'Subset Agnostic Pruning'
-            marker = 'x' if pp == 0 else '-'
+        for count, (pp, points) in enumerate(data.groupby(['PrunePerc'])):
+            labels = ['Subset Agnostic Unpruned', 'Subset Agnostic Pruning', '']
+            labelIdx = 0 if pp == "0" else 1 if count == 1 else 2
+            marker = 'x' if pp == "0" else '+'
             
-            axes[net][subset].plot([float(points['InferenceGops'])], [float(points['TestAcc'])], label=label, marker=marker, markersize=4, color='red', linestyle="None")
+            axes[net][subset].plot([float(points['InferenceGops'])], [float(points['TestAcc'])], label=labels[labelIdx], marker=marker, markersize=4, color='red', linestyle="None")
             axes[net][subset].legend()
 #}}}
 

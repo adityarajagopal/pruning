@@ -73,19 +73,27 @@ def summary_statistics(logs, networks, datasets, prunePercs):
     return df
 #}}}
 
-def subset_agnostic_summary_statistics(logs, networks, datasets, prunePercs):
+def subset_agnostic_summary_statistics(logs, networks, datasets, prunePercs, subsetAgnosticLogs):
 #{{{
     # data refers to runs that have not been pruned or pruned without finetuning on the subset 
     data = {'Network':[], 'Subset':[], 'PrunePerc':[], 'TestAcc':[], 'InferenceGops':[]}
+
+    prunePercs = ['0'] + prunePercs
     
     for network in networks:
         for subset in datasets:
-            pp = 0
-            data['Network'].append(network)
-            data['Subset'].append(subset)
-            data['PrunePerc'].append(pp)
-            data['TestAcc'].append(logs[network][subset]['unpruned_inference']['test_top1'])
-            data['InferenceGops'].append(logs[network][subset]['unpruned_inference']['gops'])
+            for pp in prunePercs:
+                data['Network'].append(network)
+                data['Subset'].append(subset)
+                data['PrunePerc'].append(pp)
+                if pp == '0':
+                    data['TestAcc'].append(logs[network][subset]['unpruned_inference']['test_top1'])
+                    data['InferenceGops'].append(logs[network][subset]['unpruned_inference']['gops'])
+                else:
+                    sALog = subsetAgnosticLogs[network]['entire_dataset']
+                    data['TestAcc'].append(sALog['{}_inference'.format(subset)][pp])
+                    gops,_,_ = gopSrc.get_gops(sALog['base_path'], 'pp_{}/{}/orig/'.format(pp, sALog[pp][0]))
+                    data['InferenceGops'].append(gops)
     
     df = pd.DataFrame(data)
     return df
@@ -124,84 +132,6 @@ def per_epoch_statistics(logs, networks, datasets, prunePercs):
                 data[network][dataset][pp] = perEpochStats
     
     return data
-#}}}
-
-def single_search(perEpochData, currCost, targetAcc, pruneAfter):
-#{{{
-    testAccs = list(perEpochData['Test_Top1'])
-    bestTestAcc = max(testAccs[pruneAfter:])
-    bestIdx = testAccs.index(bestTestAcc)
-
-    # remove cost of finetuning as this happens only once
-    gops = np.array(list(perEpochData['Ft_Gops'])) - perEpochData['Ft_Gops'][pruneAfter-1]
-    
-    currTotalGops = currCost['Gops'][-1]
-    cost = {'Gops': currCost['Gops'] + list(currTotalGops + gops[pruneAfter:]), 'TestAcc': currCost['TestAcc'] + testAccs[pruneAfter:]}
-    
-    if int(bestTestAcc) < int(targetAcc):
-        return -1, cost
-    else:
-        return 1, cost
-#}}}
-
-def check_stopping(mode, state, prevPp, currPp):
-#{{{
-    if mode == 'memory_opt':
-        if prevPp == currPp:
-            return True
-    elif mode == 'cost_opt':
-        if state == 1:
-            return True
-
-    return False
-#}}}
-
-def bin_search_cost(logs, networks, datasets, prunePercs, mode='memory_opt'):
-#{{{
-    # perform binary search to find pruning percentage that give no accuracy loss
-    data = {net:{subset:None for subset in datasets} for net in networks}
-    initPp = 50                     
-    pruneAfter = 5
-    ppToSearch = [int(x) for x in prunePercs]
-
-    for net in networks:
-        for subset in datasets:
-            prevPp = 0
-            currPp = initPp
-            uB = ppToSearch[-1]
-            lB = ppToSearch[0]
-            bestPp = 0
-            
-            # find best test accuracy and gops obtained after initial 5 epochs of finetuning
-            perEpochData = per_epoch_statistics(logs, networks, datasets, [str(initPp)])[net][subset][str(initPp)]
-            targetAcc = max(list(perEpochData['Test_Top1'])[:pruneAfter])
-            cost = {'Gops':list(perEpochData['Ft_Gops'])[:pruneAfter], 'TestAcc':list(perEpochData['Test_Top1'])[:pruneAfter]}
-            state = 0
-            
-            # perform binary search
-            while not check_stopping(mode, state, prevPp, currPp):
-                print("Pruning level to search = {} %".format(currPp)) 
-                
-                perEpochData = per_epoch_statistics(logs, networks, datasets, [str(currPp)])[net][subset][str(currPp)]
-                state, cost = single_search(perEpochData, cost, targetAcc, pruneAfter)
-                
-                # prune less
-                if state == -1: 
-                    tmp = (lB + currPp) / 2.
-                    uB = currPp 
-
-                # try to prune more, but return previous model if state goes to -1
-                elif state == 1:
-                    tmp = (uB + currPp) / 2.
-                    lB = currPp 
-                    bestPp = currPp 
-
-                prevPp = currPp
-                currPp = 5 * math.ceil(tmp/5)  
-            
-            print('Best Pruning Perc = {}'.format(bestPp))
-            pd.DataFrame(cost).plot(x='Gops', y='TestAcc')
-            plt.show()
 #}}}
 
 def l1_norm_statistics(logs, networks, datasets, prunePercs): 

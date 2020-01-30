@@ -19,6 +19,9 @@ class Params(ppSrc.Params) :
 
         self.unprunedTestAcc = config_file.getboolean('pruning_hyperparameters', 'unpruned_test_acc', fallback=None) 
         
+        self.prunedTestAcc = config_file.getboolean('pruning_hyperparameters', 'pruned_test_acc', fallback=None) 
+        self.trainedOn = config_file.get('pruning_hyperparameters', 'trained_on', fallback=None) 
+        
         self.noFtChannelsPruned = config_file.getboolean('pruning_hyperparameters', 'no_finetune_channels_pruned', fallback=False)
         
         self.retrain = config_file.getboolean('pruning_hyperparameters', 'retrain', fallback=False)

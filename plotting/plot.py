@@ -35,13 +35,16 @@ def parse_arguments():
     # plot data for only a subset of networks / datasets
     parser.add_argument('--networks', type=str, nargs='+', default=None, help='name of networks to display')
     parser.add_argument('--subsets', type=str, nargs='+', default=None, help='name of subsets to display')
-    
+    parser.add_argument('--logs_json', type=str, default='/home/ar4414/pytorch_training/src/ar4414/pruning/logs/logs.json', help='full file path of json file where logs summary to be placed')
+
     # types of plots
     parser.add_argument('--channel_diff', action='store_true', help='plot difference in channels before and after finetuning')
-    parser.add_argument('--inf_gops', action='store_true', help='plot inference gops vs test accuracy')
     parser.add_argument('--ft_gops', action='store_true', help='plot finetune gops vs test accuracy')
     parser.add_argument('--l1_norm', action='store_true', help='plot histograms of l1-norms and change in l1-norms before and after finetuning')
     parser.add_argument('--pretty_print', action='store_true', help='pretty print summary data table')
+    
+    parser.add_argument('--inf_gops', action='store_true', help='plot inference gops vs test accuracy')
+    parser.add_argument('--subset_agnostic_logs', type=str, default='/home/ar4414/pytorch_training/src/ar4414/pruning/logs/subset_agnostic_logs.json', help='full file path of json file where logs for subset agnostic pruning was performed')
     
     parser.add_argument('--ft_epoch_gops', action='store_true', help='plot finetune gops vs test accuracy')
     parser.add_argument('--plot_as_line', type=str, nargs='+', default=None, help='pruning percentages to plot as a line')
@@ -60,8 +63,6 @@ def parse_arguments():
     parser.add_argument('--pre_ft_path', type=str, default=None, help='path to model before finetuning')
     parser.add_argument('--base_folder', type=str, help='folder name where timestamped logs are to be placed')
     
-    parser.add_argument('--logs_json', type=str, default='/home/ar4414/pytorch_training/src/ar4414/pruning/logs/logs.json', help='full file path of json file where logs summary to be placed')
-
     args = parser.parse_args()
     
     return args
@@ -106,7 +107,10 @@ if __name__ == '__main__':
     if args.channel_diff or args.inf_gops or args.ft_gops:
         print("==> Collecting Accuracy and Gops statistics")
         summaryData = collector.summary_statistics(logs, networks, datasets, prunePercs)
-        subsetAgnosticSummaryData = collector.subset_agnostic_summary_statistics(logs, networks, datasets, prunePercs)
+        
+        with open(args.subset_agnostic_logs, 'r') as jFile:
+            subsetAgnosticLogs = json.load(jFile)
+        subsetAgnosticSummaryData = collector.subset_agnostic_summary_statistics(logs, networks, datasets, prunePercs, subsetAgnosticLogs)
 
         if args.pretty_print:
             print(tabulate(summaryData, headers='keys', tablefmt='psql'))

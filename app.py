@@ -45,7 +45,6 @@ class Application(appSrc.Application):
         self.setup_dataset()
         self.setup_model()
         self.setup_tee_printing()
-        
         self.setup_pruners()
 
         if self.params.getGops: 
@@ -54,8 +53,7 @@ class Application(appSrc.Application):
             with open(logs, 'r') as jFile:
                 logs = json.load(jFile)    
             log = logs[self.params.arch][self.params.subsetName]
-            prunedPercs = list(log.keys())
-            prunedPercs.remove('base_path')
+            prunedPercs = list(filter(lambda x: (x != 'base_path') and ('_inference' not in x), list(log.keys())))
             
             if self.params.inferenceGops:
             #{{{
@@ -117,6 +115,35 @@ class Application(appSrc.Application):
             
             with open(logs, 'w') as jFile: 
                 json.dump(logJson, jFile, indent=2)
+        #}}}
+
+        elif self.params.prunedTestAcc:
+        #{{{
+            logs = self.params.logs
+            with open(logs, 'r') as jFile:
+                logs = json.load(jFile)    
+            log = logs[self.params.arch][self.params.trainedOn]
+            prunedPercs = list(filter(lambda x: (x != 'base_path') and ('_inference' not in x), list(log.keys())))
+                    
+            log['{}_inference'.format(self.params.subsetName)] = {pp:0 for pp in prunedPercs}
+            
+            for pp in prunedPercs:
+                print("==========> Pruning Perc = {}".format(pp))
+                for run in log[pp]:
+                    finetunePath = os.path.join(log['base_path'], "pp_{}/{}/orig".format(pp, run))
+
+                    # get inference acc for pruned model
+                    self.model, self.optimiser = self.pruner.get_random_init_model(finetunePath)
+                    self.params.pretrained = os.path.join(finetunePath, "best-model.pth.tar")
+                    self.params.evaluate = True
+                    self.model = self.mc.load_pretrained(self.params, self.model)
+                    loss, top1, top5 = self.run_inference()
+                    
+                    #update log file
+                    log['{}_inference'.format(self.params.subsetName)][pp] = top1 
+            
+            with open(self.params.logs, 'w') as jFile:
+                json.dump(logs, jFile, indent=2)
         #}}}
 
         elif self.params.noFtChannelsPruned:
