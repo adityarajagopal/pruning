@@ -22,6 +22,7 @@ sys.path.append(parentDir[0])
 
 from src.ar4414.pruning.plotting import log_updater 
 from src.ar4414.pruning.plotting.summary_stats import collector 
+from src.ar4414.pruning.plotting.summary_stats import prune_search as searchSrc
 from src.ar4414.pruning.plotting.summary_stats import gops as gopSrc 
 from src.ar4414.pruning.plotting.summary_stats import l1_norms as l1NormsSrc
 from src.ar4414.pruning.plotting.summary_stats import channel_diff as channeDiffSrc
@@ -47,6 +48,7 @@ def parse_arguments():
     parser.add_argument('--acc_metric', type=str, default='Test_Top1', help='y-axis metric : one of (Train_Top1, Test_Top1 and Val_Top1')
     
     parser.add_argument('--bin_search_cost', action='store_true', help='plot cost of binary search')
+    parser.add_argument('--mode', type=str, default='memory_opt', help='how to prioritse binary search : one of memory_opt or cost_opt')
     
     # update logs.json with timestamps
     parser.add_argument('--update_logs', action='store_true', help='update logs.json file with relevant timestamps')
@@ -72,7 +74,8 @@ if __name__ == '__main__':
         sys.exit()
     
     networks = ['alexnet', 'mobilenetv2', 'resnet', 'squeezenet'] if args.networks is None else args.networks
-    datasets = ['entire_dataset', 'subset1', 'aquatic'] if args.subsets is None else args.subsets
+    # datasets = ['entire_dataset', 'subset1', 'aquatic'] if args.subsets is None else args.subsets
+    datasets = ['subset1', 'aquatic'] if args.subsets is None else args.subsets
     prunePercs = [str(i) for i in range(5,100,5)]
     logsJson = '/home/ar4414/pytorch_training/src/ar4414/pruning/logs/logs.json'
     
@@ -109,7 +112,8 @@ if __name__ == '__main__':
 
     if args.bin_search_cost:
         print("==> Performing binary search to get pruning percentage that gives no accuracy loss")
-        binSearchCost = collector.bin_search_cost(logs, networks, datasets, prunePercs)
+        binSearchCost = searchSrc.bin_search_cost(logs, networks, datasets, prunePercs, args.mode)
+        searchSrc.plot_bin_search_cost(binSearchCost)
 
     if args.l1_norm:
         print("==> L1-Norm Statistics")

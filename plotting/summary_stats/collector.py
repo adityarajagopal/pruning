@@ -142,13 +142,21 @@ def single_search(perEpochData, currCost, targetAcc, pruneAfter):
         return -1, cost
     else:
         return 1, cost
-    # elif int(bestTestAcc) > int(targetAcc): 
-    #     return 1, cost
-    # else:
-    #     return 0, cost
 #}}}
 
-def bin_search_cost(logs, networks, datasets, prunePercs):
+def check_stopping(mode, state, prevPp, currPp):
+#{{{
+    if mode == 'memory_opt':
+        if prevPp == currPp:
+            return True
+    elif mode == 'cost_opt':
+        if state == 1:
+            return True
+
+    return False
+#}}}
+
+def bin_search_cost(logs, networks, datasets, prunePercs, mode='memory_opt'):
 #{{{
     # perform binary search to find pruning percentage that give no accuracy loss
     data = {net:{subset:None for subset in datasets} for net in networks}
@@ -168,9 +176,10 @@ def bin_search_cost(logs, networks, datasets, prunePercs):
             perEpochData = per_epoch_statistics(logs, networks, datasets, [str(initPp)])[net][subset][str(initPp)]
             targetAcc = max(list(perEpochData['Test_Top1'])[:pruneAfter])
             cost = {'Gops':list(perEpochData['Ft_Gops'])[:pruneAfter], 'TestAcc':list(perEpochData['Test_Top1'])[:pruneAfter]}
+            state = 0
             
             # perform binary search
-            while prevPp != currPp:
+            while not check_stopping(mode, state, prevPp, currPp):
                 print("Pruning level to search = {} %".format(currPp)) 
                 
                 perEpochData = per_epoch_statistics(logs, networks, datasets, [str(currPp)])[net][subset][str(currPp)]
@@ -186,9 +195,6 @@ def bin_search_cost(logs, networks, datasets, prunePercs):
                     tmp = (uB + currPp) / 2.
                     lB = currPp 
                     bestPp = currPp 
-
-                # elif state == 0:
-                #     break
 
                 prevPp = currPp
                 currPp = 5 * math.ceil(tmp/5)  
