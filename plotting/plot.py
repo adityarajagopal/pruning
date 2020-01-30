@@ -57,9 +57,10 @@ def parse_arguments():
     # add network to logs.json
     parser.add_argument('--add_network', action='store_true', help='add a network to logs')
     parser.add_argument('--name', type=str, help='name of network to add')
-    parser.add_argument('--pre_ft_path', type=str, help='path to model before finetuning')
+    parser.add_argument('--pre_ft_path', type=str, default=None, help='path to model before finetuning')
     parser.add_argument('--base_folder', type=str, help='folder name where timestamped logs are to be placed')
-
+    
+    parser.add_argument('--logs_json', type=str, default='/home/ar4414/pytorch_training/src/ar4414/pruning/logs/logs.json', help='full file path of json file where logs summary to be placed')
 
     args = parser.parse_args()
     
@@ -77,11 +78,18 @@ if __name__ == '__main__':
     # datasets = ['entire_dataset', 'subset1', 'aquatic'] if args.subsets is None else args.subsets
     datasets = ['subset1', 'aquatic'] if args.subsets is None else args.subsets
     prunePercs = [str(i) for i in range(5,100,5)]
-    logsJson = '/home/ar4414/pytorch_training/src/ar4414/pruning/logs/logs.json'
+    logsJson = args.logs_json 
     
     # load json with log file locations
-    with open(logsJson, 'r') as jFile:
-        logs = json.load(jFile)
+    try:
+        with open(logsJson, 'r') as jFile:
+            logs = json.load(jFile)
+    except FileNotFoundError:
+        with open(logsJson, 'w+') as jFile:
+            emptyJson = {}
+            json.dump(emptyJson, jFile)
+        with open(logsJson, 'r') as jFile:
+            logs = json.load(jFile)
 
     if args.add_network:
         print("==> Updating json with new network")
