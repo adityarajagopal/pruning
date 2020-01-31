@@ -88,7 +88,6 @@ def bin_search_cost(logs, networks, datasets, prunePercs, mode='memory_opt'):
 
                 prevPp = currPp
                 currPp = 5 * math.ceil(tmp/5)  
-                print(prevPp, currPp, state)
 
             data[net][subset] = {'cost':pd.DataFrame(cost), 'best_pp':bestPp, 'best_acc':bestTestAcc}
     

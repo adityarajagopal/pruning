@@ -35,7 +35,7 @@ def parse_arguments():
     # plot data for only a subset of networks / datasets
     parser.add_argument('--networks', type=str, nargs='+', default=None, help='name of networks to display')
     parser.add_argument('--subsets', type=str, nargs='+', default=None, help='name of subsets to display')
-    parser.add_argument('--logs_json', type=str, default='/home/ar4414/pytorch_training/src/ar4414/pruning/logs/logs.json', help='full file path of json file where logs summary to be placed')
+    parser.add_argument('--logs_json', type=str, default='/home/ar4414/pytorch_training/src/ar4414/pruning/logs/logs_v1.json', help='full file path of json file where logs summary to be placed')
 
     # types of plots
     parser.add_argument('--channel_diff', action='store_true', help='plot difference in channels before and after finetuning')
