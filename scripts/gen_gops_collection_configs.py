@@ -12,7 +12,7 @@ batchSize = []
 ftBudget = []
 lrSchedule = []
 configPath = '/home/ar4414/pytorch_training/src/ar4414/pruning/configs/gops_calculation'
-runFileBase = '/home/ar4414/pytorch_training/src/ar4414/pruning/scripts_conf_logs/'
+runFileBase = '/home/ar4414/pytorch_training/src/ar4414/pruning/scripts/'
 config = cp.ConfigParser()
 
 cmd = 'mkdir -p ' + configPath

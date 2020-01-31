@@ -94,7 +94,7 @@ def bin_search_cost(logs, networks, datasets, prunePercs, mode='memory_opt'):
     return data 
 #}}}
 
-def plot_bin_search_cost(data):
+def plot_bin_search_cost(data, saveLoc=None):
 #{{{
     nets = list(data.keys())
     subsets = list(data[nets[0]].keys())
@@ -110,6 +110,11 @@ def plot_bin_search_cost(data):
             ax.set_xlabel('Cost (GOps) of performing binary search to find best pruning level')
             ax.set_ylabel('Test Top1 (%)')
             ax.legend()
+
+            if saveLoc is not None: 
+                plt.tight_layout()
+                figFile = os.path.join(saveLoc, '{}_{}.png'.format(net, subset))
+                plt.savefig(figFile)
 #}}}
 
 

@@ -10,8 +10,8 @@ sub_classes = ["large_man-made_outdoor_things large_natural_outdoor_scenes vehic
 batchSize = []
 ftBudget = []
 lrSchedule = []
-configPath = '/home/ar4414/pytorch_training/src/ar4414/pruning/configs/pruned_acc'
-runFileBase = '/home/ar4414/pytorch_training/src/ar4414/pruning/scripts_conf_logs/'
+configPath = '/home/ar4414/pytorch_training/src/ar4414/pruning/configs/unpruned_acc'
+runFileBase = '/home/ar4414/pytorch_training/src/ar4414/pruning/scripts/'
 config = cp.ConfigParser()
 
 cmd = 'mkdir -p ' + configPath
@@ -29,15 +29,10 @@ for netCount, net in enumerate(nets):
     config['pytorch_parameters']['branch'] = "False"
     config['pytorch_parameters']['evaluate'] = "False"
     
-    config['pruning_hyperparameters']['logs'] = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/subset_agnostic_logs.json"
-    
     config['pruning_hyperparameters']['get_gops'] = "False"
     config['pruning_hyperparameters']['inference_gops'] = "False"
     
-    config['pruning_hyperparameters']['unpruned_test_acc'] = "False"
-    
-    config['pruning_hyperparameters']['pruned_test_acc'] = "True"
-    config['pruning_hyperparameters']['trained_on'] = "entire_dataset"
+    config['pruning_hyperparameters']['unpruned_test_acc'] = "True"
     
     config['pruning_hyperparameters']['no_finetune_channels_pruned'] = "False"
     
@@ -52,7 +47,7 @@ for netCount, net in enumerate(nets):
         config['pruning_hyperparameters']['sub_name'] = ss
         config['pruning_hyperparameters']['sub_classes'] = sub_classes[ssCount]
         
-        runFileName = 'run_pruned_acc.sh'
+        runFileName = 'run_unpruned_acc.sh'
         runFile = os.path.join(runFileBase, runFileName)
 
         testConfig = os.path.join(configPath, str(net) + '_' + str(testCount) + '.ini')

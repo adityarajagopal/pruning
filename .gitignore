@@ -5,10 +5,8 @@ __pycache__
 */__pycache__
 runs/
 logs/
-scripts/
 configs/baseline_tests
 configs/random_init_tests
 configs/validation_prune
-gop_graphs/
-prunedChannels/
+graphs/
 */*.pyc

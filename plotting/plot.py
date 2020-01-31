@@ -4,6 +4,7 @@ import math
 import json
 import argparse
 import itertools
+import subprocess
 
 import torch
 import numpy as np
@@ -36,6 +37,9 @@ def parse_arguments():
     parser.add_argument('--networks', type=str, nargs='+', default=None, help='name of networks to display')
     parser.add_argument('--subsets', type=str, nargs='+', default=None, help='name of subsets to display')
     parser.add_argument('--logs_json', type=str, default='/home/ar4414/pytorch_training/src/ar4414/pruning/logs/logs_v1.json', help='full file path of json file where logs summary to be placed')
+    
+    parser.add_argument('--save', action='store_true', help='save figures')
+    parser.add_argument('--loc', type=str, default='recent', help='folder under graphs/ where images should be saved')
 
     # types of plots
     parser.add_argument('--channel_diff', action='store_true', help='plot difference in channels before and after finetuning')
@@ -68,7 +72,25 @@ def parse_arguments():
     return args
 #}}}
 
+def get_save_location(args):
+#{{{
+    saveLoc = None
+    if args.save:
+        if args.bin_search_cost:
+            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/bin_search_cost/{}/'.format(args.loc, args.mode)
+        elif args.inf_gops:
+            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/inference_gops/'.format(args.loc)
+
+        print("Saving graphs to {}".format(saveLoc))
+        if not os.path.isdir(saveLoc):
+            cmd = 'mkdir -p ' + saveLoc 
+            subprocess.check_call(cmd, shell=True)
+    
+    return saveLoc
+#}}}
+
 if __name__ == '__main__':
+#{{{
     args = parse_arguments()
 
     if len(sys.argv) == 1:
@@ -76,7 +98,6 @@ if __name__ == '__main__':
         sys.exit()
     
     networks = ['alexnet', 'mobilenetv2', 'resnet', 'squeezenet'] if args.networks is None else args.networks
-    # datasets = ['entire_dataset', 'subset1', 'aquatic'] if args.subsets is None else args.subsets
     datasets = ['subset1', 'aquatic'] if args.subsets is None else args.subsets
     prunePercs = [str(i) for i in range(5,100,5)]
     logsJson = args.logs_json 
@@ -93,43 +114,66 @@ if __name__ == '__main__':
             logs = json.load(jFile)
 
     if args.add_network:
+    #{{{
         print("==> Updating json with new network")
         logs = log_updater.add_network(logs, args.name, datasets, args.base_folder, args.pre_ft_path)
         with open(logsJson, 'w') as jFile:
             logs = json.dump(logs, jFile, indent=2)
+    #}}}
 
     if args.update_logs: 
+    #{{{
         print("==> Updating logs.json with new timestamps")
         logs = log_updater.update_timestamps(logs, networks, datasets, prunePercs, asOf=args.as_of)
         with open(logsJson, 'w') as jFile:
             logs = json.dump(logs, jFile, indent=2)
+    #}}}
 
     if args.channel_diff or args.inf_gops or args.ft_gops:
+    #{{{
         print("==> Collecting Accuracy and Gops statistics")
         summaryData = collector.summary_statistics(logs, networks, datasets, prunePercs)
         
         with open(args.subset_agnostic_logs, 'r') as jFile:
             subsetAgnosticLogs = json.load(jFile)
         subsetAgnosticSummaryData = collector.subset_agnostic_summary_statistics(logs, networks, datasets, prunePercs, subsetAgnosticLogs)
+    
+        # plot inference gops vs accuracy tradeoff
+        if args.inf_gops:
+            print("==> Plotting GOps for inference vs best test top1 accuracy obtained")
+            saveLoc = get_save_location(args) 
+            gopSrc.plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc)
+    
+        # plot difference in channels pruned by percentage pruned
+        if args.channel_diff:
+            print("==> Plotting Difference in Channels Pruned before and after finetuning")
+            channeDiffSrc.plot_channel_diff_by_pp(summaryData)
+    
+        # plot finetune gops vs accuracy tradeoff 
+        if args.ft_gops:
+            print("==> Plotting GOps for finetuning vs best test top1 accuracy obtained")
+            gopSrc.plot_ft_gops_vs_acc(summaryData)
 
         if args.pretty_print:
             print(tabulate(summaryData, headers='keys', tablefmt='psql'))
             print(tabulate(subsetAgnosticSummaryData, headers='keys', tablefmt='psql'))
-    
-    if args.ft_epoch_gops:
-        print("==> Collecting cumulative gops by epoch statistics")
-        gopsByEpochData = collector.per_epoch_statistics(logs, networks, datasets, prunePercs)
-        print("==> Plotting cumulative gops by epoch statistics")
-        gopSrc.plot_ft_gops_by_epoch(gopsByEpochData, args.plot_as_line, args.acc_metric)
+    #}}}
 
     if args.bin_search_cost:
+    #{{{
         print("==> Performing binary search to get pruning percentage that gives no accuracy loss")
         binSearchCost = searchSrc.bin_search_cost(logs, networks, datasets, prunePercs, args.mode)
-        searchSrc.plot_bin_search_cost(binSearchCost)
+        saveLoc = get_save_location(args)
+        searchSrc.plot_bin_search_cost(binSearchCost, saveLoc)
+    #}}}
 
     if args.l1_norm:
+    #{{{
         print("==> L1-Norm Statistics")
         normsDict = collector.l1_norm_statistics(logs, networks, datasets, prunePercs)
+        
+        print("==> Plotting l1-norm histograms and histograms in difference in l1-norm before and after finetuning")
+        l1NormsSrc.plot_histograms(normsDict)        
         
         if args.pretty_print:
             for net,v in normsDict.items():
@@ -137,26 +181,16 @@ if __name__ == '__main__':
                     print("=============== L1-Norm per filter or Network {} and Subset {} ==================".format(net, dataset))
                     print(tabulate(df, headers='keys', tablefmt='psql'))
                     print()
+    #}}}
     
-    # plot difference in channels pruned by percentage pruned
-    if args.channel_diff:
-        print("==> Plotting Difference in Channels Pruned before and after finetuning")
-        channeDiffSrc.plot_channel_diff_by_pp(summaryData)
-
-    # plot inference gops vs accuracy tradeoff
-    if args.inf_gops:
-        print("==> Plotting GOps for inference vs best test top1 accuracy obtained")
-        gopSrc.plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData)
+    if args.ft_epoch_gops:
+    #{{{
+        print("==> Collecting cumulative gops by epoch statistics")
+        gopsByEpochData = collector.per_epoch_statistics(logs, networks, datasets, prunePercs)
+        print("==> Plotting cumulative gops by epoch statistics")
+        gopSrc.plot_ft_gops_by_epoch(gopsByEpochData, args.plot_as_line, args.acc_metric)
+    #}}}
     
-    # plot finetune gops vs accuracy tradeoff 
-    if args.ft_gops:
-        print("==> Plotting GOps for finetuning vs best test top1 accuracy obtained")
-        gopSrc.plot_ft_gops_vs_acc(summaryData)
-
-    # plot difference in l1-norms and l1-norms 
-    if args.l1_norm: 
-        print("==> Plotting l1-norm histograms and histograms in difference in l1-norm before and after finetuning")
-        l1NormsSrc.plot_histograms(normsDict)        
-     
     plt.show()
+#}}}
 

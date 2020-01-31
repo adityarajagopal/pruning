@@ -41,20 +41,21 @@ def get_gops(basePath, log, perEpoch=False):
         return (infGops, totalFtGops, gops['mem']['pruned'])
 #}}}
 
-def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData):
+def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc=None):
 #{{{
     xAxis = 'InferenceGops'
     yAxis = 'AvgTestAcc'
 
     subsets = set(list(summaryData['Dataset']))
     networks = set(list(summaryData['Network']))
-    axes = {net:{subset:plt.subplots(1,1)[1] for subset in subsets} for net in networks} 
+    #plt.subplots returns fig,ax
+    axes = {net:{subset:plt.subplots(1,1) for subset in subsets} for net in networks} 
 
     for (dataset, net), data in summaryData.groupby(['Dataset', 'Network']):
         title = 'Top1 Test Accuracy (%) for {} on {}'.format(net.capitalize(), dataset.capitalize()) 
         label = 'Subset Aware Pruning'
         
-        ax = data.plot.scatter(x=xAxis, y=yAxis, ax=axes[net][dataset], label=label, title=title)
+        ax = data.plot.scatter(x=xAxis, y=yAxis, ax=axes[net][dataset][1], label=label, title=title)
         
         ax.set_xlabel('Inference GOps')
         ax.set_ylabel('Test Accuracy (%)')
@@ -65,8 +66,15 @@ def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData):
             labelIdx = 0 if pp == "0" else 1 if count == 1 else 2
             marker = 'x' if pp == "0" else '+'
             
-            axes[net][subset].plot([float(points['InferenceGops'])], [float(points['TestAcc'])], label=labels[labelIdx], marker=marker, markersize=4, color='red', linestyle="None")
-            axes[net][subset].legend()
+            axes[net][subset][1].plot([float(points['InferenceGops'])], [float(points['TestAcc'])], label=labels[labelIdx], marker=marker, markersize=4, color='red', linestyle="None")
+            axes[net][subset][1].legend()
+
+    if saveLoc is not None:
+        for net,plots in axes.items(): 
+            for subset,plot in plots.items(): 
+                plt.tight_layout()
+                figFile = os.path.join(saveLoc, '{}_{}.png'.format(net, subset))
+                plot[0].savefig(figFile)
 #}}}
 
 def plot_ft_gops_vs_acc(summaryData):

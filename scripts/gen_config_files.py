@@ -15,7 +15,7 @@ lrSchedule = []
 config = cp.ConfigParser()
 
 configPath = '/home/ar4414/pytorch_training/src/ar4414/pruning/configs/data_agnostic_l1_prune'
-runFileBase = '/home/ar4414/pytorch_training/src/ar4414/pruning/scripts_conf_logs/'
+runFileBase = '/home/ar4414/pytorch_training/src/ar4414/pruning/scripts/'
 cpRoot = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/{}/cifar100/{}/data_agnostic_l1_prune"
 
 cmd = 'mkdir -p ' + configPath

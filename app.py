@@ -12,11 +12,9 @@ from src.ar4414.pruning.pruners.alexnet import AlexNetPruning
 from src.ar4414.pruning.pruners.resnet import ResNet20PruningDependency as ResNetPruning
 from src.ar4414.pruning.pruners.mobilenetv2 import MobileNetV2PruningDependency as MobileNetV2Pruning 
 from src.ar4414.pruning.pruners.squeezenet import SqueezeNetPruning 
-from src.ar4414.pruning.plotter import *
 
 import src.app as appSrc
 import src.input_preprocessor as preprocSrc
-from src.ar4414.pruning.rbo import *
 
 import os
 import random
@@ -167,6 +165,34 @@ class Application(appSrc.Application):
                 logLocation = '/home/ar4414/pytorch_training/src/ar4414/pruning/logs/{}/{}/baseline/pre_ft_pp_{}.pth.tar'.format(self.params.arch, self.params.dataset, int(pp))
                 torch.save(preFtChannelsPruned, logLocation)
         #}}}
+        
+        elif self.params.pruneFilters == True:
+        #{{{
+            print('=========Baseline Accuracy==========')
+            testStats = self.run_inference()
+            print('==========================')
+
+            if self.params.finetune:
+            #{{{
+                # run finetuning
+                self.run_finetune()
+            #}}}
+
+            elif self.params.retrain:
+            #{{{
+                self.model, self.optimiser = self.pruner.get_random_init_model()
+                self.run_training()
+            #}}}
+
+            else:
+            #{{{
+                channelsPruned, prunedModel, optimiser = self.pruner.prune_model(self.model)
+                pruneRate, prunedSize, origSize = self.pruner.prune_rate(prunedModel)
+                print('Pruned Percentage = {:.2f}%, NewModelSize = {:.2f}MB, OrigModelSize = {:.2f}MB'.format(pruneRate, prunedSize, origSize))
+                self.inferer.test_network(self.params, self.test_loader, prunedModel, self.criterion, optimiser)
+                print('==========================')
+            #}}}
+        #}}}
 
         elif self.params.entropy == True:
         #{{{
@@ -250,34 +276,6 @@ class Application(appSrc.Application):
 
                 logger = entropySrc.EntropyLogger(self.params, calculators, layerNames) 
                 logger.log_entropies(testStats)
-            #}}}
-        #}}}
-        
-        elif self.params.pruneFilters == True:
-        #{{{
-            print('=========Baseline Accuracy==========')
-            testStats = self.run_inference()
-            print('==========================')
-
-            if self.params.finetune:
-            #{{{
-                # run finetuning
-                self.run_finetune()
-            #}}}
-
-            elif self.params.retrain:
-            #{{{
-                self.model, self.optimiser = self.pruner.get_random_init_model()
-                self.run_training()
-            #}}}
-
-            else:
-            #{{{
-                channelsPruned, prunedModel, optimiser = self.pruner.prune_model(self.model)
-                pruneRate, prunedSize, origSize = self.pruner.prune_rate(prunedModel)
-                print('Pruned Percentage = {:.2f}%, NewModelSize = {:.2f}MB, OrigModelSize = {:.2f}MB'.format(pruneRate, prunedSize, origSize))
-                self.inferer.test_network(self.params, self.test_loader, prunedModel, self.criterion, optimiser)
-                print('==========================')
             #}}}
         #}}}
         
