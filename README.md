@@ -19,7 +19,7 @@ This README has details of the main pruning framework. Details on scripts availa
 - Trained\_on: 
     * default 'entire\_dataset' works at the moment 
     * this parameter specifies the pruned models have been retrained after pruning on what subset/dataset
-- Logs: path to json file which holds the timestamps for newtorks that were pruned and finetuned on a particular subset/dataset 
+- Logs: path to json file which holds the timestamps for logs from runs where pruning was data agnostic 
 
 ## Channels that would've been pruned before performing finetuning
 - No_Finetune_Channels_Pruned: True

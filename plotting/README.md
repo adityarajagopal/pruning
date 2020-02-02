@@ -1,5 +1,5 @@
 # Creating new json file for storing time stamped directories 
-## Use the **--add_network** command in plot.py 
+## Use the --add_network command in plot.py 
 - **--name** : name of the new network that you want to add 
 - **--pre_ft_path** : path to the model that was used before finetuning
     * if finetuning was not performed then this can be left empty 
@@ -9,10 +9,24 @@
 * Optional : set the **--subsets** if you want only certain subsets to be add per network
 
 # Updating the json with logs
-## Use the **--update_logs** command 
+## Use the --update_logs command 
 - **--as_of** : date including and after which logs will be added in the format y-m-d
 - **--logs_json** passes the full path to the json file you want to update
 
 * Optional : set the **--subsets** if you want only certain subsets to be add per network
 * The command uses the base path present in the json file to automatically find the directories 
 * The command also ensure no duplicate logs are added
+
+# Plotting
+
+# Plotting inference gops vs accuracy tradeoff
+## Use the --inf_gops command
+- **--subset_agnostic_logs** : path to the json file containing the timestamps for data agnostic pruning, 
+  i.e. pruning and retraining on entire dataset instead of specific to a subset
+
+* Set **--networks** and **--subsets** to specific ones if only certain graphs required
+
+# Plotting cost of performing binary search to find best pruning percentage 
+## Use the --bin_search_cost command 
+- **--mode** : memory_opt - performs binary search to find smallest model size that results in test accuracy >= target
+             : cost_opt - performs binary search to find first model that results in test accuracy >= target, optimises for search cost
