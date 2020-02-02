@@ -1,5 +1,6 @@
 # Pruning Configurations 
-As you go down the config file, within the pruning_hyperpamaters section, each true before will cancel out the following true or falses, i.e. priority is top down
+As you go down the config file, within the pruning_hyperpamaters section, each true before will cancel out the following true or falses, i.e. priority is top down.
+This README has details of the main pruning framework. Details on scripts available are in a README in the scripts folder and plotting options are in a README in the plotting folder. 
 
 ## Get GOps for a given design
 - Get\_Gops: True
@@ -45,7 +46,4 @@ Multiple configurations possible. Base parameters are as follows:
 - Finetune: False
 - Retrain: False
 * will prune model specified in Pretrained to pruning percentage sepcified by Pruning_Perc and report inference statistics 
-
-# Scripts
-
 
