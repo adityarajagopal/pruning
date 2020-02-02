@@ -1,5 +1,5 @@
 # Creating new json file for storing time stamped directories 
-- Use the **--add_network** command in plot.py 
+## Use the **--add_network** command in plot.py 
 - **--name** : name of the new network that you want to add 
 - **--pre_ft_path** : path to the model that was used before finetuning
     * if finetuning was not performed then this can be left empty 
@@ -9,7 +9,7 @@
 * Optional : set the **--subsets** if you want only certain subsets to be add per network
 
 # Updating the json with logs
-- Use the **--update_logs** command 
+## Use the **--update_logs** command 
 - **--as_of** : date including and after which logs will be added in the format y-m-d
 - **--logs_json** passes the full path to the json file you want to update
 
