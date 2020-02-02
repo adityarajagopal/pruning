@@ -20,6 +20,10 @@
 * The command also ensure no duplicate logs are added
 
 # Plotting
+## Saving plots to file 
+### Use the --save command 
+- **--loc** : specifies the highest level folder name inside graphs/ to store the figures to 
+- For subfolder within **--loc** that each type of plotting stores to, look at the *get_save_location* function inside plot.py
 
 ## Plotting inference gops vs accuracy tradeoff
 ### Use the --inf_gops command
