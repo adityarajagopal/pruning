@@ -1,36 +1,32 @@
 # Pruning Configurations 
-- Prune without retraining
-    - Prune_Filters : True
-    - Finetune : False
-    - Get_Gops : False
-    - Plot_Channels : Commented out 
+As you go down the config file, within the pruning_hyperpamaters section, each true before will cancel out the following true or falses, i.e. priority is top down
 
-- Prune with retraining 
-    - Prune_Filters : True
-    - Finetune : True
-    - Get_Gops : False 
-    - Plot_Channels : Commented out
+## Get GOps for a given design
+- Get\_Gops: True
+- Logs: path to json file with the time stamps of all the logs  
+- Inference\_Gops: 
+    * if True, inference gops stored in gops.json file inside folder with logs 
+    * if False, training gops stored in gops.json file inside folder with logs
+    * inference gops is gops per minibatch, training gops is minibatch independent as it stores gops per epoch
 
-- Get Acc vs Pruning GOps graph (based on log-file)
-    - Prune_Filters : True
-    - Finetune : True
-    - Get_Gops : True
-    - Plot_Channels : Commented out
-    - Sub_Name, Sub_Classes, LogDir, LogFiles : Need to be filled correctly 
+## Performance of subset on network trained on entire dataset
+- Unpruned\_Test\_Acc: True
+    * stores into logs json the dict {'test_top1':#, 'gops':infernece\_gops} per network and subset
 
-- Get Pruned and Unpruned GOps for a certain level of pruning  
-    - Prune_Filters : True
-    - Finetune : False
-    - Get_Gops : True
-    - Plot_Channels : Commented out
-    - PrunePerc : Set to desired value
+## Performance of subset on network pruned after training on entire dataset 
+- Pruned\_Test\_Acc: True
+- Trained\_on: 
+    * default 'entire\_dataset' works at the moment 
+    * this parameter specifies the pruned models have been retrained after pruning on what subset/dataset
+- Logs: path to json file which holds the timestamps for newtorks that were pruned and finetuned on a particular subset/dataset 
 
-- Get plot of stats about channels pruned   
-    - Prune_Filters : True
-    - Finetune : N/A
-    - Get_Gops : False
-    - Plot_Type : joint / number / hamming
-    - Plot_Channels : Filled correctly 
+## Channels that would've been pruned before performing finetuning
+- No_Finetune_Channels_Pruned: True
+- Pretrained: path to model that was trained originally before any finetuning
 
- 
+* location is currently set by default to '{path to pruning dir}/logs/{arch}/{dataset}/baseline/pre\_ft\_pp\_{pruning percentage}.pth.tar'
 
+## Prune filters 
+Multiple configurations possible. Base parameters are as follows: 
+- Pruning_Perc: percentage of network (memory wise) to be pruned
+- Finetune_Budget: Number of epochs after pruning that retraining should be performed 
