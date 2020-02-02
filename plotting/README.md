@@ -29,4 +29,5 @@
 # Plotting cost of performing binary search to find best pruning percentage 
 ## Use the --bin_search_cost command 
 - **--mode** : memory_opt - performs binary search to find smallest model size that results in test accuracy >= target
+
              : cost_opt - performs binary search to find first model that results in test accuracy >= target, optimises for search cost
