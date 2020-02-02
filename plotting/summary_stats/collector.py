@@ -141,6 +141,7 @@ def l1_norm_statistics(logs, networks, datasets, prunePercs):
 
     for network in networks:
         for dataset in datasets:
+            print("Collecting for {} on {}".format(network, dataset))
             tmpPre = np.array([])
             tmpPost = np.array([])
             tmpDiff = np.array([])

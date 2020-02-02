@@ -61,7 +61,7 @@ def get_cutoff_l1_norms(l1Norms, channelsPruned, layerIndexOffset):
     return max(l1NormsPrunedFilters)
 #}}}
 
-def plot_histograms(normsDict):
+def plot_histograms(normsDict, saveLoc):
 #{{{
     for net,v in normsDict.items():
         for dataset,l1NormStats in v.items():
@@ -71,6 +71,11 @@ def plot_histograms(normsDict):
             diffDf.plot.hist(bins=int(math.sqrt(len(diffDf.index))), ax=ax, title=title)
             ax.set_xlabel('Difference in l1-norm before and after finetuning')
             ax.set_ylabel('Frequency occured')
+        
+            if saveLoc is not None:
+                plt.tight_layout
+                figFile = os.path.join(saveLoc, 'diff_{}_{}.png'.format(net, dataset))
+                plt.savefig(figFile)
 
             ax = plt.subplots(1,1)[1]
             title = "Histogram of l1-norms before and after finetuning \n Net:{}, Subset:{}".format(net, dataset)
@@ -79,12 +84,17 @@ def plot_histograms(normsDict):
             ax.set_xlabel('L1-norm before and after finetuning')
             ax.set_ylabel('Frequency occured')
             
-            pp = list(l1NormStats.keys())
-            pp.remove('stats')
-            colourMap = matplotlib.cm.get_cmap('Dark2')
-            colours = colourMap(np.linspace(0,1,num=len(pp)))
-            for i,p in enumerate(pp):
-                ax.axvline(l1NormStats[p], color=colours[i], label='{}-%'.format(p))
-            plt.legend()
+            if saveLoc is not None:
+                plt.tight_layout
+                figFile = os.path.join(saveLoc, 'raw_{}_{}.png'.format(net, dataset))
+                plt.savefig(figFile)
+            
+            # pp = list(l1NormStats.keys())
+            # pp.remove('stats')
+            # colourMap = matplotlib.cm.get_cmap('Dark2')
+            # colours = colourMap(np.linspace(0,1,num=len(pp)))
+            # for i,p in enumerate(pp):
+            #     ax.axvline(l1NormStats[p], color=colours[i], label='{}-%'.format(p))
+            # plt.legend()
 #}}}
 

@@ -42,10 +42,13 @@ def parse_arguments():
     parser.add_argument('--loc', type=str, default='recent', help='folder under graphs/ where images should be saved')
 
     # types of plots
-    parser.add_argument('--channel_diff', action='store_true', help='plot difference in channels before and after finetuning')
     parser.add_argument('--ft_gops', action='store_true', help='plot finetune gops vs test accuracy')
     parser.add_argument('--l1_norm', action='store_true', help='plot histograms of l1-norms and change in l1-norms before and after finetuning')
     parser.add_argument('--pretty_print', action='store_true', help='pretty print summary data table')
+    
+    parser.add_argument('--channel_diff', action='store_true', help='plot difference in channels before and after finetuning')
+    parser.add_argument('--pre_post_ft', action='store_true', help='plot difference in channels per network and subset between pre-post ft and models reached post ft')
+    parser.add_argument('--across_networks', action='store_true', help='plot difference in channels before and after finetuning compared across networks')
     
     parser.add_argument('--inf_gops', action='store_true', help='plot inference gops vs test accuracy')
     parser.add_argument('--subset_agnostic_logs', type=str, default='/home/ar4414/pytorch_training/src/ar4414/pruning/logs/subset_agnostic_logs.json', help='full file path of json file where logs for subset agnostic pruning was performed')
@@ -80,6 +83,12 @@ def get_save_location(args):
             saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/bin_search_cost/{}/'.format(args.loc, args.mode)
         elif args.inf_gops:
             saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/inference_gops/'.format(args.loc)
+        elif args.pre_post_ft:
+            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/difference_in_channels_pruned/'.format(args.loc)
+        elif args.across_networks:
+            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/difference_in_channels_pruned_by_subset/'.format(args.loc)
+        elif args.l1_norm:
+            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/l1_norm/'.format(args.loc)
 
         print("Saving graphs to {}".format(saveLoc))
         if not os.path.isdir(saveLoc):
@@ -133,30 +142,36 @@ if __name__ == '__main__':
     #{{{
         print("==> Collecting Accuracy and Gops statistics")
         summaryData = collector.summary_statistics(logs, networks, datasets, prunePercs)
-        
+
         with open(args.subset_agnostic_logs, 'r') as jFile:
             subsetAgnosticLogs = json.load(jFile)
         subsetAgnosticSummaryData = collector.subset_agnostic_summary_statistics(logs, networks, datasets, prunePercs, subsetAgnosticLogs)
+
+        if args.pretty_print:
+            print(tabulate(summaryData, headers='keys', tablefmt='psql'))
+            print(tabulate(subsetAgnosticSummaryData, headers='keys', tablefmt='psql'))
+            sys.exit()
     
+        saveLoc = get_save_location(args) 
         # plot inference gops vs accuracy tradeoff
         if args.inf_gops:
             print("==> Plotting GOps for inference vs best test top1 accuracy obtained")
-            saveLoc = get_save_location(args) 
             gopSrc.plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc)
     
         # plot difference in channels pruned by percentage pruned
-        if args.channel_diff:
+        if args.pre_post_ft:
+            print("==> Plotting change in channels pruned between pre-post ft and post ft models")
+            channeDiffSrc.plot_channel_diff_by_pp(summaryData, saveLoc)
+        
+        # plot difference in channels pruned by percentage pruned
+        if args.across_networks:
             print("==> Plotting Difference in Channels Pruned before and after finetuning")
-            channeDiffSrc.plot_channel_diff_by_pp(summaryData)
+            channeDiffSrc.plot_channel_diff_by_subset(summaryData, saveLoc)
     
         # plot finetune gops vs accuracy tradeoff 
         if args.ft_gops:
             print("==> Plotting GOps for finetuning vs best test top1 accuracy obtained")
             gopSrc.plot_ft_gops_vs_acc(summaryData)
-
-        if args.pretty_print:
-            print(tabulate(summaryData, headers='keys', tablefmt='psql'))
-            print(tabulate(subsetAgnosticSummaryData, headers='keys', tablefmt='psql'))
     #}}}
 
     if args.bin_search_cost:
@@ -173,7 +188,8 @@ if __name__ == '__main__':
         normsDict = collector.l1_norm_statistics(logs, networks, datasets, prunePercs)
         
         print("==> Plotting l1-norm histograms and histograms in difference in l1-norm before and after finetuning")
-        l1NormsSrc.plot_histograms(normsDict)        
+        saveLoc = get_save_location(args) 
+        l1NormsSrc.plot_histograms(normsDict, saveLoc)        
         
         if args.pretty_print:
             for net,v in normsDict.items():

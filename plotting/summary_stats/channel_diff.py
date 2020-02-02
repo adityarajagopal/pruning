@@ -4,6 +4,7 @@ import json
 import itertools
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 def get_pruned_channels(basePath, log):
@@ -45,11 +46,39 @@ def compute_differences(preFtChannelsPruned, prunedChannels):
     return np.mean(pDiffPerRun), np.mean(pDiffBetweenRuns) 
 #}}}
 
-def plot_channel_diff_by_pp(summaryData):
+def plot_channel_diff_by_pp(summaryData, saveLoc=None):
 #{{{
     for (dataset, net), data in summaryData.groupby(['Dataset', 'Network']):
         ax = plt.subplots(1,1)[1]
         data.plot.bar(x='PrunePerc', y=['PreFtDiff', 'PostFtDiff'], title='Difference in Channels Pruned for {} on {}'.format(net, dataset), ax=ax)
         ax.set_xlabel('Pruning Percentage (%)')
         ax.set_ylabel('Percentage Difference in Channels Pruned (%)')
+
+        if saveLoc is not None:
+            plt.tight_layout
+            figFile = os.path.join(saveLoc, '{}_{}.png'.format(net, dataset))
+            plt.savefig(figFile)
 #}}}
+
+def plot_channel_diff_by_subset(summaryData, saveLoc=None):
+#{{{
+    transformedData = {}
+    for subset, data in summaryData.groupby(['Dataset']):
+        ax = plt.subplots(1,1)[1]
+        for net, changes in data.groupby(['Network']):
+            transformedData['pp'] = list(changes['PrunePerc'])
+            transformedData[net] = list(changes['PreFtDiff'])
+        newDf = pd.DataFrame(transformedData)
+        newDf.plot.bar(x='pp', title='Difference in Channels Pruned with finetuning on the {} subset'.format(subset.capitalize()), ax=ax)
+        ax.set_xlabel('Pruning Percentage (%)')
+        ax.set_ylabel('Percentage Difference in Channels Pruned before and after finetuning (%)')
+
+        if saveLoc is not None:
+            plt.tight_layout
+            figFile = os.path.join(saveLoc, '{}.png'.format(subset))
+            plt.savefig(figFile)
+#}}}
+
+
+
+
