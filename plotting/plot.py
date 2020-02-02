@@ -40,6 +40,16 @@ def parse_arguments():
     
     parser.add_argument('--save', action='store_true', help='save figures')
     parser.add_argument('--loc', type=str, default='recent', help='folder under graphs/ where images should be saved')
+    
+    # add network to logs.json
+    parser.add_argument('--add_network', action='store_true', help='add a network to logs')
+    parser.add_argument('--name', type=str, help='name of network to add')
+    parser.add_argument('--pre_ft_path', type=str, default=None, help='path to model before finetuning')
+    parser.add_argument('--base_folder', type=str, help='folder name where timestamped logs are to be placed')
+    
+    # update logs.json with timestamps
+    parser.add_argument('--update_logs', action='store_true', help='update logs.json file with relevant timestamps')
+    parser.add_argument('--as_of', type=str, help='year-month-day including and after which to store the logs')
 
     # types of plots
     parser.add_argument('--ft_gops', action='store_true', help='plot finetune gops vs test accuracy')
@@ -59,16 +69,6 @@ def parse_arguments():
     
     parser.add_argument('--bin_search_cost', action='store_true', help='plot cost of binary search')
     parser.add_argument('--mode', type=str, default='memory_opt', help='how to prioritse binary search : one of memory_opt or cost_opt')
-    
-    # update logs.json with timestamps
-    parser.add_argument('--update_logs', action='store_true', help='update logs.json file with relevant timestamps')
-    parser.add_argument('--as_of', type=str, help='year-month-day including and after which to store the logs')
-   
-    # add network to logs.json
-    parser.add_argument('--add_network', action='store_true', help='add a network to logs')
-    parser.add_argument('--name', type=str, help='name of network to add')
-    parser.add_argument('--pre_ft_path', type=str, default=None, help='path to model before finetuning')
-    parser.add_argument('--base_folder', type=str, help='folder name where timestamped logs are to be placed')
     
     args = parser.parse_args()
     
