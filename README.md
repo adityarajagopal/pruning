@@ -28,5 +28,24 @@ As you go down the config file, within the pruning_hyperpamaters section, each t
 
 ## Prune filters 
 Multiple configurations possible. Base parameters are as follows: 
+- Prune_Filters: True
 - Pruning_Perc: percentage of network (memory wise) to be pruned
 - Finetune_Budget: Number of epochs after pruning that retraining should be performed 
+- Prune_After: Epoch at which pruning should be performed 
+# Finetune on subset before pruning
+- Finetune: True 
+- Static: True 
+    * currently no other mode exists for finetuning
+    * static refers to setting a pre-defined and fixed number of epochs for finetuning and retraining
+# Prune and retrain from scratch
+- Finetune: False
+- Retrain: True
+* Prune model without any finetuning and retrain from scratch on dataset specified by Sub_Name and Sub_Classes parameters
+# Perform inference on pruned model without any retraining
+- Finetune: False
+- Retrain: False
+* will prune model specified in Pretrained to pruning percentage sepcified by Pruning_Perc and report inference statistics 
+
+# Scripts
+
+
