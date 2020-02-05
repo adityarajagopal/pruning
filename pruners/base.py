@@ -9,11 +9,37 @@ import pickle
 import subprocess
 import importlib
 import math
+import functools
 
 from abc import ABC, abstractmethod
 
 import torch
 import torch.nn as nn
+
+#decorators to annotate class
+def basic_block(*args, **kwargs):
+#{{{
+    def decorator(block): 
+        BasicPruning.update_block_names('residual', block, *args)
+        return block
+    return decorator
+#}}}
+
+def bottleneck(*args, **kwargs):
+#{{{
+    def decorator(block): 
+        BasicPruning.update_block_names('bottleneck', block, *args)
+        return block
+    return decorator
+#}}}
+
+def mb_conv(*args, **kwargs):
+#{{{
+    def decorator(block): 
+        BasicPruning.update_block_names('mb_conv', block, *args)
+        return block
+    return decorator
+#}}}
 
 class FBSPruning(object):
     #{{{
@@ -68,7 +94,7 @@ class BasicPruning(ABC):
     #{{{
         self.params = params
         self.model = model
-    
+
         self.metricValues = []
         self.channelsToPrune = {}
         self.gpu_list = [int(x) for x in self.params.gpu_id.split(',')]
@@ -89,6 +115,13 @@ class BasicPruning(ABC):
         self.importPath = 'src.ar4414.pruning.{}.{}'.format('.'.join(dirName.split('/')), self.fileName.split('.')[0])
     #}}} 
     
+    @classmethod
+    def update_block_names(cls, blockType, blockName, *args):
+        if blockType != 'mb_conv':
+            setattr(cls, blockType, {'instance':blockName, 'conv':args[0], 'downsample':args[1]})
+        else:
+            setattr(cls, blockType, {'instance':blockName, 'conv':(args[0], args[1]), 'downsample':args[1]})
+
     def get_layer_params(self):
     #{{{
         for p in self.model.named_parameters():
@@ -275,14 +308,3 @@ class BasicPruning(ABC):
     def transfer_weights(self, oModel, pModel): 
         pass
 #}}}
-
-def get_pruned_model_import_path(logPath):
-#{{{
-    prunedModelDesc = os.path.join(logPath, 'pruned_model.py')
-    tmpModelPath = prunedModelDesc[prunedModelDesc.index('src'):]
-    tmpModelPath = tmpModelPath.replace('/','.')
-    prunedModelPath = tmpModelPath.split('.py')[0]
-
-    return prunedModelPath
-#}}}
-

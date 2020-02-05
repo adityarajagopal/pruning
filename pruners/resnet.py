@@ -471,6 +471,12 @@ class ResNet20PruningDependency(BasicPruning):
     #{{{
         localRanking, globalRanking = self.rank_filters(model)
 
+        for n,m in model.named_modules(): 
+            print(self.residual['instance'])
+            if isinstance(m, self.residual['instance']):
+                print(m)
+        sys.exit()
+
         # ------------------------------ build dependency list ----------------------
         # dependencies for resnet are between all conv2s in residual blocks (pruning one should prune all)
         # this way the output of one residual can be added together as they have the same number of channels 

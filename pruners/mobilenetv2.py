@@ -254,6 +254,9 @@ class MobileNetV2PruningDependency(BasicPruning):
     #{{{
         localRanking, globalRanking = self.rank_filters(model) 
 
+        print(model)
+        sys.exit()
+
         # ------------------------------- build dependency lists -------------------------------------
         # mobilenet has 2 dependency sets, 1 for the depthwise layers and another for the residuals
         # the dw layer dependency is how much ever is pruned in conv1, should also be pruned in conv2 (dwconv) in the block
@@ -287,6 +290,8 @@ class MobileNetV2PruningDependency(BasicPruning):
                 else:
                     resDepLayers[groupIdx] += [n+'.conv3']
         resDepLayers.pop(-1)        
+        
+        breakpoint()
 
         if self.params.pruningPerc >= 50.0:
             groupLimits = [int(math.ceil(gs * (1.0 - self.params.pruningPerc/100.0))) for gs in pruneLimit]

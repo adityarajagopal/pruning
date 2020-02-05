@@ -14,6 +14,8 @@ import sys
 import torch.nn.functional as F
 import time
 
+from src.ar4414.pruning.pruners.base import basic_block, bottleneck
+
 __all__ = ['resnet']
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -21,8 +23,9 @@ def conv3x3(in_planes, out_planes, stride=1):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
 
-
+@basic_block('conv2', 'downsample')
 class BasicBlock(nn.Module):
+#{{{
     expansion = 1
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
@@ -52,9 +55,12 @@ class BasicBlock(nn.Module):
         out = self.relu(out)
 
         return out
+#}}}
 
 
+@bottleneck('conv3', 'downsample')
 class Bottleneck(nn.Module):
+#{{{
     expansion = 4
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
@@ -90,6 +96,7 @@ class Bottleneck(nn.Module):
         out = self.relu(out)
 
         return out
+#}}}
 
 
 class ResNet(nn.Module):
