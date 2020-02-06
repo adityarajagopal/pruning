@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-def residual_dependencies(model, residual_instances):
+def residual(model, residual_instances):
 #{{{
     def check_inst(instance): 
         check = []

@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 
 from src.ar4414.pruning.pruners.base import BasicPruning
-from src.ar4414.pruning.pruners.blocks.residual import residual_dependencies
+import src.ar4414.pruning.pruners.dependencies as dependSrc
 
 #decorators to annotate class
 def basic_block(*args, **kwargs):
@@ -489,7 +489,7 @@ class ResNet20PruningDependency(BasicPruning):
     #{{{
         localRanking, globalRanking = self.rank_filters(model)
 
-        deps = residual_dependencies(model, self.dependentLayers) 
+        deps = dependSrc.residual(model, self.dependentLayers) 
 
         # ------------------------------ build dependency list ----------------------
         # dependencies for resnet are between all conv2s in residual blocks (pruning one should prune all)
