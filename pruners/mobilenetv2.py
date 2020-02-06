@@ -16,6 +16,15 @@ from src.ar4414.pruning.pruners.base import BasicPruning
 import torch
 import torch.nn as nn
 
+# decorator to annotate class
+def mb_conv(*args, **kwargs):
+#{{{
+    def decorator(block): 
+        MobileNetV2PruningDependency.update_block_names(block, *args)
+        return block
+    return decorator
+#}}}
+
 class MobileNetV2Pruning(BasicPruning):
 #{{{
     def __init__(self, params, model):
@@ -253,10 +262,24 @@ class MobileNetV2PruningDependency(BasicPruning):
     def structured_l1_weight(self, model):
     #{{{
         localRanking, globalRanking = self.rank_filters(model) 
-
-        print(model)
-        sys.exit()
-
+        
+        prev = list(localRanking.keys())[0]
+        for n,m in model.named_modules(): 
+            if any(isinstance(m,inst) for inst in self.dependentLayers['instance']):
+                idx = self.dependentLayers['instance'].index(type(m))
+                convs = self.dependentLayers['conv'][idx]
+                ds = self.dependentLayers['downsample'][idx]
+                hasDS = any(dsName in m._modules.keys() for dsName in ds)
+                dwDep = ["{}.{}".format(n,conv) for conv in convs[0:1]]
+                if hasDS: 
+                    check = []
+                    for _n,_m in m.named_modules():
+                        check += [len(_m._modules) for dsName in ds if dsName in _n]
+                    hasDS = any(check)
+                if not hasDS:
+                    curr = "{}.{}".format(n,convs[2])
+                    print(curr)
+        
         # ------------------------------- build dependency lists -------------------------------------
         # mobilenet has 2 dependency sets, 1 for the depthwise layers and another for the residuals
         # the dw layer dependency is how much ever is pruned in conv1, should also be pruned in conv2 (dwconv) in the block
@@ -298,6 +321,8 @@ class MobileNetV2PruningDependency(BasicPruning):
         else:
             groupLimits = [int(math.ceil(gs * self.params.pruningPerc/100.0)) for gs in pruneLimit]
         #}}}
+        
+        breakpoint()
 
         #remove filters
         #{{{

@@ -16,31 +16,6 @@ from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
 
-#decorators to annotate class
-def basic_block(*args, **kwargs):
-#{{{
-    def decorator(block): 
-        BasicPruning.update_block_names('residual', block, *args)
-        return block
-    return decorator
-#}}}
-
-def bottleneck(*args, **kwargs):
-#{{{
-    def decorator(block): 
-        BasicPruning.update_block_names('bottleneck', block, *args)
-        return block
-    return decorator
-#}}}
-
-def mb_conv(*args, **kwargs):
-#{{{
-    def decorator(block): 
-        BasicPruning.update_block_names('mb_conv', block, *args)
-        return block
-    return decorator
-#}}}
-
 class FBSPruning(object):
     #{{{
     def __init__(self, params, model):
@@ -116,11 +91,15 @@ class BasicPruning(ABC):
     #}}} 
     
     @classmethod
-    def update_block_names(cls, blockType, blockName, *args):
-        if blockType != 'mb_conv':
-            setattr(cls, blockType, {'instance':blockName, 'conv':args[0], 'downsample':args[1]})
+    def update_block_names(cls, blockInst, *args):
+    #{{{
+        if hasattr(cls, 'dependentLayers'):
+            cls.dependentLayers['instance'].append(blockInst)
+            cls.dependentLayers['conv'].append(args[0])
+            cls.dependentLayers['downsample'].append(args[1])
         else:
-            setattr(cls, blockType, {'instance':blockName, 'conv':(args[0], args[1]), 'downsample':args[1]})
+            setattr(cls, 'dependentLayers', {'instance':[blockInst], 'conv':[args[0]], 'downsample':[args[1]]})
+    #}}}
 
     def get_layer_params(self):
     #{{{

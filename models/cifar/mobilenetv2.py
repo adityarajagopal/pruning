@@ -9,10 +9,11 @@ import torch.nn.functional as F
 
 __all__ = ['mobilenetv2']
 
-from src.ar4414.pruning.pruners.base import mb_conv
+from src.ar4414.pruning.pruners.mobilenetv2 import mb_conv
 
-@mb_conv('conv1', 'conv2', 'shortcut')
+@mb_conv(['conv1', 'conv2', 'conv3'], ['shortcut'])
 class Block(nn.Module):
+#{{{
     '''expand + depthwise + pointwise'''
     def __init__(self, in_planes, out_planes, expansion, stride):
         super(Block, self).__init__()
@@ -39,7 +40,7 @@ class Block(nn.Module):
         out = self.bn3(self.conv3(out))
         out = out + self.shortcut(x) if self.stride==1 else out
         return out
-
+#}}}
 
 class MobileNetV2(nn.Module):
     # (expansion, out_planes, num_blocks, stride)

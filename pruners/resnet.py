@@ -15,6 +15,24 @@ import torch
 import torch.nn as nn
 
 from src.ar4414.pruning.pruners.base import BasicPruning
+from src.ar4414.pruning.pruners.blocks.residual import residual_dependencies
+
+#decorators to annotate class
+def basic_block(*args, **kwargs):
+#{{{
+    def decorator(block): 
+        ResNet20PruningDependency.update_block_names(block, *args)
+        return block
+    return decorator
+#}}}
+
+def bottleneck(*args, **kwargs):
+#{{{
+    def decorator(block): 
+        ResNet20PruningDependency.update_block_names(block, *args)
+        return block
+    return decorator
+#}}}
 
 class ResNet20Pruning(BasicPruning):
 #{{{
@@ -471,11 +489,7 @@ class ResNet20PruningDependency(BasicPruning):
     #{{{
         localRanking, globalRanking = self.rank_filters(model)
 
-        for n,m in model.named_modules(): 
-            print(self.residual['instance'])
-            if isinstance(m, self.residual['instance']):
-                print(m)
-        sys.exit()
+        deps = residual_dependencies(model, self.dependentLayers) 
 
         # ------------------------------ build dependency list ----------------------
         # dependencies for resnet are between all conv2s in residual blocks (pruning one should prune all)
@@ -505,7 +519,9 @@ class ResNet20PruningDependency(BasicPruning):
                 groupIdx += 1
             prevGs = currGs
         #}}} 
-        
+
+        breakpoint()
+
         # remove filters
         #{{{
         currentPruneRate = 0
