@@ -329,10 +329,6 @@ class BasicPruning(ABC):
     def skip_layer(self, lName):
         pass
     
-    # @abstractmethod
-    # def structured_l1_weight(self, model):
-    #     pass
-
     @abstractmethod
     def write_net(self, subsetName=None):
         pass
