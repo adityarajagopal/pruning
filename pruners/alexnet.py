@@ -47,33 +47,6 @@ class AlexNetPruning(BasicPruning):
         return False
     #}}}
 
-    def structured_l1_weight(self, model):
-    #{{{
-        localRanking, globalRanking = self.rank_filters(model)
-
-        # remove filters
-        #{{{
-        currentPruneRate = 0
-        listIdx = 0
-        while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(globalRanking)):
-            layerName, filterNum, _  = globalRanking[listIdx]
-
-            if len(localRanking[layerName]) <= 2:
-                listIdx += 1
-                continue
-            localRanking[layerName].pop(0)
-
-            incPrunePerc = self.inc_prune_rate(layerName)
-
-            self.channelsToPrune[layerName].append(filterNum)
-            currentPruneRate += incPrunePerc
-            
-            listIdx += 1
-        #}}}
-        
-        return self.channelsToPrune
-    #}}}
-
     def write_net(self):
     #{{{
         def fprint(text):

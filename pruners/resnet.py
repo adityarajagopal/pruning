@@ -10,29 +10,12 @@ import subprocess
 import importlib
 import math
 import copy
+from functools import reduce
 
 import torch
 import torch.nn as nn
 
 from src.ar4414.pruning.pruners.base import BasicPruning
-import src.ar4414.pruning.pruners.dependencies as dependSrc
-
-#decorators to annotate class
-def basic_block(*args, **kwargs):
-#{{{
-    def decorator(block): 
-        ResNet20PruningDependency.update_block_names(block, *args)
-        return block
-    return decorator
-#}}}
-
-def bottleneck(*args, **kwargs):
-#{{{
-    def decorator(block): 
-        ResNet20PruningDependency.update_block_names(block, *args)
-        return block
-    return decorator
-#}}}
 
 class ResNet20Pruning(BasicPruning):
 #{{{
@@ -483,82 +466,6 @@ class ResNet20PruningDependency(BasicPruning):
     def skip_layer(self, lName):
     #{{{
         return False
-    #}}}
-
-    def structured_l1_weight(self, model):
-    #{{{
-        localRanking, globalRanking = self.rank_filters(model)
-
-        deps = dependSrc.residual(model, self.dependentLayers) 
-
-        # ------------------------------ build dependency list ----------------------
-        # dependencies for resnet are between all conv2s in residual blocks (pruning one should prune all)
-        # this way the output of one residual can be added together as they have the same number of channels 
-        # resnet20 has multiple groups where the number of output channels from conv2 are the same
-        # inbetween groups there is a downsampling connection to increase the number of channels 
-        # the dependency mentioned above only exists within a group, across groups the conv2s can be pruned differently
-        #{{{
-        depLayerNames = [list(localRanking.keys())[0]]
-        depLayerNames += [x for x in list(localRanking.keys()) if 'layer' in x and 'conv2' in x]
-        groupSizes = list(len(localRanking[k]) for k in depLayerNames)
-        if self.params.pruningPerc >= 50.0:
-            minFilters = [int(math.ceil(gs * (1.0 - self.params.pruningPerc/100.0))) for gs in groupSizes]
-        else:
-            minFilters = [int(math.ceil(gs * self.params.pruningPerc/100.0)) for gs in groupSizes]
-        
-        dependencies = [[]]
-        groupLimits = [minFilters[0]]
-        prevGs = groupSizes[0]
-        groupIdx = 0
-        for i,currGs in enumerate(groupSizes):
-            if currGs == prevGs:
-                dependencies[groupIdx] += [depLayerNames[i]]
-            else:
-                dependencies.append([depLayerNames[i]])        
-                groupLimits.append(minFilters[i])
-                groupIdx += 1
-            prevGs = currGs
-        #}}} 
-
-        breakpoint()
-
-        # remove filters
-        #{{{
-        currentPruneRate = 0
-        listIdx = 0
-        while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(globalRanking)):
-            layerName, filterNum, _ = globalRanking[listIdx]
-
-            depLayers = []
-            for i, group in enumerate(dependencies):
-                if layerName in group:            
-                    depLayers = group
-                    groupIdx = i
-                    break
-            
-            # if layer not in group, just remove filter from layer 
-            # if layer is in a dependent group remove corresponding filter from each layer
-            depLayers = [layerName] if depLayers == [] else depLayers
-            for layerName in depLayers:
-                if len(localRanking[layerName]) <= groupLimits[groupIdx]:
-                    listIdx += 1
-                    continue
-            
-                # if filter has already been pruned, continue
-                # could happen to due to dependencies
-                if filterNum in self.channelsToPrune[layerName]:
-                    listIdx += 1
-                    continue 
-                
-                localRanking[layerName].pop(0)
-                self.channelsToPrune[layerName].append(filterNum)
-                
-                currentPruneRate += self.inc_prune_rate(layerName) 
-            
-            listIdx += 1
-        #}}}
-
-        return self.channelsToPrune
     #}}}
         
     def write_net(self):

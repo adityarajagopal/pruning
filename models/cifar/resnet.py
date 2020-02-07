@@ -14,7 +14,7 @@ import sys
 import torch.nn.functional as F
 import time
 
-from src.ar4414.pruning.pruners.resnet import basic_block, bottleneck
+from src.ar4414.pruning.pruners.dependencies import basic_block, bottleneck
 
 __all__ = ['resnet']
 

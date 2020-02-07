@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 __all__ = ['mobilenetv2']
 
-from src.ar4414.pruning.pruners.mobilenetv2 import mb_conv
+from src.ar4414.pruning.pruners.dependencies import mb_conv
 
 @mb_conv(['conv1', 'conv2', 'conv3'], ['shortcut'])
 class Block(nn.Module):

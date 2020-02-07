@@ -10,8 +10,11 @@ import subprocess
 import importlib
 import math
 import functools
+import copy
 
 from abc import ABC, abstractmethod
+
+import src.ar4414.pruning.pruners.dependencies as dependSrc
 
 import torch
 import torch.nn as nn
@@ -70,6 +73,8 @@ class BasicPruning(ABC):
         self.params = params
         self.model = model
 
+        self.minFiltersInLayer = 2
+
         self.metricValues = []
         self.channelsToPrune = {}
         self.gpu_list = [int(x) for x in self.params.gpu_id.split(',')]
@@ -90,17 +95,6 @@ class BasicPruning(ABC):
         self.importPath = 'src.ar4414.pruning.{}.{}'.format('.'.join(dirName.split('/')), self.fileName.split('.')[0])
     #}}} 
     
-    @classmethod
-    def update_block_names(cls, blockInst, *args):
-    #{{{
-        if hasattr(cls, 'dependentLayers'):
-            cls.dependentLayers['instance'].append(blockInst)
-            cls.dependentLayers['conv'].append(args[0])
-            cls.dependentLayers['downsample'].append(args[1])
-        else:
-            setattr(cls, 'dependentLayers', {'instance':[blockInst], 'conv':[args[0]], 'downsample':[args[1]]})
-    #}}}
-
     def get_layer_params(self):
     #{{{
         for p in self.model.named_parameters():
@@ -254,6 +248,66 @@ class BasicPruning(ABC):
         return localRanking, globalRanking
     #}}}
 
+    def remove_filters(self, localRanking, globalRanking, dependencies, groupPruningLimits):
+    #{{{
+        currentPruneRate = 0
+        listIdx = 0
+        while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(globalRanking)):
+            layerName, filterNum, _ = globalRanking[listIdx]
+
+            depLayers = []
+            pruningLimit = self.minFiltersInLayer
+            for i, group in enumerate(dependencies):
+                if layerName in group:            
+                    depLayers = group
+                    pruningLimit = groupPruningLimits[i]
+                    break
+            
+            # if layer not in group, just remove filter from layer 
+            # if layer is in a dependent group remove corresponding filter from each layer
+            depLayers = [layerName] if depLayers == [] else depLayers
+            for layerName in depLayers:
+                if len(localRanking[layerName]) <= pruningLimit:
+                    listIdx += 1
+                    continue
+            
+                # if filter has already been pruned, continue
+                # could happen to due to dependencies
+                if filterNum in self.channelsToPrune[layerName]:
+                    listIdx += 1
+                    continue 
+                
+                localRanking[layerName].pop(0)
+                self.channelsToPrune[layerName].append(filterNum)
+                
+                currentPruneRate += self.inc_prune_rate(layerName) 
+            
+            listIdx += 1
+
+        return self.channelsToPrune
+    #}}}
+    
+    def structured_l1_weight(self, model):
+    #{{{
+        localRanking, globalRanking = self.rank_filters(model)
+        
+        depBlock = dependSrc.DependencyBlock(model) 
+        internalDeps, externalDeps = depBlock.get_dependencies()
+        
+        numChannelsInDependencyGroup = [len(localRanking[k[0]]) for k in externalDeps]
+        if self.params.pruningPerc >= 50.0:
+            groupPruningLimits = [int(math.ceil(gs * (1.0 - self.params.pruningPerc/100.0))) for gs in numChannelsInDependencyGroup]
+        else:
+            groupPruningLimits = [int(math.ceil(gs * self.params.pruningPerc/100.0)) for gs in numChannelsInDependencyGroup]
+
+        dependencies = internalDeps + externalDeps
+        groupPruningLimits = [2]*len(internalDeps) + groupPruningLimits
+        
+        self.remove_filters(localRanking, globalRanking, dependencies, groupPruningLimits)
+
+        return self.channelsToPrune
+    #}}}
+
     # selects only convs and fc layers 
     # used in get_layer_params to get sizes of only convs and fcs 
     # lParam is from loop over named_parameters()
@@ -275,9 +329,9 @@ class BasicPruning(ABC):
     def skip_layer(self, lName):
         pass
     
-    @abstractmethod
-    def structured_l1_weight(self, model):
-        pass
+    # @abstractmethod
+    # def structured_l1_weight(self, model):
+    #     pass
 
     @abstractmethod
     def write_net(self, subsetName=None):

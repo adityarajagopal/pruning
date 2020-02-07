@@ -16,15 +16,6 @@ from src.ar4414.pruning.pruners.base import BasicPruning
 import torch
 import torch.nn as nn
 
-# decorator to annotate class
-def mb_conv(*args, **kwargs):
-#{{{
-    def decorator(block): 
-        MobileNetV2PruningDependency.update_block_names(block, *args)
-        return block
-    return decorator
-#}}}
-
 class MobileNetV2Pruning(BasicPruning):
 #{{{
     def __init__(self, params, model):
@@ -257,111 +248,6 @@ class MobileNetV2PruningDependency(BasicPruning):
     def skip_layer(self, lName):
     #{{{
         return False
-    #}}}
-    
-    def structured_l1_weight(self, model):
-    #{{{
-        localRanking, globalRanking = self.rank_filters(model) 
-        
-        prev = list(localRanking.keys())[0]
-        for n,m in model.named_modules(): 
-            if any(isinstance(m,inst) for inst in self.dependentLayers['instance']):
-                idx = self.dependentLayers['instance'].index(type(m))
-                convs = self.dependentLayers['conv'][idx]
-                ds = self.dependentLayers['downsample'][idx]
-                hasDS = any(dsName in m._modules.keys() for dsName in ds)
-                dwDep = ["{}.{}".format(n,conv) for conv in convs[0:1]]
-                if hasDS: 
-                    check = []
-                    for _n,_m in m.named_modules():
-                        check += [len(_m._modules) for dsName in ds if dsName in _n]
-                    hasDS = any(check)
-                if not hasDS:
-                    curr = "{}.{}".format(n,convs[2])
-                    print(curr)
-        
-        # ------------------------------- build dependency lists -------------------------------------
-        # mobilenet has 2 dependency sets, 1 for the depthwise layers and another for the residuals
-        # the dw layer dependency is how much ever is pruned in conv1, should also be pruned in conv2 (dwconv) in the block
-        # for the residuals, the same logic applies as in resnet
-        #{{{
-        dwDepLayers = [] 
-        groupIdx = 0
-        for n,m in model.named_modules():
-            if 'layers.' in n and len(m._modules) != 0 and 'shortcut' not in n:
-                dwDepLayers.append([])
-                dwDepLayers[groupIdx] += [n+'.conv1', n+'.conv2']
-                groupIdx += 1
-        
-        # the first block of mobilenet has residuals hence added into the list initially
-        resDepLayers = [[list(localRanking.keys())[0]]]
-        groupIdx = 0
-        pruneLimit = []
-        for n,m in model.named_modules():
-            if 'layers.' in n and len(m._modules) != 0 and 'shortcut' not in n:
-                # if there are downsampling modules or it is a stride 2 dw conv, neither need dependencies
-                # so if we only have 1 layer with a dependency at the moment, just replace it with the current
-                # if we have more than one, start a new group 
-                if len(m.shortcut._modules) > 0 or m.conv2.stride[0] > 1:
-                    if len(resDepLayers[groupIdx]) == 1:
-                        resDepLayers[groupIdx][0] = n+'.conv3'
-                    else:
-                        resDepLayers.append([n+'.conv3'])
-                        pruneLimit.append(len(localRanking[resDepLayers[groupIdx][0]]))
-                        groupIdx += 1
-                # add a dependency if no downsampling or if stride is 2 (no residual)
-                else:
-                    resDepLayers[groupIdx] += [n+'.conv3']
-        resDepLayers.pop(-1)        
-        
-        breakpoint()
-
-        if self.params.pruningPerc >= 50.0:
-            groupLimits = [int(math.ceil(gs * (1.0 - self.params.pruningPerc/100.0))) for gs in pruneLimit]
-        else:
-            groupLimits = [int(math.ceil(gs * self.params.pruningPerc/100.0)) for gs in pruneLimit]
-        #}}}
-        
-        breakpoint()
-
-        #remove filters
-        #{{{
-        currentPruneRate = 0
-        listIdx = 0
-        while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(globalRanking)):
-            layerName, filterNum, _ = globalRanking[listIdx]
-
-            depLayers = []
-            limit = 2
-            dependencies = resDepLayers if ('layers' in layerName and 'conv3' in layerName) else dwDepLayers
-            for i, group in enumerate(dependencies):
-                if layerName in group:            
-                    depLayers = group
-                    # update limit if residual group as in resnet pruning 
-                    if 'layers' in layerName and 'conv3' in layerName:
-                        groupIdx = i
-                        limit = groupLimits[groupIdx]
-                    break
-            
-            depLayers = [layerName] if depLayers == [] else depLayers
-            for layerName in depLayers:
-                if len(localRanking[layerName]) <= limit:
-                    listIdx += 1
-                    continue
-            
-                if filterNum in self.channelsToPrune[layerName]:
-                    listIdx += 1
-                    continue
-                
-                localRanking[layerName].pop(0)
-                self.channelsToPrune[layerName].append(filterNum)
-                
-                currentPruneRate += self.inc_prune_rate(layerName) 
-                
-            listIdx += 1
-        #}}}
-        
-        return self.channelsToPrune
     #}}}
     
     def write_net(self):
