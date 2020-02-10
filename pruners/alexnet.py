@@ -91,6 +91,8 @@ class AlexNetPruning(BasicPruning):
 
                 linesToWrite[n] = '\t\tself.{} = nn.{}'.format('_'.join(n.split('.')[1:]), str(m))
         #}}}
+
+        breakpoint()
         
         self.orderedKeys = list(linesToWrite.keys())
         [fprint(linesToWrite[k]) for k in self.orderedKeys]

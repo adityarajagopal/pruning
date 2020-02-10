@@ -15,6 +15,7 @@ import copy
 from abc import ABC, abstractmethod
 
 import src.ar4414.pruning.pruners.dependencies as dependSrc
+from src.ar4414.pruning.pruners.model_writers import writerFunctions
 
 import torch
 import torch.nn as nn
@@ -91,7 +92,10 @@ class BasicPruning(ABC):
         ## create dir if it doesn't exist
         cmd = 'mkdir -p {}'.format(dirName)
         subprocess.check_call(cmd, shell=True)
-        
+
+        self.depBlock = dependSrc.DependencyBlock(model)
+        self.writer = writerFunctions
+
         self.importPath = 'src.ar4414.pruning.{}.{}'.format('.'.join(dirName.split('/')), self.fileName.split('.')[0])
     #}}} 
     
@@ -160,6 +164,8 @@ class BasicPruning(ABC):
 
                 # perform pruning by writing out pruned network
                 self.write_net()
+                
+                sys.exit()
                 
                 prunedModel = self.import_pruned_model()
                 
@@ -291,8 +297,7 @@ class BasicPruning(ABC):
     #{{{
         localRanking, globalRanking = self.rank_filters(model)
         
-        depBlock = dependSrc.DependencyBlock(model) 
-        internalDeps, externalDeps = depBlock.get_dependencies()
+        internalDeps, externalDeps = self.depBlock.get_dependencies()
         
         numChannelsInDependencyGroup = [len(localRanking[k[0]]) for k in externalDeps]
         if self.params.pruningPerc >= 50.0:

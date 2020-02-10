@@ -1,32 +1,7 @@
 import sys
 
-from abc import ABC,abstractmethod 
 import torch.nn as nn
-
-#decorators to annotate class
-def basic_block(*args, **kwargs):
-#{{{
-    def decorator(block): 
-        DependencyBlock.update_block_names('residual', block, *args)
-        return block
-    return decorator
-#}}}
-
-def bottleneck(*args, **kwargs):
-#{{{
-    def decorator(block): 
-        DependencyBlock.update_block_names('residual', block, *args)
-        return block
-    return decorator
-#}}}
-
-def mb_conv(*args, **kwargs):
-#{{{
-    def decorator(block): 
-        DependencyBlock.update_block_names('mb_conv', block, *args)
-        return block
-    return decorator
-#}}}
+from abc import ABC,abstractmethod 
 
 class DependencyCalculator(ABC):
 #{{{
@@ -153,21 +128,33 @@ class DependencyBlock(object):
 
         self.linkedConvs = self.create_conv_graph()
 
-        self.depCalcs = {'basic': Basic(), 'residual': Residual(), 'mb_conv': MBConv()}
+        if hasattr(self, 'depCalcs'):
+            self.depCalcs['basic'] = Basic()
+        else: 
+            self.depCalcs = {'basic': Basic()}
     #}}}
     
     @classmethod
-    def update_block_names(cls, blockType, blockInst, *args):
+    def update_block_names(cls, blockInst, *args):
     #{{{
         if hasattr(cls, 'dependentLayers'):
-            cls.dependentLayers['type'].append(blockType)
+            cls.dependentLayers['type'].append(args[0])
             cls.dependentLayers['instance'].append(blockInst)
-            cls.dependentLayers['conv'].append(args[0])
-            cls.dependentLayers['downsample'].append(args[1])
+            cls.dependentLayers['conv'].append(args[1])
+            cls.dependentLayers['downsample'].append(args[2])
         else:
-            setattr(cls, 'dependentLayers', {'type':[blockType], 'instance':[blockInst], 'conv':[args[0]], 'downsample':[args[1]]})
+            setattr(cls, 'dependentLayers', {'type':[args[0]], 'instance':[blockInst], 'conv':[args[1]], 'downsample':[args[2]]})
     #}}}
 
+    @classmethod 
+    def register_dependency_calculator(cls, blockName, calcFunc):
+    #{{{
+        if hasattr(cls, 'depCalcs'): 
+            cls.depCalcs[blockName] = calcFunc
+        else: 
+            setattr(cls, 'depCalcs', {blockName: calcFunc})
+    #}}}
+    
     @classmethod
     def check_children(cls, module, instances): 
     #{{{
