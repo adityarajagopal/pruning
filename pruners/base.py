@@ -15,7 +15,6 @@ import copy
 from abc import ABC, abstractmethod
 
 import src.ar4414.pruning.pruners.dependencies as dependSrc
-from src.ar4414.pruning.pruners.model_writers import writerFunctions
 
 import torch
 import torch.nn as nn
@@ -94,7 +93,6 @@ class BasicPruning(ABC):
         subprocess.check_call(cmd, shell=True)
 
         self.depBlock = dependSrc.DependencyBlock(model)
-        self.writer = writerFunctions
 
         self.importPath = 'src.ar4414.pruning.{}.{}'.format('.'.join(dirName.split('/')), self.fileName.split('.')[0])
     #}}} 
@@ -161,16 +159,9 @@ class BasicPruning(ABC):
             if self.params.pruningMetric == 'weights':
                 tqdm.write("Pruning filters - Weights")
                 channelsPruned = self.structured_l1_weight(model)
-
-                # perform pruning by writing out pruned network
                 self.write_net()
-                
-                sys.exit()
-                
                 prunedModel = self.import_pruned_model()
-                
-                prunedModel = self.transfer_weights(model, prunedModel)
-                
+                # prunedModel = self.transfer_weights(model, prunedModel)
                 optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
 
                 return channelsPruned, prunedModel, optimiser

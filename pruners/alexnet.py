@@ -12,6 +12,7 @@ import math
 import copy
 
 from src.ar4414.pruning.pruners.base import BasicPruning
+from src.ar4414.pruning.pruners.model_writers import Writer
 
 import torch
 import torch.nn as nn
@@ -49,82 +50,107 @@ class AlexNetPruning(BasicPruning):
 
     def write_net(self):
     #{{{
-        def fprint(text):
-            print(text, file=self.modelDesc)
-        
-        self.modelDesc = open(self.filePath, 'w+')
-
-        fprint('import torch')
-        fprint('import torch.nn as nn')
-        fprint('import torch.nn.functional as F')
-    
-        fprint('')
-        fprint('class {}(nn.Module):'.format(self.netName))
-        fprint('\tdef __init__(self, num_classes=10):')
-        fprint('\t\tsuper().__init__()')
-        fprint('')
-
-        channelsPruned = {l:len(v) for l,v in self.channelsToPrune.items()}
-        start = True
-        currentIpChannels = 3
-
-        linesToWrite = {}
-        prunedModel = copy.deepcopy(self.model)
-        for n,m in prunedModel.named_modules():
         #{{{
-            if not m._modules:
-                if n in channelsPruned.keys():
-                    m.out_channels -= channelsPruned[n] 
-                    m.in_channels = currentIpChannels if not start else m.in_channels
-                    currentIpChannels = m.out_channels
-                    if start:
-                        start = False
-                
-                elif isinstance(m, nn.BatchNorm2d):
-                    m.num_features = currentIpChannels
+        # def fprint(text):
+        #     print(text, file=self.modelDesc)
+        # 
+        # self.modelDesc = open(self.filePath, 'w+')
 
-                elif isinstance(m, nn.Linear):
-                    m.in_features = currentIpChannels
+        # fprint('import torch')
+        # fprint('import torch.nn as nn')
+        # fprint('import torch.nn.functional as F')
+    
+        # fprint('')
+        # fprint('class {}(nn.Module):'.format(self.netName))
+        # fprint('\tdef __init__(self, num_classes=10):')
+        # fprint('\t\tsuper().__init__()')
+        # fprint('')
 
-                elif isinstance(m, nn.ReLU):
-                    continue
+        # channelsPruned = {l:len(v) for l,v in self.channelsToPrune.items()}
+        # start = True
+        # currentIpChannels = 3
 
-                linesToWrite[n] = '\t\tself.{} = nn.{}'.format('_'.join(n.split('.')[1:]), str(m))
+        # linesToWrite = {}
+        # prunedModel = copy.deepcopy(self.model)
+        # for n,m in prunedModel.named_modules():
+        # #{{{
+        #     if not m._modules:
+        #         if n in channelsPruned.keys():
+        #             m.out_channels -= channelsPruned[n] 
+        #             m.in_channels = currentIpChannels if not start else m.in_channels
+        #             currentIpChannels = m.out_channels
+        #             if start:
+        #                 start = False
+        #         
+        #         elif isinstance(m, nn.BatchNorm2d):
+        #             m.num_features = currentIpChannels
+
+        #         elif isinstance(m, nn.Linear):
+        #             m.in_features = currentIpChannels
+
+        #         elif isinstance(m, nn.ReLU):
+        #             continue
+
+        #         linesToWrite[n] = '\t\tself.{} = nn.{}'.format('_'.join(n.split('.')[1:]), str(m))
+        # #}}}
+
+        # self.orderedKeys = list(linesToWrite.keys())
+        # [fprint(linesToWrite[k]) for k in self.orderedKeys]
+        #             
+        # fprint('')
+        # fprint('\tdef forward(self, x):')
+
+        # i = 0
+        # maxpoolConvs = ['module.conv1', 'module.conv2', 'module.conv5']
+        # maxPoolLayerName = [x for x in self.orderedKeys if 'maxpool' in x][0]
+        # while i < len(self.orderedKeys): 
+        #     if 'conv' in self.orderedKeys[i]:
+        #         fprint('\t\tx = F.relu(self.{}(x))'.format('_'.join(self.orderedKeys[i].split('.')[1:])))
+        #         if self.orderedKeys[i] in maxpoolConvs:
+        #             fprint('\t\tx = self.{}(x)'.format('_'.join(maxPoolLayerName.split('.')[1:])))
+        #         i = i+1
+        #     
+        #     elif 'linear' in self.orderedKeys[i] or 'classifier' in self.orderedKeys[i]:
+        #         fprint('\t\tx = x.view(x.size(0), -1)')
+        #         fprint('\t\tx = self.{}(x)'.format('_'.join(self.orderedKeys[i].split('.')[1:])))
+        #         i += 1
+
+        #     elif 'maxpool' in self.orderedKeys[i]:
+        #         i += 1
+
+        # fprint('\t\treturn x')
+        # fprint('')
+        # fprint('def alexnet(**kwargs):')
+        # fprint('\treturn AlexNet(**kwargs)')
+        # 
+        # self.modelDesc.close()
         #}}}
-
+        print("Pruned model written to {}".format(self.filePath))
+        channelsPruned = {l:len(v) for l,v in self.channelsToPrune.items()}
+        self.writer = Writer(self.netName, channelsPruned, self.depBlock, self.filePath)
+        lTypes, lNames = zip(*self.depBlock.linkedConvs)
+        prunedModel = copy.deepcopy(self.model)
         breakpoint()
-        
-        self.orderedKeys = list(linesToWrite.keys())
-        [fprint(linesToWrite[k]) for k in self.orderedKeys]
-                    
-        fprint('')
-        fprint('\tdef forward(self, x):')
-
-        i = 0
-        maxpoolConvs = ['module.conv1', 'module.conv2', 'module.conv5']
-        maxPoolLayerName = [x for x in self.orderedKeys if 'maxpool' in x][0]
-        while i < len(self.orderedKeys): 
-            if 'conv' in self.orderedKeys[i]:
-                fprint('\t\tx = F.relu(self.{}(x))'.format('_'.join(self.orderedKeys[i].split('.')[1:])))
-                if self.orderedKeys[i] in maxpoolConvs:
-                    fprint('\t\tx = self.{}(x)'.format('_'.join(maxPoolLayerName.split('.')[1:])))
-                i = i+1
+        for n,m in prunedModel.named_modules(): 
+            # detect dependent modules and convs
+            if any(n == x for x in lNames):
+                idx = lNames.index(n) 
+                lType = lTypes[idx]
+                self.writer.write_module(lType, n, m)
             
-            elif 'linear' in self.orderedKeys[i] or 'classifier' in self.orderedKeys[i]:
-                fprint('\t\tx = x.view(x.size(0), -1)')
-                fprint('\t\tx = self.{}(x)'.format('_'.join(self.orderedKeys[i].split('.')[1:])))
-                i += 1
-
-            elif 'maxpool' in self.orderedKeys[i]:
-                i += 1
-
-        fprint('\t\treturn x')
-        fprint('')
-        fprint('def alexnet(**kwargs):')
-        fprint('\treturn AlexNet(**kwargs)')
+            # ignore recursion into dependent modules
+            elif any(x in n for t,x in self.depBlock.linkedConvs):
+                continue
+            
+            # all other modules in the network
+            else:
+                try: 
+                    self.writer.write_module(type(m).__name__.lower(), n, m)
+                except KeyError:
+                    print("CRITICAL WARNING : layer found ({}) that is not handled in writers. This could potentially break the network.".format(type(m)))
         
-        self.modelDesc.close()
-        #}}}                  
+        self.writer.write_network()       
+    #}}}                  
 
     def transfer_weights(self, oModel, pModel):
     #{{{

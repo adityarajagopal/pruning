@@ -16,6 +16,7 @@ import torch
 import torch.nn as nn
 
 from src.ar4414.pruning.pruners.base import BasicPruning
+from src.ar4414.pruning.pruners.model_writers import Writer
 
 class ResNet20Pruning(BasicPruning):
 #{{{
@@ -470,161 +471,18 @@ class ResNet20PruningDependency(BasicPruning):
         
     def write_net(self):
     #{{{
-        def fprint(text):
-            print(text, file=self.modelDesc)
-        
         print("Pruned model written to {}".format(self.filePath))
-        self.modelDesc = open(self.filePath, 'w+')
-        # self.modelDesc = sys.stdout 
 
-        #{{{
-        # fprint('import torch')
-        # fprint('import torch.nn as nn')
-        # fprint('import torch.nn.functional as F')
-    
-        # fprint('')
-        # fprint('class {}(nn.Module):'.format(self.netName))
-        # fprint('\tdef __init__(self, num_classes=10):')
-        # fprint('\t\tsuper().__init__()')
-        # fprint('')
-        
-        # start = True
-        # currentIpChannels = 3
-        # linesToWrite = {}
-        # for n,m in prunedModel.named_modules():
-        # #{{{
-        #     if not m._modules:
-        #         if 'downsample' not in n:
-        #             if n in channelsPruned.keys():
-        #                 m.out_channels -= channelsPruned[n] 
-        #                 m.in_channels = currentIpChannels if not start else m.in_channels
-        #                 currentIpChannels = m.out_channels
-        #                 if start:
-        #                     start = False
-        #             
-        #             if isinstance(m, nn.BatchNorm2d):
-        #                 m.num_features = currentIpChannels
-
-        #             elif isinstance(m, nn.Linear):
-        #                 m.in_features = currentIpChannels
-
-        #             elif isinstance(m, nn.ReLU):
-        #                 continue
-        #             
-        #             linesToWrite[n] = '\t\tself.{} = nn.{}'.format('_'.join(n.split('.')[1:]), str(m))
-        # #}}}
-        # #{{{
-        # blockInChannels = {}
-        # for n,m in prunedModel.named_modules():
-        #     if 'layer' in n and len(n.split('.')) == 3:
-        #         blockInChannels[n] = [m._modules['conv1'].in_channels, m._modules['conv2'].out_channels, m._modules['conv1'].stride]
-        # 
-        # self.orderedKeys = list(linesToWrite.keys())
-        # updatedIpChannels = {k:v[0] for k,v in blockInChannels.items()}
-        # for i,(k,v) in enumerate(blockInChannels.items()):
-
-        #     ic = updatedIpChannels[k]
-        #     
-        #     if v[2][0] == 2:
-        #         newKey = k + '.downsample.0'
-        #         self.orderedKeys.insert(self.orderedKeys.index(k + '.bn2')+1, newKey)
-        #         m = nn.Conv2d(ic, v[1], kernel_size=1, stride=v[2], padding=0, bias=False)
-        #         linesToWrite[newKey] = '\t\tself.{} = nn.{}'.format('_'.join(newKey.split('.')[1:]), str(m))
-
-        #         newKey = k + '.downsample.1'
-        #         self.orderedKeys.insert(self.orderedKeys.index(k + '.downsample.0')+1, newKey)
-        #         m = nn.BatchNorm2d(v[1])
-        #         linesToWrite[newKey] = '\t\tself.{} = nn.{}'.format('_'.join(newKey.split('.')[1:]), str(m))
-        #     
-        #     else:
-        #         newKey = 'ignore:res' if ic == v[1] else 'ignore:pad_out' if ic > v[1] else 'ignore:pad_x'
-        #         self.orderedKeys.insert(self.orderedKeys.index(k + '.bn2') + 1, newKey)
-        #         
-        #         if newKey == 'ignore:pad_out':
-        #             toEdit = self.orderedKeys[self.orderedKeys.index(k + '.bn2') + 2]
-        #             lineToEdit = linesToWrite[toEdit]
-        #             modName, module = lineToEdit.split('=',1)
-        #             module = eval(module)
-        #             module.in_channels = v[0]
-        #             linesToWrite[toEdit] = '\t\t{} = nn.{}'.format(modName.strip(), str(module))
-
-        #             layerName = '.'.join(toEdit.split('.')[:-1])
-        #             updatedIpChannels[layerName] = v[0]
-        # 
-        # # if last layer has a concatenated output, then fc layer that follows this needs to also have a different input size
-        # if newKey == 'ignore:pad_out':
-        #     i = self.orderedKeys.index(k + '.bn2')
-        #     while('fc' not in self.orderedKeys[i]):
-        #         i += 1
-        #     toEdit = self.orderedKeys[i]
-        #     lineToEdit = linesToWrite[toEdit]
-        #     modName, module = lineToEdit.split('=',1)
-        #     module = eval(module)
-        #     module.in_features = ic
-        #     linesToWrite[toEdit] = '\t\t{} = nn.{}'.format(modName.strip(), str(module))
-
-        # [fprint(linesToWrite[k]) for k in self.orderedKeys if 'ignore' not in k]
-
-        # fprint('')
-        # fprint('\tdef forward(self, x):')
-
-        # i = 0
-        # while i < len(self.orderedKeys): 
-        #     if 'layer' in self.orderedKeys[i]:
-        #         fprint('\t\tout = F.relu(self.{}(self.{}(x)))'.format('_'.join(self.orderedKeys[i+1].split('.')[1:]), '_'.join(self.orderedKeys[i].split('.')[1:])))
-        #         i = i+2
-        #         fprint('\t\tout = self.{}(self.{}(out))'.format('_'.join(self.orderedKeys[i+1].split('.')[1:]), '_'.join(self.orderedKeys[i].split('.')[1:])))
-        #         i = i+2
-        #         
-        #         if 'downsample.0' in self.orderedKeys[i]:
-        #             fprint('\t\tx = F.relu(out + self.{}(self.{}(x)))'.format('_'.join(self.orderedKeys[i+1].split('.')[1:]), '_'.join(self.orderedKeys[i].split('.')[1:])))
-        #             i = i+2
-        #         elif self.orderedKeys[i] == 'ignore:res':
-        #             i += 1
-        #         elif self.orderedKeys[i] == 'ignore:pad_x':
-        #             fprint("\t\ttmp = torch.zeros(out.shape[0], out.shape[1] - x.shape[1], out.shape[2], out.shape[3], requires_grad=False).cuda('{}')".format(self.gpu))
-        #             fprint("\t\tx = torch.cat([x, tmp], dim=1)")
-        #             i += 1 
-        #         elif self.orderedKeys[i] == 'ignore:pad_out':
-        #             fprint("\t\ttmp = torch.zeros(x.shape[0], x.shape[1] - out.shape[1], x.shape[2], x.shape[3], requires_grad=False).cuda('{}')".format(self.gpu))
-        #             fprint("\t\tout = torch.cat([out, tmp], dim=1)")
-        #             i += 1 
-        #         
-        #         fprint('\t\tx = F.relu(out + x)')
-        #     
-        #     elif 'fc' in self.orderedKeys[i]:
-        #         fprint('\t\tx = x.view(x.size(0), -1)')
-        #         fprint('\t\tx = self.{}(x)'.format('_'.join(self.orderedKeys[i].split('.')[1:])))
-        #         i += 1
-        #     
-        #     elif 'conv' in self.orderedKeys[i]:
-        #         fprint('\t\tx = F.relu(self.{}(self.{}(x)))'.format('_'.join(self.orderedKeys[i+1].split('.')[1:]), '_'.join(self.orderedKeys[i].split('.')[1:])))
-        #         i = i+2
-        #     
-        #     elif 'avgpool' in self.orderedKeys[i]:
-        #         fprint('\t\tx = self.{}(x)'.format('_'.join(self.orderedKeys[i].split('.')[1:])))
-        #         i += 1
-
-        # fprint('\t\treturn x')
-        # fprint('')
-        # # fprint('def resnet_{}(**kwargs):'.format(self.params.pruningPerc))
-        # # fprint('\treturn ResNet_{}(**kwargs)'.format(self.params.pruningPerc))
-        # fprint('def resnet(**kwargs):')
-        # fprint('\treturn ResNet(**kwargs)')
-        # #}}}                  
-        #}}}
-        
         channelsPruned = {l:len(v) for l,v in self.channelsToPrune.items()}
-        linesToWrite = {'modules':[], 'forward':[]}
-        prunedModel = copy.deepcopy(self.model) 
-        currIpChannels = 3 
+        self.writer = Writer(self.netName, channelsPruned, self.depBlock, self.filePath)
         lTypes, lNames = zip(*self.depBlock.linkedConvs)
+        prunedModel = copy.deepcopy(self.model) 
         for n,m in prunedModel.named_modules(): 
             # detect dependent modules and convs
             if any(n == x for x in lNames):
                 idx = lNames.index(n) 
                 lType = lTypes[idx]
-                currIpChannels = self.writer[lType](linesToWrite, n, m, currIpChannels, channelsPruned, self.depBlock)
+                self.writer.write_module(lType, n, m)
             
             # ignore recursion into dependent modules
             elif any(x in n for t,x in self.depBlock.linkedConvs):
@@ -632,39 +490,11 @@ class ResNet20PruningDependency(BasicPruning):
             
             # all other modules in the network
             else:
-                if isinstance(m, nn.BatchNorm2d): 
-                    currIpChannels = self.writer['batchnorm2d'](linesToWrite, n, m, currIpChannels)
-
-                elif isinstance(m, nn.Linear):
-                    currIpChannels = self.writer['linear'](linesToWrite, n, m, currIpChannels)
-
-                elif isinstance(m, nn.ReLU): 
-                    self.writer['relu'](linesToWrite, n, m)
-                
-                elif isinstance(m, nn.AvgPool2d): 
-                    self.writer['avgpool2d'](linesToWrite, n, m)
-
-                else: 
+                try: 
+                    self.writer.write_module(type(m).__name__.lower(), n, m)
+                except KeyError:
                     print("CRITICAL WARNING : layer found ({}) that is not handled in writers. This could potentially break the network.".format(type(m)))
-        
-        fprint('import torch')
-        fprint('import torch.nn as nn')
-        fprint('import torch.nn.functional as F')
-    
-        fprint('')
-        fprint('class {}(nn.Module):'.format(self.netName))
-        fprint('\tdef __init__(self, num_classes=10):')
-        fprint('\t\tsuper().__init__()')
-        fprint('')
-
-        [fprint(x) for x in linesToWrite['modules']]
-        
-        fprint('')
-        fprint('\tdef forward(self, x):')
-        
-        [fprint(x) for x in linesToWrite['forward']]
-
-        self.modelDesc.close()
+        self.writer.write_network()       
     #}}}
     
     def transfer_weights(self, oModel, pModel):
