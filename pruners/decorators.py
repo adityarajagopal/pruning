@@ -1,32 +1,57 @@
+import sys
+
 import src.ar4414.pruning.pruners.dependencies as dependencies
 import src.ar4414.pruning.pruners.model_writers as writers
 
-def basic_block(*args, **kwargs):
+def check_kwargs(**kwargs): 
+#{{{
+    """Check that kwargs has atleast the lType argument, if not it is an invalid decorator"""
+    if 'lType' in kwargs.keys(): 
+        return 
+    else: 
+        print("ERROR : Decorator without lType argument declared. This is invalid")
+        sys.exit()
+#}}}
+
+def basic_block(**kwargs):
 #{{{
     def decorator(block): 
-        dependencies.DependencyBlock.update_block_names(block, *args)
-        dependencies.DependencyBlock.register_dependency_calculator(args[0], dependencies.Residual())
-        writers.Writer.register_writer(args[0], writers.residual)
+        check_kwargs(**kwargs)
+        dependencies.DependencyBlock.update_block_names(block, **kwargs)
+        dependencies.DependencyBlock.register_dependency_calculator(kwargs['lType'], dependencies.Residual())
+        writers.Writer.register_writer(kwargs['lType'], writers.residual)
         return block
     return decorator
 #}}}
 
-def bottleneck(*args, **kwargs):
+def bottleneck(**kwargs):
 #{{{
     def decorator(block): 
-        dependencies.DependencyBlock.update_block_names(block, *args)
-        dependencies.DependencyBlock.register_dependency_calculator(args[0], dependencies.Residual())
-        writers.Writer.register_writer(args[0], writers.residual)
+        check_kwargs(**kwargs)
+        dependencies.DependencyBlock.update_block_names(block, **kwargs)
+        dependencies.DependencyBlock.register_dependency_calculator(kwargs['lType'], dependencies.Residual())
+        writers.Writer.register_writer(kwargs['lType'], writers.residual)
         return block
     return decorator
 #}}}
 
-def mb_conv(*args, **kwargs):
+def mb_conv(**kwargs):
 #{{{
     def decorator(block): 
-        dependencies.DependencyBlock.update_block_names(block, *args)
-        dependencies.DependencyBlock.register_dependency_calculator(args[0], dependencies.MBConv())
-        writers.Writer.register_writer(args[0], writers.mb_conv)
+        check_kwargs(**kwargs)
+        dependencies.DependencyBlock.update_block_names(block, **kwargs)
+        dependencies.DependencyBlock.register_dependency_calculator(kwargs['lType'], dependencies.MBConv())
+        writers.Writer.register_writer(kwargs['lType'], writers.mb_conv)
+        return block
+    return decorator
+#}}}
+
+def fire(**kwargs):
+#{{{
+    def decorator(block): 
+        check_kwargs(**kwargs)
+        dependencies.DependencyBlock.update_block_names(block, **kwargs)
+        writers.Writer.register_writer(kwargs['lType'], writers.fire)
         return block
     return decorator
 #}}}

@@ -11,7 +11,7 @@ __all__ = ['mobilenetv2']
 
 from src.ar4414.pruning.pruners.decorators import mb_conv
 
-@mb_conv('mb_conv', ['conv1', 'conv2', 'conv3'], ['shortcut'])
+@mb_conv(lType='mb_conv', convs=['conv1', 'conv2', 'conv3'], downsampling=['shortcut'])
 class Block(nn.Module):
 #{{{
     '''expand + depthwise + pointwise'''

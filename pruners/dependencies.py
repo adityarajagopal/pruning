@@ -135,15 +135,23 @@ class DependencyBlock(object):
     #}}}
     
     @classmethod
-    def update_block_names(cls, blockInst, *args):
+    def update_block_names(cls, blockInst, **kwargs):
     #{{{
+        lType = kwargs['lType']
+        convs = None
+        if 'convs' in kwargs.keys(): 
+            convs = kwargs['convs']
+        ds = None
+        if 'downsampling' in kwargs.keys():
+            ds = kwargs['downsampling']
+        
         if hasattr(cls, 'dependentLayers'):
-            cls.dependentLayers['type'].append(args[0])
             cls.dependentLayers['instance'].append(blockInst)
-            cls.dependentLayers['conv'].append(args[1])
-            cls.dependentLayers['downsample'].append(args[2])
+            cls.dependentLayers['type'].append(lType)
+            cls.dependentLayers['conv'].append(convs)
+            cls.dependentLayers['downsample'].append(ds)
         else:
-            setattr(cls, 'dependentLayers', {'type':[args[0]], 'instance':[blockInst], 'conv':[args[1]], 'downsample':[args[2]]})
+            setattr(cls, 'dependentLayers', {'type':[lType], 'instance':[blockInst], 'conv':[convs], 'downsample':[ds]})
     #}}}
 
     @classmethod 
@@ -203,7 +211,12 @@ class DependencyBlock(object):
                 convs = self.convs[idx]
                 ds = self.dsLayers[idx]
                 
-                internallyDep, depLayers = self.depCalcs[mType].internal_dependency(m, mType, convs, ds)
+                try:
+                    internallyDep, depLayers = self.depCalcs[mType].internal_dependency(m, mType, convs, ds)
+                except KeyError: 
+                    print("CRITICAL WARNING : Dependency Calculator not defined for layer ({}). Assumed that no dependency exists".format(type(m)))
+                    continue
+                
                 if internallyDep: 
                     intDeps.append(["{}.{}".format(n,x) for x in depLayers])
                 

@@ -13,8 +13,10 @@ class Writer(object):
         self.netName = netName
         self.toWrite = {'modules':[], 'forward':[]}
         self.modelDesc = open(modelFile, 'w+')
+
+        self.returnStatement = "return {}.squeeze()" if 'squeezenet' == self.netName.lower() else "return {}"
         
-        baseWriters = {'basic': nn_conv2d, 'relu': nn_relu, 'maxpool2d':nn_maxpool2d, 'avgpool2d':nn_avgpool2d, 'batchnorm2d': nn_batchnorm2d, 'linear': nn_linear}
+        baseWriters = {'basic': nn_conv2d, 'relu': nn_relu, 'maxpool2d':nn_maxpool2d, 'avgpool2d':nn_avgpool2d, 'adaptiveavgpool2d':nn_adaptiveavgpool2d, 'batchnorm2d': nn_batchnorm2d, 'linear': nn_linear, 'logsoftmax': nn_logsoftmax}
         if hasattr(self, 'writers'):
             self.writers.update(baseWriters)
         else:
@@ -46,6 +48,15 @@ class Writer(object):
         self.fprint('')
     #}}}
 
+    def write_postamble(self):
+    #{{{
+        ret = self.returnStatement.format(self.forVar)
+        self.fprint('\t\t{}'.format(ret))
+        self.fprint('')
+        self.fprint('def {}(**kwargs):'.format(self.netName.lower()))
+        self.fprint('\treturn {}(**kwargs)'.format(self.netName))
+    #}}}
+
     def write_network(self, stdout=False): 
     #{{{
         if stdout:
@@ -59,6 +70,8 @@ class Writer(object):
         self.fprint('\tdef forward(self, {}):'.format(self.forVar))
         
         [self.fprint(x) for x in self.toWrite['forward']]
+
+        self.write_postamble()
 
         self.modelDesc.close()
     #}}}
@@ -89,7 +102,6 @@ def nn_conv2d(writer, modName, module, dw=False):
     module.in_channels = writer.currIpChannels 
     if dw:
         module.groups = writer.currIpChannels
-        breakpoint()
     module.out_channels -= writer.channelsPruned[modName]
     writer.currIpChannels = module.out_channels
     
@@ -114,6 +126,12 @@ def nn_avgpool2d(writer, modName, module):
     writer.write_module_forward(modName)
 #}}}
 
+def nn_adaptiveavgpool2d(writer, modName, module): 
+#{{{
+    writer.write_module_desc(modName, module)
+    writer.write_module_forward(modName)
+#}}}
+
 def nn_batchnorm2d(writer, modName, module): 
 #{{{
     module.num_features = writer.currIpChannels
@@ -129,6 +147,16 @@ def nn_linear(writer, modName, module):
     writer.write_module_desc(modName, module)
     
     writer.toWrite['forward'].append('\t\t{} = {}.view({}.size(0), -1)'.format(writer.forVar, writer.forVar, writer.forVar))
+    writer.write_module_forward(modName)
+#}}}
+
+def nn_logsoftmax(writer, modName, module): 
+#{{{
+    layerName = '_'.join(modName.split('.')[1:])
+    moduleStr = str(module).split('(')[0]
+    mod = '\t\tself.{} = nn.{}(dim={})'.format(layerName, moduleStr, module.dim)
+    writer.toWrite['modules'].append(mod)
+    
     writer.write_module_forward(modName)
 #}}}
 
@@ -171,6 +199,42 @@ def residual_backbone(writer, modName, module, main_branch, residual_branch, agg
         writer.forVar = forVarBkp
 
         aggregation_op(writer, opNode, opNode1)
+#}}}
+
+def split_and_aggregate_backbone(writer, parentModName, parentModule, branchStarts, branchProcs, aggregation_op): 
+#{{{
+    assert len(branchStarts) == len(branchProcs), 'For each branch a processing function must be provided - branches = {}, procFuns = {}'.format(len(branchConvs), len(branchProcs))
+
+    inputToBlock = writer.currIpChannels
+    forVarBkp = writer.forVar
+
+    branchOpChannels = []
+    opNodes = []
+            
+    for idx in range(len(branchStarts)):
+        branchVar = "{}_{}".format(writer.forVar, idx)
+        opNodes.append(branchVar)
+        writer.toWrite['forward'].append("\t\t{} = {}".format(branchVar, writer.forVar))
+        writer.forVar = branchVar
+        writer.currIpChannels = inputToBlock
+
+        inBranch = False
+        for n,m in parentModule._modules.items(): 
+            if n in branchStarts and not inBranch:
+                inBranch = True
+                branchStarts.pop(0)
+            elif n in branchStarts and inBranch: 
+                break
+            
+            if inBranch:
+                fullName = "{}.{}".format(parentModName, n)
+                branchProcs[idx](writer, fullName, m)
+        
+        branchOpChannels.append(writer.currIpChannels)
+        writer.forVar = forVarBkp
+
+    if aggregation_op is not None:
+        aggregation_op(writer, opNodes, branchOpChannels)  
 #}}}
 
 def residual(writer, modName, module):
@@ -256,4 +320,67 @@ def mb_conv(writer, modName, module):
     else:
         residual_backbone(writer, modName, module, main_branch, residual_branch, aggregation_op)
 #}}}
+
+def fire(writer, modName, module): 
+#{{{
+    def basic(writer, fullName, module): 
+    #{{{
+        if isinstance(module, nn.Conv2d): 
+            nn_conv2d(writer, fullName, module)
+
+        if isinstance(module, nn.BatchNorm2d): 
+            nn_batchnorm2d(writer, fullName, module)
+    #}}}
+
+    def aggregation_op(writer, opNodes, branchOpChannels): 
+    #{{{
+        writer.currIpChannels = sum(branchOpChannels)
+        nodes = "[{}]".format(','.join(opNodes))
+        writer.toWrite['forward'].append("\t\t{} = torch.cat({}, 1)".format(writer.forVar, nodes))
+        nn_relu(writer, None, None)
+    #}}}
+    
+    inputToBlock = writer.currIpChannels
+    idx = writer.depBlk.instances.index(type(module))
+    convs = writer.depBlk.convs[idx]
+
+    for n,m in module.named_modules(): 
+        fullName = "{}.{}".format(modName, n)
+        
+        if isinstance(m, nn.Conv2d): 
+            if n == convs[0]:
+                nn_conv2d(writer, fullName, m)
+        
+        if isinstance(m, nn.BatchNorm2d):
+            nn_batchnorm2d(writer, fullName, m)
+        
+        if isinstance(m, nn.ReLU): 
+            nn_relu(writer, fullName, m)     
+            split_and_aggregate_backbone(writer, modName, module, convs[1:], [basic,basic], aggregation_op)
+            break
+#}}}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

@@ -6,7 +6,11 @@ import numpy as np
 import torch.optim as optim
 import math
 
+from src.ar4414.pruning.pruners.decorators import fire
+
+@fire(lType='fire', convs=['conv1', 'conv2', 'conv3'])
 class fire(nn.Module):
+#{{{
     def __init__(self, inplanes, squeeze_planes, expand_planes):
         super(fire, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, squeeze_planes, kernel_size=1, stride=1)
@@ -35,6 +39,7 @@ class fire(nn.Module):
         out = torch.cat([out1, out2], 1)
         out = self.relu2(out)
         return out
+#}}}
 
 
 class SqueezeNet(nn.Module):
