@@ -162,7 +162,7 @@ class BasicPruning(ABC):
                 channelsPruned = self.structured_l1_weight(model)
                 self.write_net()
                 prunedModel = self.import_pruned_model()
-                # prunedModel = self.transfer_weights(model, prunedModel)
+                prunedModel = self.transfer_weights(model, prunedModel)
                 optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
 
                 return channelsPruned, prunedModel, optimiser
