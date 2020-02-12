@@ -134,3 +134,7 @@ class ResNet20(nn.Module):
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
+        return x
+
+def resnet20(**kwargs):
+    return ResNet20(**kwargs)

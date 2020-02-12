@@ -317,3 +317,7 @@ class MobileNetV2(nn.Module):
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         x = self.linear(x)
+        return x
+
+def mobilenetv2(**kwargs):
+    return MobileNetV2(**kwargs)

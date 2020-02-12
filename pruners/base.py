@@ -15,6 +15,7 @@ import copy
 from abc import ABC, abstractmethod
 
 import src.ar4414.pruning.pruners.dependencies as dependSrc
+from src.ar4414.pruning.pruners.model_writers import Writer
 
 import torch
 import torch.nn as nn
@@ -303,6 +304,34 @@ class BasicPruning(ABC):
 
         return self.channelsToPrune
     #}}}
+    
+    def write_net(self):
+    #{{{
+        print("Pruned model written to {}".format(self.filePath))
+        channelsPruned = {l:len(v) for l,v in self.channelsToPrune.items()}
+        self.writer = Writer(self.netName, channelsPruned, self.depBlock, self.filePath)
+        lTypes, lNames = zip(*self.depBlock.linkedConvs)
+        prunedModel = copy.deepcopy(self.model)
+        for n,m in prunedModel.named_modules(): 
+            # detect dependent modules and convs
+            if any(n == x for x in lNames):
+                idx = lNames.index(n) 
+                lType = lTypes[idx]
+                self.writer.write_module(lType, n, m)
+            
+            # ignore recursion into dependent modules
+            elif any(x in n for t,x in self.depBlock.linkedConvs):
+                continue
+            
+            # all other modules in the network
+            else:
+                try: 
+                    self.writer.write_module(type(m).__name__.lower(), n, m)
+                except KeyError:
+                    print("CRITICAL WARNING : layer found ({}) that is not handled in writers. This could potentially break the network.".format(type(m)))
+        
+        self.writer.write_network()       
+    #}}}
 
     # selects only convs and fc layers 
     # used in get_layer_params to get sizes of only convs and fcs 
@@ -323,10 +352,6 @@ class BasicPruning(ABC):
     # lName here is module name, so doesn't have 'weight'/'bias' keyword
     @abstractmethod
     def skip_layer(self, lName):
-        pass
-    
-    @abstractmethod
-    def write_net(self, subsetName=None):
         pass
     
     @abstractmethod
