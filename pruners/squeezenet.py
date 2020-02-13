@@ -109,7 +109,7 @@ class SqueezeNetPruning(BasicPruning):
             return False
     #}}} 
         
-    def transfer_weights(self, oModel, pModel):
+    def transfer_weights_old(self, oModel, pModel):
     #{{{
         parentModel = oModel.state_dict() 
         prunedModel = pModel.state_dict() 
@@ -178,6 +178,24 @@ class SqueezeNetPruning(BasicPruning):
         pModel.load_state_dict(prunedModel)
 
         return pModel
+    #}}}
+    
+    def transfer_weights(self, oModel, pModel): 
+    #{{{
+
+        lTypes, lNames = zip(*self.depBlock.linkedConvs)
+        # self.weightTransfer = WeightTransfer(pModel, self.depBlock)
+        for n,m in oModel.named_modules(): 
+            if not m._modules:
+                if n in self.channelsToPrune.keys(): 
+                    key = '_'.join(n.split('.')[1:])
+                    pMod = eval("pModel.module.{}".format(key))
+                    channelsToKeep = set(list(range(m.out_channels))) - set(self.channelsToPrune[n])
+                    print('{} : {}/{} - {}'.format(n, pMod.out_channels, m.out_channels, channelsToKeep))
+                else:
+                    continue
+                    print('need_to_handle - {}'.format(n))
+        sys.exit()
     #}}}
 #}}}
 

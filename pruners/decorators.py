@@ -2,6 +2,7 @@ import sys
 
 import src.ar4414.pruning.pruners.dependencies as dependencies
 import src.ar4414.pruning.pruners.model_writers as writers
+import src.ar4414.pruning.pruners.weight_transfer as weight_transfer
 
 def check_kwargs(**kwargs): 
 #{{{
@@ -20,6 +21,7 @@ def basic_block(**kwargs):
         dependencies.DependencyBlock.update_block_names(block, **kwargs)
         dependencies.DependencyBlock.register_dependency_calculator(kwargs['lType'], dependencies.Residual())
         writers.Writer.register_writer(kwargs['lType'], writers.residual)
+        weight_transfer.WeightTransferUnit.register_transfer_func(kwargs['lType'], writers.residual)
         return block
     return decorator
 #}}}
@@ -31,6 +33,7 @@ def bottleneck(**kwargs):
         dependencies.DependencyBlock.update_block_names(block, **kwargs)
         dependencies.DependencyBlock.register_dependency_calculator(kwargs['lType'], dependencies.Residual())
         writers.Writer.register_writer(kwargs['lType'], writers.residual)
+        weight_transfer.WeightTransferUnit.register_transfer_func(kwargs['lType'], writers.residual)
         return block
     return decorator
 #}}}
@@ -42,6 +45,7 @@ def mb_conv(**kwargs):
         dependencies.DependencyBlock.update_block_names(block, **kwargs)
         dependencies.DependencyBlock.register_dependency_calculator(kwargs['lType'], dependencies.MBConv())
         writers.Writer.register_writer(kwargs['lType'], writers.mb_conv)
+        weight_transfer.WeightTransferUnit.register_transfer_func(kwargs['lType'], writers.mb_conv)
         return block
     return decorator
 #}}}
@@ -52,6 +56,7 @@ def fire(**kwargs):
         check_kwargs(**kwargs)
         dependencies.DependencyBlock.update_block_names(block, **kwargs)
         writers.Writer.register_writer(kwargs['lType'], writers.fire)
+        weight_transfer.WeightTransferUnit.register_transfer_func(kwargs['lType'], writers.fire)
         return block
     return decorator
 #}}}

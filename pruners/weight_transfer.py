@@ -1,135 +1,72 @@
 import sys
+import copy
 
 import torch.nn as nn
     
-class Writer(object): 
+class WeightTransferUnit(object): 
 #{{{
-    def __init__(self, netName, channelsPruned, depBlk, modelFile, forwardVar='x'): 
+    def __init__(self, prunedModel, channelsPruned, depBlk): 
     #{{{
-        self.currIpChannels = 3
         self.channelsPruned = channelsPruned
         self.depBlk = depBlk
-        self.forVar = forwardVar
-        self.netName = netName
-        self.toWrite = {'modules':[], 'forward':[]}
-        self.modelDesc = open(modelFile, 'w+')
-
-        self.returnStatement = "return {}.squeeze()" if 'squeezenet' == self.netName.lower() else "return {}"
+        self.pModel = prunedModel
         
-        baseWriters = {'basic': nn_conv2d, 'relu': nn_relu, 'maxpool2d':nn_maxpool2d, 'avgpool2d':nn_avgpool2d, 'adaptiveavgpool2d':nn_adaptiveavgpool2d, 'batchnorm2d': nn_batchnorm2d, 'linear': nn_linear, 'logsoftmax': nn_logsoftmax}
-        if hasattr(self, 'writers'):
-            self.writers.update(baseWriters)
+        self.ipChannelsPruned = []
+
+        baseMods = {'basic': nn_conv2d, 'relu': nn_relu, 'maxpool2d':nn_maxpool2d, 'avgpool2d':nn_avgpool2d, 'adaptiveavgpool2d':nn_adaptiveavgpool2d, 'batchnorm2d': nn_batchnorm2d, 'linear': nn_linear, 'logsoftmax': nn_logsoftmax}
+        if hasattr(self, 'wtFuncs'):
+            self.wtFuncs.update(baseMods)
         else:
-            sef.writers = baseWriters 
+            sef.wtFuncs = baseMods 
     #}}}
 
     @classmethod 
-    def register_writer(cls, blockName, func):
+    def register_transfer_func(cls, blockName, func):
     #{{{
-        if hasattr(cls, 'writers'):
-            cls.writers[blockName] = func
+        if hasattr(cls, 'wtFuncs'):
+            cls.wtFuncs[blockName] = func
         else: 
-            setattr(cls, 'writers', {blockName:func})
+            setattr(cls, 'wtFuncs', {blockName:func})
     #}}}
         
-    def fprint(self, text):
-        print(text.replace('\t','    '), file=self.modelDesc)
-
-    def write_preamble(self):
+    def transfer_weights(self, lType, modName, module): 
     #{{{
-        self.fprint('import torch')
-        self.fprint('import torch.nn as nn')
-        self.fprint('import torch.nn.functional as F')
-    
-        self.fprint('')
-        self.fprint('class {}(nn.Module):'.format(self.netName))
-        self.fprint('\tdef __init__(self, num_classes=10):')
-        self.fprint('\t\tsuper().__init__()')
-        self.fprint('')
-    #}}}
-
-    def write_postamble(self):
-    #{{{
-        ret = self.returnStatement.format(self.forVar)
-        self.fprint('\t\t{}'.format(ret))
-        self.fprint('')
-        self.fprint('def {}(**kwargs):'.format(self.netName.lower()))
-        self.fprint('\treturn {}(**kwargs)'.format(self.netName))
-    #}}}
-
-    def write_network(self, stdout=False): 
-    #{{{
-        if stdout:
-            self.modelDesc = sys.stdout 
-
-        self.write_preamble()
-        
-        [self.fprint(x) for x in self.toWrite['modules']]
-        
-        self.fprint('')
-        self.fprint('\tdef forward(self, {}):'.format(self.forVar))
-        
-        [self.fprint(x) for x in self.toWrite['forward']]
-
-        self.write_postamble()
-
-        self.modelDesc.close()
-    #}}}
-    
-    def write_module(self, className, modName, module): 
-    #{{{
-        self.writers[className](self, modName, module)
-    #}}}
-
-    def write_module_desc(self, modName, module):
-    #{{{
-        layerName = '_'.join(modName.split('.')[1:])
-        mod = '\t\tself.{} = nn.{}'.format(layerName, str(module))
-        self.toWrite['modules'].append(mod)
-    #}}}
-
-    def write_module_forward(self, modName):
-    #{{{
-        layerName = '_'.join(modName.split('.')[1:])
-        forward = '\t\t{} = self.{}({})'.format(self.forVar, layerName, self.forVar) 
-        self.toWrite['forward'].append(forward)
+        self.wtFuncs[lType](self, modName, module)
+        pass
     #}}}
 #}}}
 
 # torch.nn modules
-def nn_conv2d(writer, modName, module, dw=False): 
+def nn_conv2d(wtu, modName, module, dw=False): 
 #{{{
-    module.in_channels = writer.currIpChannels 
-    if dw:
-        module.groups = writer.currIpChannels
-    module.out_channels -= writer.channelsPruned[modName]
-    writer.currIpChannels = module.out_channels
-    
-    writer.write_module_desc(modName, module)
-    writer.write_module_forward(modName)
+    allIpChannels = list(range(module.in_channels))
+    allOpChannels = list(range(module.out_channels))
+    ipChannels = list(set(allIpChannels) - set(wtu.ipChannelsPruned))
+    opChannels = list(set(allOpChannels) - set(wtu.channelsPruned[modName]))
+    pMod = eval('wtu.pModel.module.{}'.format('_'.join(modName.split('.')[1:])))
+    pMod._parameters['weight'] = module._parameters['weight'][opChannels,:][:,ipChannels,:,:]
+    if pMod._parameters['bias'] is not None: 
+        pMod._parameters['bias'] = module._parameters['bias'][opChannels]
 #}}}
 
 def nn_relu(writer, modName, module): 
 #{{{
-    writer.toWrite['forward'].append('\t\t{} = F.relu({})'.format(writer.forVar, writer.forVar)) 
+    pass
 #}}}
 
 def nn_maxpool2d(writer, modName, module): 
 #{{{
-    writer.write_module_desc(modName, module)
-    writer.write_module_forward(modName)
+    pass
 #}}}
 
 def nn_avgpool2d(writer, modName, module): 
 #{{{
-    writer.write_module_desc(modName, module)
-    writer.write_module_forward(modName)
+    pass
 #}}}
 
 def nn_adaptiveavgpool2d(writer, modName, module): 
 #{{{
-    writer.write_module_desc(modName, module)
-    writer.write_module_forward(modName)
+    pass
 #}}}
 
 def nn_batchnorm2d(writer, modName, module): 
