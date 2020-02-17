@@ -37,13 +37,13 @@ class WeightTransferUnit(object):
 #}}}
 
 # torch.nn modules
-def nn_conv2d(wtu, modName, module, ipChannelsPruned=None, opChannelsPruned=None): 
+def nn_conv2d(wtu, modName, module, ipChannelsPruned=None, opChannelsPruned=None, dw=False): 
 #{{{
     allIpChannels = list(range(module.in_channels))
     allOpChannels = list(range(module.out_channels))
     ipPruned = wtu.ipChannelsPruned if ipChannelsPruned is None else ipChannelsPruned
     opPruned = wtu.channelsPruned[modName] if opChannelsPruned is None else opChannelsPruned
-    ipChannels = list(set(allIpChannels) - set(ipPruned))
+    ipChannels = list(set(allIpChannels) - set(ipPruned)) if not dw else [0]
     opChannels = list(set(allOpChannels) - set(opPruned))
     wtu.ipChannelsPruned = opPruned 
 
@@ -192,43 +192,28 @@ def mb_conv(wtu, modName, module):
         if isinstance(m, nn.Conv2d): 
             idx = wtu.depBlk.instances.index(type(module))
             wtu.convIdx = wtu.depBlk.convs[idx].index(n)
-            nn_conv2d(wtu, fullName, m, dw=(wtu.convIdx==1))
+            nn_conv2d(wtu, fullName, m, None, None, dw=(wtu.convIdx==1))
 
         elif isinstance(m, nn.BatchNorm2d): 
             nn_batchnorm2d(wtu, fullName, m)
-            if wtu.convIdx == 0 or wtu.convIdx == 1: 
-                nn_relu(wtu, fullName, m)
     #}}}
     
     def residual_branch(n, m, fullName, wtu, ipToBlock, opOfBlock): 
     #{{{
         if isinstance(m, nn.Conv2d): 
-            m.in_channels = ipToBlock
-            m.out_channels = opOfBlock
-            wtu.currIpChannels = opOfBlock
-            
-            wtu.write_module_desc(fullName, m)
-            wtu.write_module_forward(fullName)
+            nn_conv2d(wtu, fullName, m, ipToBlock, opOfBlock)
         
         elif isinstance(m, nn.BatchNorm2d):
             nn_batchnorm2d(wtu, fullName, m)
     #}}}
     
-    def aggregation_op(wtu, node1, node2):
-    #{{{
-        forward = '\t\t{} = {} + {}'.format(wtu.forVar, node1, node2)
-        wtu.toWrite['forward'].append(forward)
-    #}}}
-    
     idx = wtu.depBlk.instances.index(type(module))
     midConv = wtu.depBlk.convs[idx][1] 
-    for n,m in module.named_modules(): 
-        if n == midConv: 
-            stride = m.stride[0]
+    stride = module._modules[midConv].stride[0]
     if stride == 2: 
         residual_backbone(wtu, modName, module, main_branch, None, None)
     else:
-        residual_backbone(wtu, modName, module, main_branch, residual_branch, aggregation_op)
+        residual_backbone(wtu, modName, module, main_branch, residual_branch, None)
 #}}}
 
 def fire(wtu, modName, module): 
