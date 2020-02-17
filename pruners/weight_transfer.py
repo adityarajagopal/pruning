@@ -60,7 +60,7 @@ def nn_batchnorm2d(wtu, modName, module):
     numFeaturesKept = list(set(allFeatures) - set(wtu.ipChannelsPruned))
     key = 'module.{}'.format('_'.join(modName.split('.')[1:]))
     wtu.pModel['{}.weight'.format(key)] = module._parameters['weight'][numFeaturesKept]
-    wtu.pModel['{}.bias'.format(key)] = module._parameters['weight'][numFeaturesKept]
+    wtu.pModel['{}.bias'.format(key)] = module._parameters['bias'][numFeaturesKept]
     wtu.pModel['{}.running_mean'.format(key)] = module._buffers['running_mean'][numFeaturesKept]
     wtu.pModel['{}.running_var'.format(key)] = module._buffers['running_var'][numFeaturesKept]
     wtu.pModel['{}.num_batches_tracked'.format(key)] = module._buffers['num_batches_tracked']
