@@ -52,11 +52,6 @@ def nn_conv2d(wtu, modName, module, ipChannelsPruned=None, opChannelsPruned=None
     wtu.pModel[pWeight] = module._parameters['weight'][opChannels,:][:,ipChannels,:,:]
     if module._parameters['bias'] is not None:
         wtu.pModel[pBias] = module._parameters['bias'][opChannels]
-    
-    # pMod = eval('wtu.pModel.module.{}'.format('_'.join(modName.split('.')[1:]))
-    # pMod._parameters['weight'] = module._parameters['weight'][opChannels,:][:,ipChannels,:,:]
-    # if pMod._parameters['bias'] is not None: 
-    #     pMod._parameters['bias'] = module._parameters['bias'][opChannels]
 #}}}
 
 def nn_batchnorm2d(wtu, modName, module): 
