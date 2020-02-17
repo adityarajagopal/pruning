@@ -37,124 +37,127 @@ class WeightTransferUnit(object):
 #}}}
 
 # torch.nn modules
-def nn_conv2d(wtu, modName, module, dw=False): 
+def nn_conv2d(wtu, modName, module, ipChannelsPruned=None, opChannelsPruned=None): 
 #{{{
     allIpChannels = list(range(module.in_channels))
     allOpChannels = list(range(module.out_channels))
-    ipChannels = list(set(allIpChannels) - set(wtu.ipChannelsPruned))
-    opChannels = list(set(allOpChannels) - set(wtu.channelsPruned[modName]))
-    pMod = eval('wtu.pModel.module.{}'.format('_'.join(modName.split('.')[1:])))
-    pMod._parameters['weight'] = module._parameters['weight'][opChannels,:][:,ipChannels,:,:]
-    if pMod._parameters['bias'] is not None: 
-        pMod._parameters['bias'] = module._parameters['bias'][opChannels]
+    ipPruned = wtu.ipChannelsPruned if ipChannelsPruned is None else ipChannelsPruned
+    opPruned = wtu.channelsPruned[modName] if opChannelsPruned is None else opChannelsPruned
+    ipChannels = list(set(allIpChannels) - set(ipPruned))
+    opChannels = list(set(allOpChannels) - set(opPruned))
+    wtu.ipChannelsPruned = opPruned 
+
+    pWeight = 'module.{}.weight'.format('_'.join(modName.split('.')[1:]))
+    pBias = 'module.{}.bias'.format('_'.join(modName.split('.')[1:]))
+    wtu.pModel[pWeight] = module._parameters['weight'][opChannels,:][:,ipChannels,:,:]
+    if module._parameters['bias'] is not None:
+        wtu.pModel[pBias] = module._parameters['bias'][opChannels]
+    
+    # pMod = eval('wtu.pModel.module.{}'.format('_'.join(modName.split('.')[1:]))
+    # pMod._parameters['weight'] = module._parameters['weight'][opChannels,:][:,ipChannels,:,:]
+    # if pMod._parameters['bias'] is not None: 
+    #     pMod._parameters['bias'] = module._parameters['bias'][opChannels]
 #}}}
 
-def nn_relu(writer, modName, module): 
+def nn_batchnorm2d(wtu, modName, module): 
+#{{{
+    allFeatures = list(range(module.num_features))
+    numFeaturesKept = list(set(allFeatures) - set(wtu.ipChannelsPruned))
+    key = 'module.{}'.format('_'.join(modName.split('.')[1:]))
+    wtu.pModel['{}.weight'.format(key)] = module._parameters['weight'][numFeaturesKept]
+    wtu.pModel['{}.bias'.format(key)] = module._parameters['weight'][numFeaturesKept]
+    wtu.pModel['{}.running_mean'.format(key)] = module._buffers['running_mean'][numFeaturesKept]
+    wtu.pModel['{}.running_var'.format(key)] = module._buffers['running_var'][numFeaturesKept]
+    wtu.pModel['{}.num_batches_tracked'.format(key)] = module._buffers['num_batches_tracked']
+    
+    # pMod = eval('wtu.pModel.module.{}'.format('_'.join(modName.split('.')[1:])))
+    # pMod._parameters['weight'] = module._parameters['weight'][numFeaturesKept]
+    # pMod._parameters['bias'] = module._parameters['weight'][numFeaturesKept]
+    # pMod._buffers['running_mean'] = module._buffers['running_mean'][numFeaturesKept]
+    # pMod._buffers['running_var'] = module._buffers['running_var'][numFeaturesKept]
+    # pMod._buffers['num_batches_tracked'] = module._buffers['num_batches_tracked']
+#}}}
+
+def nn_linear(wtu, modName, module): 
+#{{{
+    allIpChannels = list(range(module.in_features))
+    ipChannelsKept = list(set(allIpChannels) - set(wtu.ipChannelsPruned))
+    
+    key = 'module.{}'.format('_'.join(modName.split('.')[1:]))
+    wtu.pModel['{}.weight'.format(key)] = module._parameters['weight'][:,ipChannelsKept]
+    wtu.pModel['{}.bias'.format(key)] = module._parameters['bias']
+    
+    # pMod = eval('wtu.pModel.module.{}'.format('_'.join(modName.split('.')[1:])))
+    # pMod._parameters['weight'] = module._parameters['weight'][:,ipChannelsKept]
+    # pMod._parameters['bias'] = module._parameters['bias']
+#}}}
+
+def nn_relu(wtu, modName, module): 
 #{{{
     pass
 #}}}
 
-def nn_maxpool2d(writer, modName, module): 
+def nn_maxpool2d(wtu, modName, module): 
 #{{{
     pass
 #}}}
 
-def nn_avgpool2d(writer, modName, module): 
+def nn_avgpool2d(wtu, modName, module): 
 #{{{
     pass
 #}}}
 
-def nn_adaptiveavgpool2d(writer, modName, module): 
+def nn_adaptiveavgpool2d(wtu, modName, module): 
 #{{{
     pass
 #}}}
 
-def nn_batchnorm2d(writer, modName, module): 
+def nn_logsoftmax(wtu, modName, module): 
 #{{{
-    module.num_features = writer.currIpChannels
-    
-    writer.write_module_desc(modName, module)
-    writer.write_module_forward(modName)
-#}}}
-
-def nn_linear(writer, modName, module): 
-#{{{
-    module.in_features = writer.currIpChannels
-    
-    writer.write_module_desc(modName, module)
-    
-    writer.toWrite['forward'].append('\t\t{} = {}.view({}.size(0), -1)'.format(writer.forVar, writer.forVar, writer.forVar))
-    writer.write_module_forward(modName)
-#}}}
-
-def nn_logsoftmax(writer, modName, module): 
-#{{{
-    layerName = '_'.join(modName.split('.')[1:])
-    moduleStr = str(module).split('(')[0]
-    mod = '\t\tself.{} = nn.{}(dim={})'.format(layerName, moduleStr, module.dim)
-    writer.toWrite['modules'].append(mod)
-    
-    writer.write_module_forward(modName)
+    pass
 #}}}
 
 # custom modules
-def residual_backbone(writer, modName, module, main_branch, residual_branch, aggregation_op):
+def residual_backbone(wtu, modName, module, main_branch, residual_branch, aggregation_op):
 #{{{
-    inputToBlock = writer.currIpChannels
-    idx = writer.depBlk.instances.index(type(module))
-    forVarBkp = writer.forVar
+    inputToBlock = wtu.ipChannelsPruned
+    idx = wtu.depBlk.instances.index(type(module))
 
     # main path through residual
-    if residual_branch is not None:
-        opNode = '{}_main'.format(writer.forVar)
-        forward = '\t\t{} = {}'.format(opNode, writer.forVar)
-        writer.toWrite['forward'].append(forward)
-        writer.forVar = opNode 
-    
     for n,m in module.named_modules(): 
         fullName = "{}.{}".format(modName, n)
-        
-        if not any(x in n for x in writer.depBlk.dsLayers[idx]):
-            main_branch(n, m, fullName, writer)
+        if not any(x in n for x in wtu.depBlk.dsLayers[idx]):
+            main_branch(n, m, fullName, wtu)
     
-    writer.forVar = forVarBkp
-    outputOfBlock = writer.currIpChannels
+    outputOfBlock = wtu.ipChannelsPruned
 
     if residual_branch is not None:
         # downsampling path if exists
-        opNode1 = '{}_residual'.format(writer.forVar)
-        forward = '\t\t{} = {}'.format(opNode1, writer.forVar)
-        writer.toWrite['forward'].append(forward)
-        forVarBkp = writer.forVar
-        writer.forVar = opNode1
-        
         for n,m in module.named_modules(): 
             fullName = "{}.{}".format(modName, n)
-            if any(x in n for x in writer.depBlk.dsLayers[idx]):
-                residual_branch(n, m, fullName, writer, inputToBlock, outputOfBlock)
-        
-        writer.forVar = forVarBkp
+            if any(x in n for x in wtu.depBlk.dsLayers[idx]):
+                residual_branch(n, m, fullName, wtu, inputToBlock, outputOfBlock)
         
         if aggregation_op is not None:
-            aggregation_op(writer, opNode, opNode1)
+            aggregation_op(wtu, opNode, opNode1)
 #}}}
 
-def split_and_aggregate_backbone(writer, parentModName, parentModule, branchStarts, branchProcs, aggregation_op): 
+def split_and_aggregate_backbone(wtu, parentModName, parentModule, branchStarts, branchProcs, aggregation_op): 
 #{{{
     assert len(branchStarts) == len(branchProcs), 'For each branch a processing function must be provided - branches = {}, procFuns = {}'.format(len(branchConvs), len(branchProcs))
 
-    inputToBlock = writer.currIpChannels
-    forVarBkp = writer.forVar
+    inputToBlock = wtu.currIpChannels
+    forVarBkp = wtu.forVar
 
     branchOpChannels = []
     opNodes = []
             
     for idx in range(len(branchStarts)):
-        branchVar = "{}_{}".format(writer.forVar, idx)
+        branchVar = "{}_{}".format(wtu.forVar, idx)
         opNodes.append(branchVar)
-        writer.toWrite['forward'].append("\t\t{} = {}".format(branchVar, writer.forVar))
-        writer.forVar = branchVar
-        writer.currIpChannels = inputToBlock
+        wtu.toWrite['forward'].append("\t\t{} = {}".format(branchVar, wtu.forVar))
+        wtu.forVar = branchVar
+        wtu.currIpChannels = inputToBlock
 
         inBranch = False
         for n,m in parentModule._modules.items(): 
@@ -166,134 +169,119 @@ def split_and_aggregate_backbone(writer, parentModName, parentModule, branchStar
             
             if inBranch:
                 fullName = "{}.{}".format(parentModName, n)
-                branchProcs[idx](writer, fullName, m)
+                branchProcs[idx](wtu, fullName, m)
         
-        branchOpChannels.append(writer.currIpChannels)
-        writer.forVar = forVarBkp
+        branchOpChannels.append(wtu.currIpChannels)
+        wtu.forVar = forVarBkp
 
     if aggregation_op is not None:
-        aggregation_op(writer, opNodes, branchOpChannels)  
+        aggregation_op(wtu, opNodes, branchOpChannels)  
 #}}}
 
-def residual(writer, modName, module):
+def residual(wtu, modName, module):
 #{{{
-    def main_branch(n, m, fullName, writer): 
+    def main_branch(n, m, fullName, wtu): 
     #{{{
         if isinstance(m, nn.Conv2d): 
-            idx = writer.depBlk.instances.index(type(module))
-            writer.addRelu = (n != writer.depBlk.convs[idx][0])
-            nn_conv2d(writer, fullName, m)
+            nn_conv2d(wtu, fullName, m)
 
         elif isinstance(m, nn.BatchNorm2d): 
-            nn_batchnorm2d(writer, fullName, m)
-            if writer.addRelu: 
-                nn_relu(writer, fullName, m)
+            nn_batchnorm2d(wtu, fullName, m)
     #}}}
     
-    def residual_branch(n, m, fullName, writer, ipToBlock, opOfBlock): 
+    def residual_branch(n, m, fullName, wtu, ipToBlock, opOfBlock): 
+    #{{{
+        if isinstance(m, nn.Conv2d): 
+            nn_conv2d(wtu, fullName, m, ipToBlock, opOfBlock)
+            
+        elif isinstance(m, nn.BatchNorm2d):
+            nn_batchnorm2d(wtu, fullName, m)
+    #}}}
+
+    residual_backbone(wtu, modName, module, main_branch, residual_branch, None)
+#}}}
+
+def mb_conv(wtu, modName, module):
+#{{{
+    def main_branch(n, m, fullName, wtu): 
+    #{{{
+        if isinstance(m, nn.Conv2d): 
+            idx = wtu.depBlk.instances.index(type(module))
+            wtu.convIdx = wtu.depBlk.convs[idx].index(n)
+            nn_conv2d(wtu, fullName, m, dw=(wtu.convIdx==1))
+
+        elif isinstance(m, nn.BatchNorm2d): 
+            nn_batchnorm2d(wtu, fullName, m)
+            if wtu.convIdx == 0 or wtu.convIdx == 1: 
+                nn_relu(wtu, fullName, m)
+    #}}}
+    
+    def residual_branch(n, m, fullName, wtu, ipToBlock, opOfBlock): 
     #{{{
         if isinstance(m, nn.Conv2d): 
             m.in_channels = ipToBlock
             m.out_channels = opOfBlock
-            writer.currIpChannels = opOfBlock
+            wtu.currIpChannels = opOfBlock
             
-            writer.write_module_desc(fullName, m)
-            writer.write_module_forward(fullName)
+            wtu.write_module_desc(fullName, m)
+            wtu.write_module_forward(fullName)
         
         elif isinstance(m, nn.BatchNorm2d):
-            nn_batchnorm2d(writer, fullName, m)
-    #}}}
-
-    def aggregation_op(writer, node1, node2):
-    #{{{
-        forward = '\t\t{} = F.relu({} + {})'.format(writer.forVar, node1, node2)
-        writer.toWrite['forward'].append(forward)
+            nn_batchnorm2d(wtu, fullName, m)
     #}}}
     
-    residual_backbone(writer, modName, module, main_branch, residual_branch, aggregation_op)
-#}}}
-
-def mb_conv(writer, modName, module):
-#{{{
-    def main_branch(n, m, fullName, writer): 
+    def aggregation_op(wtu, node1, node2):
     #{{{
-        if isinstance(m, nn.Conv2d): 
-            idx = writer.depBlk.instances.index(type(module))
-            writer.convIdx = writer.depBlk.convs[idx].index(n)
-            nn_conv2d(writer, fullName, m, dw=(writer.convIdx==1))
-
-        elif isinstance(m, nn.BatchNorm2d): 
-            nn_batchnorm2d(writer, fullName, m)
-            if writer.convIdx == 0 or writer.convIdx == 1: 
-                nn_relu(writer, fullName, m)
+        forward = '\t\t{} = {} + {}'.format(wtu.forVar, node1, node2)
+        wtu.toWrite['forward'].append(forward)
     #}}}
     
-    def residual_branch(n, m, fullName, writer, ipToBlock, opOfBlock): 
-    #{{{
-        if isinstance(m, nn.Conv2d): 
-            m.in_channels = ipToBlock
-            m.out_channels = opOfBlock
-            writer.currIpChannels = opOfBlock
-            
-            writer.write_module_desc(fullName, m)
-            writer.write_module_forward(fullName)
-        
-        elif isinstance(m, nn.BatchNorm2d):
-            nn_batchnorm2d(writer, fullName, m)
-    #}}}
-    
-    def aggregation_op(writer, node1, node2):
-    #{{{
-        forward = '\t\t{} = {} + {}'.format(writer.forVar, node1, node2)
-        writer.toWrite['forward'].append(forward)
-    #}}}
-    
-    idx = writer.depBlk.instances.index(type(module))
-    midConv = writer.depBlk.convs[idx][1] 
+    idx = wtu.depBlk.instances.index(type(module))
+    midConv = wtu.depBlk.convs[idx][1] 
     for n,m in module.named_modules(): 
         if n == midConv: 
             stride = m.stride[0]
     if stride == 2: 
-        residual_backbone(writer, modName, module, main_branch, None, None)
+        residual_backbone(wtu, modName, module, main_branch, None, None)
     else:
-        residual_backbone(writer, modName, module, main_branch, residual_branch, aggregation_op)
+        residual_backbone(wtu, modName, module, main_branch, residual_branch, aggregation_op)
 #}}}
 
-def fire(writer, modName, module): 
+def fire(wtu, modName, module): 
 #{{{
-    def basic(writer, fullName, module): 
+    def basic(wtu, fullName, module): 
     #{{{
         if isinstance(module, nn.Conv2d): 
-            nn_conv2d(writer, fullName, module)
+            nn_conv2d(wtu, fullName, module)
 
         if isinstance(module, nn.BatchNorm2d): 
-            nn_batchnorm2d(writer, fullName, module)
+            nn_batchnorm2d(wtu, fullName, module)
     #}}}
 
-    def aggregation_op(writer, opNodes, branchOpChannels): 
+    def aggregation_op(wtu, opNodes, branchOpChannels): 
     #{{{
-        writer.currIpChannels = sum(branchOpChannels)
+        wtu.currIpChannels = sum(branchOpChannels)
         nodes = "[{}]".format(','.join(opNodes))
-        writer.toWrite['forward'].append("\t\t{} = torch.cat({}, 1)".format(writer.forVar, nodes))
-        nn_relu(writer, None, None)
+        wtu.toWrite['forward'].append("\t\t{} = torch.cat({}, 1)".format(wtu.forVar, nodes))
+        nn_relu(wtu, None, None)
     #}}}
     
-    inputToBlock = writer.currIpChannels
-    idx = writer.depBlk.instances.index(type(module))
-    convs = writer.depBlk.convs[idx]
+    inputToBlock = wtu.currIpChannels
+    idx = wtu.depBlk.instances.index(type(module))
+    convs = wtu.depBlk.convs[idx]
 
     for n,m in module.named_modules(): 
         fullName = "{}.{}".format(modName, n)
         
         if isinstance(m, nn.Conv2d): 
             if n == convs[0]:
-                nn_conv2d(writer, fullName, m)
+                nn_conv2d(wtu, fullName, m)
         
         if isinstance(m, nn.BatchNorm2d):
-            nn_batchnorm2d(writer, fullName, m)
+            nn_batchnorm2d(wtu, fullName, m)
         
         if isinstance(m, nn.ReLU): 
-            nn_relu(writer, fullName, m)     
-            split_and_aggregate_backbone(writer, modName, module, convs[1:], [basic,basic], aggregation_op)
+            nn_relu(wtu, fullName, m)     
+            split_and_aggregate_backbone(wtu, modName, module, convs[1:], [basic,basic], aggregation_op)
             break
 #}}}

@@ -584,9 +584,11 @@ class ResNet20PruningDependency(BasicPruning):
 
     def transfer_weights(self, oModel, pModel): 
     #{{{
-
         lTypes, lNames = zip(*self.depBlock.linkedConvs)
-        self.wtu = WeightTransferUnit(pModel, self.channelsToPrune, self.depBlock)
+        
+        pModStateDict = pModel.state_dict() 
+
+        self.wtu = WeightTransferUnit(pModStateDict, self.channelsToPrune, self.depBlock)
         for n,m in oModel.named_modules(): 
             # detect dependent modules and convs
             if any(n == x for x in lNames):
@@ -604,6 +606,8 @@ class ResNet20PruningDependency(BasicPruning):
                     self.wtu.transfer_weights(type(m).__name__.lower(), n, m)
                 except KeyError:
                     print("CRITICAL WARNING : layer found ({}) that is not handled in writers. This could potentially break the network.".format(type(m)))
-        sys.exit()
+        
+        pModel.load_state_dict(pModStateDict)
+        return pModel 
     #}}}
 #}}}
