@@ -46,7 +46,7 @@ def nn_conv2d(wtu, modName, module, ipChannelsPruned=None, opChannelsPruned=None
     ipChannels = list(set(allIpChannels) - set(ipPruned)) if not dw else [0]
     opChannels = list(set(allOpChannels) - set(opPruned))
     wtu.ipChannelsPruned = opPruned 
-
+    
     pWeight = 'module.{}.weight'.format('_'.join(modName.split('.')[1:]))
     pBias = 'module.{}.bias'.format('_'.join(modName.split('.')[1:]))
     wtu.pModel[pWeight] = module._parameters['weight'][opChannels,:][:,ipChannels]
