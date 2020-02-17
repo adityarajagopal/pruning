@@ -49,7 +49,7 @@ def nn_conv2d(wtu, modName, module, ipChannelsPruned=None, opChannelsPruned=None
 
     pWeight = 'module.{}.weight'.format('_'.join(modName.split('.')[1:]))
     pBias = 'module.{}.bias'.format('_'.join(modName.split('.')[1:]))
-    wtu.pModel[pWeight] = module._parameters['weight'][opChannels,:][:,ipChannels,:,:]
+    wtu.pModel[pWeight] = module._parameters['weight'][opChannels,:][:,ipChannels]
     if module._parameters['bias'] is not None:
         wtu.pModel[pBias] = module._parameters['bias'][opChannels]
 #}}}
@@ -64,13 +64,6 @@ def nn_batchnorm2d(wtu, modName, module):
     wtu.pModel['{}.running_mean'.format(key)] = module._buffers['running_mean'][numFeaturesKept]
     wtu.pModel['{}.running_var'.format(key)] = module._buffers['running_var'][numFeaturesKept]
     wtu.pModel['{}.num_batches_tracked'.format(key)] = module._buffers['num_batches_tracked']
-    
-    # pMod = eval('wtu.pModel.module.{}'.format('_'.join(modName.split('.')[1:])))
-    # pMod._parameters['weight'] = module._parameters['weight'][numFeaturesKept]
-    # pMod._parameters['bias'] = module._parameters['weight'][numFeaturesKept]
-    # pMod._buffers['running_mean'] = module._buffers['running_mean'][numFeaturesKept]
-    # pMod._buffers['running_var'] = module._buffers['running_var'][numFeaturesKept]
-    # pMod._buffers['num_batches_tracked'] = module._buffers['num_batches_tracked']
 #}}}
 
 def nn_linear(wtu, modName, module): 
@@ -81,10 +74,6 @@ def nn_linear(wtu, modName, module):
     key = 'module.{}'.format('_'.join(modName.split('.')[1:]))
     wtu.pModel['{}.weight'.format(key)] = module._parameters['weight'][:,ipChannelsKept]
     wtu.pModel['{}.bias'.format(key)] = module._parameters['bias']
-    
-    # pMod = eval('wtu.pModel.module.{}'.format('_'.join(modName.split('.')[1:])))
-    # pMod._parameters['weight'] = module._parameters['weight'][:,ipChannelsKept]
-    # pMod._parameters['bias'] = module._parameters['bias']
 #}}}
 
 def nn_relu(wtu, modName, module): 
