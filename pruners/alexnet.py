@@ -46,48 +46,4 @@ class AlexNetPruning(BasicPruning):
     #{{{
         return False
     #}}}
-
-    def transfer_weights(self, oModel, pModel):
-    #{{{
-        parentModel = oModel.state_dict() 
-        prunedModel = pModel.state_dict() 
-
-        ipChannelsToPrune = []
-        ipChannelsKept = []
-        opChannelsKept = []
-        for k in self.orderedKeys:
-            if 'conv' in k:
-                layer = k
-                param = k + '.weight'
-                paramB = k + '.bias'
-                pParam = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.weight'
-                pParamB = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.bias'
-
-                opChannelsToPrune = self.channelsToPrune[layer]
-
-                allIpChannels = list(range(parentModel[param].shape[1]))
-                allOpChannels = list(range(parentModel[param].shape[0]))
-                ipChannelsKept = list(set(allIpChannels) - set(ipChannelsToPrune))
-                opChannelsKept = list(set(allOpChannels) - set(opChannelsToPrune))
-                
-                tmpW = parentModel[param][opChannelsKept,:]
-                prunedModel[pParam] = tmpW[:,ipChannelsKept] 
-                prunedModel[pParamB] = parentModel[paramB][opChannelsKept]
-                
-                ipChannelsToPrune = opChannelsToPrune
-            
-            elif 'linear' in k or 'classifier' in k:
-                layer = k
-                paramW = k + '.weight'
-                paramB = k + '.bias'
-                pParamW = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.weight'
-                pParamB = k.split('.')[0] + '.' + '_'.join(k.split('.')[1:]) + '.bias'
-
-                prunedModel[pParamB] = parentModel[paramB]
-                prunedModel[pParamW] = parentModel[paramW][:,opChannelsKept]
-            
-        pModel.load_state_dict(prunedModel)
-
-        return pModel
-    #}}}
 #}}}

@@ -21,7 +21,7 @@ def basic_block(**kwargs):
         dependencies.DependencyBlock.update_block_names(block, **kwargs)
         dependencies.DependencyBlock.register_dependency_calculator(kwargs['lType'], dependencies.Residual())
         writers.Writer.register_writer(kwargs['lType'], writers.residual)
-        weight_transfer.WeightTransferUnit.register_transfer_func(kwargs['lType'], writers.residual)
+        weight_transfer.WeightTransferUnit.register_transfer_func(kwargs['lType'], weight_transfer.residual)
         return block
     return decorator
 #}}}
@@ -33,7 +33,7 @@ def bottleneck(**kwargs):
         dependencies.DependencyBlock.update_block_names(block, **kwargs)
         dependencies.DependencyBlock.register_dependency_calculator(kwargs['lType'], dependencies.Residual())
         writers.Writer.register_writer(kwargs['lType'], writers.residual)
-        weight_transfer.WeightTransferUnit.register_transfer_func(kwargs['lType'], writers.residual)
+        weight_transfer.WeightTransferUnit.register_transfer_func(kwargs['lType'], weight_transfer.residual)
         return block
     return decorator
 #}}}
@@ -45,7 +45,7 @@ def mb_conv(**kwargs):
         dependencies.DependencyBlock.update_block_names(block, **kwargs)
         dependencies.DependencyBlock.register_dependency_calculator(kwargs['lType'], dependencies.MBConv())
         writers.Writer.register_writer(kwargs['lType'], writers.mb_conv)
-        weight_transfer.WeightTransferUnit.register_transfer_func(kwargs['lType'], writers.mb_conv)
+        weight_transfer.WeightTransferUnit.register_transfer_func(kwargs['lType'], weight_transfer.mb_conv)
         return block
     return decorator
 #}}}
@@ -56,7 +56,7 @@ def fire(**kwargs):
         check_kwargs(**kwargs)
         dependencies.DependencyBlock.update_block_names(block, **kwargs)
         writers.Writer.register_writer(kwargs['lType'], writers.fire)
-        weight_transfer.WeightTransferUnit.register_transfer_func(kwargs['lType'], writers.fire)
+        weight_transfer.WeightTransferUnit.register_transfer_func(kwargs['lType'], weight_transfer.fire)
         return block
     return decorator
 #}}}

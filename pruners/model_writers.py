@@ -313,9 +313,7 @@ def mb_conv(writer, modName, module):
     
     idx = writer.depBlk.instances.index(type(module))
     midConv = writer.depBlk.convs[idx][1] 
-    for n,m in module.named_modules(): 
-        if n == midConv: 
-            stride = m.stride[0]
+    stride = module._modules[midConv].stride[0]
     if stride == 2: 
         residual_backbone(writer, modName, module, main_branch, None, None)
     else:
