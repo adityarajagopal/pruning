@@ -11,3 +11,5 @@ configs/validation_prune
 graphs/
 */*.pyc
 test.py
+dev.pth.tar
+master.pth.tar
