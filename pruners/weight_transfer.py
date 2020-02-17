@@ -6,8 +6,6 @@ import itertools
 import numpy as np
 import torch.nn as nn
 
-master = torch.load('/home/ar4414/pytorch_training/src/ar4414/pruning/master.pth.tar')
-    
 class WeightTransferUnit(object): 
 #{{{
     def __init__(self, prunedModel, channelsPruned, depBlk): 
@@ -37,7 +35,6 @@ class WeightTransferUnit(object):
     def transfer_weights(self, lType, modName, module): 
     #{{{
         self.wtFuncs[lType](self, modName, module)
-        pass
     #}}}
 #}}}
 
@@ -200,7 +197,7 @@ def mb_conv(wtu, modName, module):
     def residual_branch(n, m, fullName, wtu, ipToBlock, opOfBlock): 
     #{{{
         if isinstance(m, nn.Conv2d): 
-            nn_conv2d(wtu, fullName, m, ipToBlock, opOfBlock)
+            nn_conv2d(wtu, fullName, m, ipToBlock, opOfBlock, dw=False)
         
         elif isinstance(m, nn.BatchNorm2d):
             nn_batchnorm2d(wtu, fullName, m)
