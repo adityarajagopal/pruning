@@ -10,3 +10,4 @@ configs/random_init_tests
 configs/validation_prune
 graphs/
 */*.pyc
+test.py
