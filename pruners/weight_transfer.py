@@ -1,8 +1,10 @@
 import sys
 import copy
 
-import torch.nn as nn
 import torch 
+import itertools
+import numpy as np
+import torch.nn as nn
 
 master = torch.load('/home/ar4414/pytorch_training/src/ar4414/pruning/master.pth.tar')
     
@@ -150,18 +152,13 @@ def split_and_aggregate_backbone(wtu, parentModName, parentModule, branchStarts,
 #{{{
     assert len(branchStarts) == len(branchProcs), 'For each branch a processing function must be provided - branches = {}, procFuns = {}'.format(len(branchConvs), len(branchProcs))
 
-    inputToBlock = wtu.currIpChannels
-    forVarBkp = wtu.forVar
+    inputToBlock = wtu.ipChannelsPruned
 
     branchOpChannels = []
-    opNodes = []
+    opNodes = None
             
     for idx in range(len(branchStarts)):
-        branchVar = "{}_{}".format(wtu.forVar, idx)
-        opNodes.append(branchVar)
-        wtu.toWrite['forward'].append("\t\t{} = {}".format(branchVar, wtu.forVar))
-        wtu.forVar = branchVar
-        wtu.currIpChannels = inputToBlock
+        wtu.ipChannelsPruned = inputToBlock
 
         inBranch = False
         for n,m in parentModule._modules.items(): 
@@ -175,8 +172,7 @@ def split_and_aggregate_backbone(wtu, parentModName, parentModule, branchStarts,
                 fullName = "{}.{}".format(parentModName, n)
                 branchProcs[idx](wtu, fullName, m)
         
-        branchOpChannels.append(wtu.currIpChannels)
-        wtu.forVar = forVarBkp
+        branchOpChannels.append(wtu.ipChannelsPruned)
 
     if aggregation_op is not None:
         aggregation_op(wtu, opNodes, branchOpChannels)  
@@ -238,9 +234,11 @@ def mb_conv(wtu, modName, module):
 
 def fire(wtu, modName, module): 
 #{{{
+    wtu.totalOutChannels = []
     def basic(wtu, fullName, module): 
     #{{{
         if isinstance(module, nn.Conv2d): 
+            wtu.totalOutChannels.append(module.out_channels)
             nn_conv2d(wtu, fullName, module)
 
         if isinstance(module, nn.BatchNorm2d): 
@@ -249,13 +247,12 @@ def fire(wtu, modName, module):
 
     def aggregation_op(wtu, opNodes, branchOpChannels): 
     #{{{
-        wtu.currIpChannels = sum(branchOpChannels)
-        nodes = "[{}]".format(','.join(opNodes))
-        wtu.toWrite['forward'].append("\t\t{} = torch.cat({}, 1)".format(wtu.forVar, nodes))
-        nn_relu(wtu, None, None)
+        offsets = [0] + list(np.cumsum(wtu.totalOutChannels))[:-1]
+        prunedChannels = [list(offsets[i] + np.array(x)) for i,x in enumerate(branchOpChannels)]    
+        prunedChannels = list(itertools.chain.from_iterable(prunedChannels))
+        wtu.ipChannelsPruned = prunedChannels
     #}}}
     
-    inputToBlock = wtu.currIpChannels
     idx = wtu.depBlk.instances.index(type(module))
     convs = wtu.depBlk.convs[idx]
 
@@ -270,7 +267,6 @@ def fire(wtu, modName, module):
             nn_batchnorm2d(wtu, fullName, m)
         
         if isinstance(m, nn.ReLU): 
-            nn_relu(wtu, fullName, m)     
             split_and_aggregate_backbone(wtu, modName, module, convs[1:], [basic,basic], aggregation_op)
             break
 #}}}
