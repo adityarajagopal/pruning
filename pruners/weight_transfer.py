@@ -2,6 +2,9 @@ import sys
 import copy
 
 import torch.nn as nn
+import torch 
+
+master = torch.load('/home/ar4414/pytorch_training/src/ar4414/pruning/master.pth.tar')
     
 class WeightTransferUnit(object): 
 #{{{
@@ -52,6 +55,11 @@ def nn_conv2d(wtu, modName, module, ipChannelsPruned=None, opChannelsPruned=None
     wtu.pModel[pWeight] = module._parameters['weight'][opChannels,:][:,ipChannels]
     if module._parameters['bias'] is not None:
         wtu.pModel[pBias] = module._parameters['bias'][opChannels]
+
+    # eq = all([(wtu.pModel[pWeight] == master[pWeight]).all()])
+    # print(modName, eq)
+    # if not eq:
+    #     breakpoint()
 #}}}
 
 def nn_batchnorm2d(wtu, modName, module): 
@@ -64,6 +72,12 @@ def nn_batchnorm2d(wtu, modName, module):
     wtu.pModel['{}.running_mean'.format(key)] = module._buffers['running_mean'][numFeaturesKept]
     wtu.pModel['{}.running_var'.format(key)] = module._buffers['running_var'][numFeaturesKept]
     wtu.pModel['{}.num_batches_tracked'.format(key)] = module._buffers['num_batches_tracked']
+
+    # params = ['weight', 'bias', 'running_mean', 'running_var', 'num_batches_tracked']
+    # eq = all([(wtu.pModel['{}.{}'.format(key,x)] == master['{}.{}'.format(key,x)]).all() for x in params])
+    # print(modName, eq)
+    # if not eq:
+    #     breakpoint()
 #}}}
 
 def nn_linear(wtu, modName, module): 
@@ -74,6 +88,12 @@ def nn_linear(wtu, modName, module):
     key = 'module.{}'.format('_'.join(modName.split('.')[1:]))
     wtu.pModel['{}.weight'.format(key)] = module._parameters['weight'][:,ipChannelsKept]
     wtu.pModel['{}.bias'.format(key)] = module._parameters['bias']
+
+    # params = ['weight', 'bias']
+    # eq = all([(wtu.pModel['{}.{}'.format(key,x)] == master['{}.{}'.format(key,x)]).all() for x in params])
+    # print(modName, eq)
+    # if not eq:
+    #     breakpoint()
 #}}}
 
 def nn_relu(wtu, modName, module): 
