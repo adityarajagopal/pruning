@@ -126,6 +126,7 @@ class MobileNetV2(nn.Module):
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
+        x = F.relu(x)
         x_main = x
         x_main = self.layers_0_conv1(x_main)
         x_main = self.layers_0_bn1(x_main)
@@ -314,6 +315,7 @@ class MobileNetV2(nn.Module):
         x = x_main + x_residual
         x = self.conv2(x)
         x = self.bn2(x)
+        x = F.relu(x)
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         x = self.linear(x)
