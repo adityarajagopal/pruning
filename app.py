@@ -188,10 +188,6 @@ class Application(appSrc.Application):
             #{{{
                 channelsPruned, prunedModel, optimiser = self.pruner.prune_model(self.model)
                 pruneRate, prunedSize, origSize = self.pruner.prune_rate(prunedModel)
-                if os.environ['STORE_DICT']:
-                    torch.save(prunedModel.state_dict(), '/home/ar4414/pytorch_training/src/ar4414/pruning/dev.pth.tar')
-                    torch.save(optimiser.param_groups, '/home/ar4414/pytorch_training/src/ar4414/pruning/dev_opt.pth.tar')
-                    torch.save(list(self.test_loader), '/home/ar4414/pytorch_training/src/ar4414/pruning/dev_test_loader.pth.tar')
                 print('Pruned Percentage = {:.2f}%, NewModelSize = {:.2f}MB, OrigModelSize = {:.2f}MB'.format(pruneRate, prunedSize, origSize))
                 self.inferer.test_network(self.params, self.test_loader, prunedModel, self.criterion, optimiser)
                 print('==========================')
