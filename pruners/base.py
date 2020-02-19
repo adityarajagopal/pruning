@@ -16,6 +16,7 @@ from abc import ABC, abstractmethod
 
 import src.ar4414.pruning.pruners.dependencies as dependSrc
 from src.ar4414.pruning.pruners.model_writers import Writer
+from src.ar4414.pruning.pruners.weight_transfer import WeightTransferUnit
 
 import torch
 import torch.nn as nn
@@ -332,6 +333,35 @@ class BasicPruning(ABC):
         
         self.writer.write_network()       
     #}}}
+    
+    def transfer_weights(self, oModel, pModel): 
+    #{{{
+        lTypes, lNames = zip(*self.depBlock.linkedConvs)
+        
+        pModStateDict = pModel.state_dict() 
+
+        self.wtu = WeightTransferUnit(pModStateDict, self.channelsToPrune, self.depBlock)
+        for n,m in oModel.named_modules(): 
+            # detect dependent modules and convs
+            if any(n == x for x in lNames):
+                idx = lNames.index(n) 
+                lType = lTypes[idx]
+                self.wtu.transfer_weights(lType, n, m)
+            
+            # ignore recursion into dependent modules
+            elif any(x in n for t,x in self.depBlock.linkedConvs):
+                continue
+            
+            # all other modules in the network
+            else:
+                try: 
+                    self.wtu.transfer_weights(type(m).__name__.lower(), n, m)
+                except KeyError:
+                    print("CRITICAL WARNING : layer found ({}) that is not handled in writers. This could potentially break the network.".format(type(m)))
+        
+        pModel.load_state_dict(pModStateDict)
+        return pModel 
+    #}}}
 
     # selects only convs and fc layers 
     # used in get_layer_params to get sizes of only convs and fcs 
@@ -352,9 +382,5 @@ class BasicPruning(ABC):
     # lName here is module name, so doesn't have 'weight'/'bias' keyword
     @abstractmethod
     def skip_layer(self, lName):
-        pass
-    
-    @abstractmethod
-    def transfer_weights(self, oModel, pModel): 
         pass
 #}}}

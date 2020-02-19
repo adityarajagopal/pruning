@@ -16,7 +16,6 @@ import torch
 import torch.nn as nn
 
 from src.ar4414.pruning.pruners.base import BasicPruning
-from src.ar4414.pruning.pruners.weight_transfer import WeightTransferUnit
 
 class ResNet20Pruning(BasicPruning):
 #{{{
@@ -467,34 +466,5 @@ class ResNet20PruningDependency(BasicPruning):
     def skip_layer(self, lName):
     #{{{
         return False
-    #}}}
-        
-    def transfer_weights(self, oModel, pModel): 
-    #{{{
-        lTypes, lNames = zip(*self.depBlock.linkedConvs)
-        
-        pModStateDict = pModel.state_dict() 
-
-        self.wtu = WeightTransferUnit(pModStateDict, self.channelsToPrune, self.depBlock)
-        for n,m in oModel.named_modules(): 
-            # detect dependent modules and convs
-            if any(n == x for x in lNames):
-                idx = lNames.index(n) 
-                lType = lTypes[idx]
-                self.wtu.transfer_weights(lType, n, m)
-            
-            # ignore recursion into dependent modules
-            elif any(x in n for t,x in self.depBlock.linkedConvs):
-                continue
-            
-            # all other modules in the network
-            else:
-                try: 
-                    self.wtu.transfer_weights(type(m).__name__.lower(), n, m)
-                except KeyError:
-                    print("CRITICAL WARNING : layer found ({}) that is not handled in writers. This could potentially break the network.".format(type(m)))
-        
-        pModel.load_state_dict(pModStateDict)
-        return pModel 
     #}}}
 #}}}
