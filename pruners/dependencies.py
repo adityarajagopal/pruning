@@ -126,12 +126,13 @@ class DependencyBlock(object):
         except AttributeError: 
             print("Instantiating dependency block without decorators on model or for class without dependencies")
 
-        self.linkedConvs = self.create_conv_graph()
-
         if hasattr(self, 'depCalcs'):
             self.depCalcs['basic'] = Basic()
         else: 
             self.depCalcs = {'basic': Basic()}
+        
+        self.linkedModules = self.create_modules_graph()
+        # self.linkedConvAndFc = self.create_layer_graph()
     #}}}
     
     @classmethod
@@ -178,25 +179,30 @@ class DependencyBlock(object):
         """Checks if module is of one of the types in list instances"""
         return any(isinstance(module, inst) for inst in instances)
 
-    def create_conv_graph(self): 
+    def create_modules_graph(self): 
     #{{{
         """
         Returns a list which has order of convs and modules which have an instance of module in instances in the entire network
         eg. conv1 -> module1(which has as an mb_conv) -> conv2 -> module2 ...    
         """
-        linkedConvs = []
+        linkedModules = []
         for n,m in self.model.module.named_children(): 
             if not DependencyBlock.check_children(m, self.instances):
                 if isinstance(m,nn.Conv2d):
-                    linkedConvs.append(('basic',"module.{}".format(n)))
+                    linkedModules.append(('basic',"module.{}".format(n)))
             else:
                 for _n,_m in m.named_modules():
                     if DependencyBlock.check_inst(_m, self.instances):
                         idx = self.instances.index(type(_m))
                         mType = self.types[idx]
-                        linkedConvs.append((mType, "module.{}.{}".format(n,_n)))
+                        linkedModules.append((mType, "module.{}.{}".format(n,_n)))
         
-        return linkedConvs
+        return linkedModules
+    #}}}
+
+    def create_layer_graph(self): 
+    #{{{
+        breakpoint() 
     #}}}
 
     def get_dependencies(self):
@@ -227,7 +233,7 @@ class DependencyBlock(object):
                     if len(tmpDeps) != 0: 
                         tmpDeps += depLayers
                     else: 
-                        bType,name = zip(*self.linkedConvs)
+                        bType,name = zip(*self.linkedModules)
                         idx = name.index(n)
                         prevType = bType[idx-1]
                         prev = self.depCalcs[prevType].dependent_conv(name[idx-1], convs)

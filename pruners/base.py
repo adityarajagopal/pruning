@@ -84,8 +84,6 @@ class BasicPruning(ABC):
         self.totalParams = 0
         self.layerSizes = {}
         
-        self.get_layer_params()
-
         # create model directory and file
         dirName = 'models/pruned/{}/{}'.format(params.dataset, params.subsetName)
         self.filePath = os.path.join(dirName, self.fileName)
@@ -95,6 +93,7 @@ class BasicPruning(ABC):
         subprocess.check_call(cmd, shell=True)
 
         self.depBlock = dependSrc.DependencyBlock(model)
+        self.get_layer_params()
 
         self.importPath = 'src.ar4414.pruning.{}.{}'.format('.'.join(dirName.split('/')), self.fileName.split('.')[0])
     #}}} 
@@ -106,10 +105,15 @@ class BasicPruning(ABC):
             for dim in p[1].size():
                 paramsInLayer *= dim
             self.totalParams += paramsInLayer
-            
-            if self.is_conv_or_fc(p[0]):
-                self.layerSizes[p[0]] = list(p[1].size())
         
+        self.depBlock.convsAndFc = copy.deepcopy(self.depBlock.linkedModules)
+        for n,m in self.model.named_modules(): 
+            if isinstance(m, nn.Linear): 
+                self.depBlock.convsAndFc.append(('fc', n))
+
+        for n,m in self.model.named_modules(): 
+            if self.is_conv_or_fc(m): 
+                self.layerSizes["{}.weight".format(n)] = list(m._parameters['weight'].size())
         self.layersInOrder = list(self.layerSizes.keys())
     #}}}
 
@@ -180,6 +184,7 @@ class BasicPruning(ABC):
     
     def inc_prune_rate(self, layerName):
     #{{{
+        breakpoint()
         lParam = str(layerName) + '.weight'
         # remove 1 output filter from current layer
         self.layerSizes[lParam][0] -= 1 
@@ -311,7 +316,7 @@ class BasicPruning(ABC):
         print("Pruned model written to {}".format(self.filePath))
         channelsPruned = {l:len(v) for l,v in self.channelsToPrune.items()}
         self.writer = Writer(self.netName, channelsPruned, self.depBlock, self.filePath)
-        lTypes, lNames = zip(*self.depBlock.linkedConvs)
+        lTypes, lNames = zip(*self.depBlock.linkedModules)
         prunedModel = copy.deepcopy(self.model)
         for n,m in prunedModel.named_modules(): 
             # detect dependent modules and convs
@@ -321,7 +326,7 @@ class BasicPruning(ABC):
                 self.writer.write_module(lType, n, m)
             
             # ignore recursion into dependent modules
-            elif any(x in n for t,x in self.depBlock.linkedConvs):
+            elif any(x in n for t,x in self.depBlock.linkedModules):
                 continue
             
             # all other modules in the network
@@ -336,7 +341,7 @@ class BasicPruning(ABC):
     
     def transfer_weights(self, oModel, pModel): 
     #{{{
-        lTypes, lNames = zip(*self.depBlock.linkedConvs)
+        lTypes, lNames = zip(*self.depBlock.linkedModules)
         
         pModStateDict = pModel.state_dict() 
 
@@ -349,7 +354,7 @@ class BasicPruning(ABC):
                 self.wtu.transfer_weights(lType, n, m)
             
             # ignore recursion into dependent modules
-            elif any(x in n for t,x in self.depBlock.linkedConvs):
+            elif any(x in n for t,x in self.depBlock.linkedModules):
                 continue
             
             # all other modules in the network
@@ -362,14 +367,16 @@ class BasicPruning(ABC):
         pModel.load_state_dict(pModStateDict)
         return pModel 
     #}}}
-
+    
     # selects only convs and fc layers 
-    # used in get_layer_params to get sizes of only convs and fcs 
-    # lParam is from loop over named_parameters()
-    @abstractmethod
-    def is_conv_or_fc(self, lParam): 
-        pass
-
+    def is_conv_or_fc(self, lModule):
+    #{{{
+        if isinstance(lModule, nn.Conv2d) or isinstance(lModule, nn.Linear):
+            return True
+        else:
+            return False
+    #}}}
+    
     # function that selects all the layers to be pruned (currently only convs)
     # used in structure_l1_weight to go through layers that are to be pruned
     # lParam is from loop over named_parameters()

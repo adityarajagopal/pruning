@@ -25,15 +25,7 @@ class AlexNetPruning(BasicPruning):
         
         super().__init__(params, model)
     #}}} 
-
-    def is_conv_or_fc(self, lParam):
-    #{{{
-        if ('conv' in lParam or 'classifier' in lParam) and ('weight' in lParam):
-            return True
-        else:
-            return False
-    #}}}
-
+    
     def prune_layer(self, lParam):
     #{{{
         if 'conv' in lParam and 'weight' in lParam:

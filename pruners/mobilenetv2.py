@@ -210,6 +210,8 @@ class MobileNetV2PruningDependency(BasicPruning):
     
     def inc_prune_rate(self, layerName):
     #{{{
+        lType, lName = zip(*self.depBlock.convsAndFc)
+        breakpoint()
         lParam = str(layerName) + '.weight'
         self.layerSizes[lParam][0] -= 1 
 
@@ -232,14 +234,6 @@ class MobileNetV2PruningDependency(BasicPruning):
     def prune_layer(self, lParam):
     #{{{   
         if 'conv' in lParam:
-            return True
-        else:
-            return False
-    #}}}
-
-    def is_conv_or_fc(self, lParam):
-    #{{{
-        if ('conv' in lParam or 'linear' in lParam) and ('weight' in lParam):
             return True
         else:
             return False

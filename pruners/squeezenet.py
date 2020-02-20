@@ -85,14 +85,6 @@ class SqueezeNetPruning(BasicPruning):
         self.layersInOrder = newOrder
     #}}}
 
-    def is_conv_or_fc(self, lParam):
-    #{{{
-        if 'conv' in lParam and 'weight' in lParam: 
-            return True
-        else:
-            return False
-    #}}}
-
     def prune_layer(self, lParam):
     #{{{
         if 'conv' in lParam and 'weight' in lParam:
