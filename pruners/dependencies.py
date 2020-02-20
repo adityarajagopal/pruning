@@ -1,6 +1,7 @@
 import sys
 
 import torch.nn as nn
+from itertools import chain
 from abc import ABC,abstractmethod 
 
 class DependencyCalculator(ABC):
@@ -48,7 +49,7 @@ class Basic(DependencyCalculator):
     
     def get_interface_layers(self, name, module, convs, ds): 
         """Basic conv is just connected to the next module, has no internal connectivity"""
-        return [name] 
+        return [(name, module.groups)] 
 #}}}
 
 class Linear(DependencyCalculator):
@@ -74,7 +75,7 @@ class Linear(DependencyCalculator):
     
     def get_interface_layers(self, name, module, convs, ds): 
         """Basic conv is just connected to the next module, has no internal connectivity"""
-        return [name] 
+        return [(name, None)] 
 #}}}
 
 class Residual(DependencyCalculator):
@@ -117,36 +118,43 @@ class Residual(DependencyCalculator):
                 if n in convs:
                     idx = convs.index(n)
                     if idx != len(convs)-1:
-                        nextLayers[_n] = ["{}.{}".format(name, convs[idx+1])]
+                        nextConv = "{}.{}".format(name, convs[idx+1])
+                        groups = module._modules[convs[idx+1]].groups
+                        nextLayers[_n] = [(nextConv, groups)]
                     else:
                         nextLayers[_n] = []
                 
                 elif any(x in n for x in ds): 
                     idx = [x in n for x in ds].index(True)
                     if idx != len(ds)-1:
-                        nextLayers[_n] = ["{}.{}".format(name, ds[idx+1])]
+                        nextConv = "{}.{}".format(name, ds[idx+1])
+                        groups = module._modules[ds[idx+1]].groups
+                        nextLayers[_n] = [(nextConv, groups)]
                 
                 else:
                     print("ERROR : Detected conv in residual block that is not part of either main branch or residual branch")
                     sys.exit()
+        
         return nextLayers
     #}}}
    
     def get_interface_layers(self, name, module, convs, ds): 
     #{{{
-        interfaceLayers = ["{}.{}".format(name, convs[0])]
+        interfaceLayers = [("{}.{}".format(name, convs[0]), module._modules[convs[0]].groups)]
         
         # only want first ds layer as this is the interface layer
         # assumption ds layers are listed in order --> ds[0]
         for n,m in module.named_modules(): 
-            if ds[0] == n and DependencyBlock.check_children(m, [nn.Conv2d]): 
+            if n == ds[0] and DependencyBlock.check_children(m, [nn.Conv2d]): 
                 if isinstance(m, nn.Conv2d): 
                     lName = n
+                    groups = m.groups
                 else:
                     idx = [isinstance(m, nn.Conv2d) for k,m in m._modules.items()].index(True)
                     subName = list(m._modules.keys())[idx]
                     lName = "{}.{}".format(n,subName)
-                interfaceLayers.append("{}.{}".format(name, lName))
+                    groups = list(m._modules.values())[idx].groups
+                interfaceLayers.append(("{}.{}".format(name, lName), groups))
         return interfaceLayers
     #}}}
 
@@ -190,6 +198,97 @@ class MBConv(DependencyCalculator):
                     return False, depLayers
         else:
             return True, depLayers 
+    #}}}
+    
+    def get_internal_connections(self, name, module, convs, ds): 
+    #{{{
+        nextLayers = {}
+        for n,m in module.named_modules(): 
+            if isinstance(m, nn.Conv2d): 
+                _n = "{}.{}".format(name,n)
+                if n in convs:
+                    idx = convs.index(n)
+                    if idx != len(convs)-1:
+                        nextConv = "{}.{}".format(name, convs[idx+1])
+                        groups = module._modules[convs[idx+1]].groups
+                        nextLayers[_n] = [(nextConv, groups)]
+                    else:
+                        nextLayers[_n] = []
+                
+                elif any(x in n for x in ds): 
+                    idx = [x in n for x in ds].index(True)
+                    if idx != len(ds)-1:
+                        nextConv = "{}.{}".format(name, ds[idx+1])
+                        groups = module._modules[ds[idx+1]].groups
+                        nextLayers[_n] = [(nextConv, groups)]
+                
+                else:
+                    print("ERROR : Detected conv in residual block that is not part of either main branch or residual branch")
+                    sys.exit()
+        
+        return nextLayers
+    #}}}
+   
+    def get_interface_layers(self, name, module, convs, ds): 
+    #{{{
+        interfaceLayers = [("{}.{}".format(name, convs[0]), module._modules[convs[0]].groups)]
+        
+        # only want first ds layer as this is the interface layer
+        # assumption ds layers are listed in order --> ds[0]
+        for n,m in module.named_modules(): 
+            if n == ds[0] and DependencyBlock.check_children(m, [nn.Conv2d]): 
+                if isinstance(m, nn.Conv2d): 
+                    lName = n
+                    groups = m.groups
+                else:
+                    idx = [isinstance(m, nn.Conv2d) for k,m in m._modules.items()].index(True)
+                    subName = list(m._modules.keys())[idx]
+                    lName = "{}.{}".format(n,subName)
+                    groups = list(m._modules.values())[idx].groups
+                interfaceLayers.append(("{}.{}".format(name, lName), groups))
+        return interfaceLayers
+    #}}}
+#}}}
+
+class Fire(DependencyCalculator):
+#{{{
+    def __init__(self):
+        pass
+    
+    def dependent_conv(self, layerName, convs): 
+        return layerName 
+
+    def internal_dependency(self, module, mType, convs, ds):
+        return False, None 
+
+    def external_dependency(self, module, mType, convs, ds): 
+        return False, None 
+    
+    def get_internal_connections(self, name, module, convs, ds): 
+    #{{{
+        #TODO: make internal connection more about branches rather than fire specifically
+        nextLayers = {}
+        for n,m in module.named_modules(): 
+            if isinstance(m, nn.Conv2d): 
+                _n = "{}.{}".format(name,n)
+                if n == convs[0]: 
+                    nextLayers[_n] = []
+                    for i in range(2): 
+                        nextConv = "{}.{}".format(name, convs[i+1])
+                        groups = module._modules[convs[i+1]].groups
+                        nextLayers[_n].append((nextConv, groups))
+                elif n == convs[1] or n == convs[2]:
+                    nextLayers[_n] = []
+                else:
+                    print("ERROR : Detected conv in fire block that is not part of 3 convs declared")
+                    sys.exit()
+        return nextLayers
+    #}}}
+   
+    def get_interface_layers(self, name, module, convs, ds): 
+    #{{{
+        interfaceLayers = [("{}.{}".format(name, convs[0]), module._modules[convs[0]].groups)]
+        return interfaceLayers
     #}}}
 #}}}
 
@@ -293,7 +392,10 @@ class DependencyBlock(object):
             else:
                 for _n,_m in m.named_modules():
                     if DependencyBlock.check_inst(_m, self.instances):
-                        name = "module.{}.{}".format(n,_n)
+                        if _n is not '':
+                            name = "module.{}.{}".format(n,_n)
+                        else:
+                            name = "module.{}".format(n)
                         idx = self.instances.index(type(_m))
                         mType = self.types[idx]
                         linkedConvModules.append((mType, name))

@@ -125,11 +125,6 @@ class BasicPruning(ABC):
                 paramsInLayer *= dim
             self.totalParams += paramsInLayer
         
-        self.depBlock.convsAndFc = copy.deepcopy(self.depBlock.linkedModules)
-        for n,m in self.model.named_modules(): 
-            if isinstance(m, nn.Linear): 
-                self.depBlock.convsAndFc.append(('fc', n))
-
         for n,m in self.model.named_modules(): 
             if self.is_conv_or_fc(m): 
                 self.layerSizes["{}".format(n)] = list(m._parameters['weight'].size())
@@ -225,23 +220,28 @@ class BasicPruning(ABC):
     def inc_prune_rate(self, layerName):
     #{{{
         lParam = str(layerName)
-        
         # remove 1 output filter from current layer
         self.layerSizes[lParam][0] -= 1 
-
-        nextLayerNames = self.depBlock.linkedConvAndFc[lParam]
-        for nextLayer in nextLayerNames:
+        
+        nextLayerDetails = self.depBlock.linkedConvAndFc[lParam]
+        for nextLayer, groups in nextLayerDetails:
             nextLayerSize = self.layerSizes[nextLayer]
             currLayerSize = self.layerSizes[lParam]
             paramsPruned = currLayerSize[1]*currLayerSize[2]*currLayerSize[3]
-            
+
             # check if FC layer
             if len(nextLayerSize) == 2: 
                 paramsPruned += nextLayerSize[0]
             else:
-                paramsPruned += nextLayerSize[0]*nextLayerSize[2]*nextLayerSize[3]
-                # remove 1 input activation from next layer
-                self.layerSizes[nextLayer][1] -= 1
+                #TODO:
+                # this is assuming we only have either non-grouped convolutions or dw convolutions
+                # have to change to accomodate grouped convolutions
+                nextOpChannels = nextLayerSize[0] if groups == 1 else 1
+                paramsPruned += nextOpChannels*nextLayerSize[2]*nextLayerSize[3]
+                
+                # remove 1 input activation from next layer if it is not a dw conv
+                if groups == 1:
+                    self.layerSizes[nextLayer][1] -= 1
         
         return (100.* paramsPruned / self.totalParams)
     #}}}
