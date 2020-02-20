@@ -98,6 +98,25 @@ class BasicPruning(ABC):
         self.importPath = 'src.ar4414.pruning.{}.{}'.format('.'.join(dirName.split('/')), self.fileName.split('.')[0])
     #}}} 
     
+    # def get_layer_params(self):
+    # #{{{
+    #     for p in self.model.named_parameters():
+    #         paramsInLayer = 1
+    #         for dim in p[1].size():
+    #             paramsInLayer *= dim
+    #         self.totalParams += paramsInLayer
+    #     
+    #     self.depBlock.convsAndFc = copy.deepcopy(self.depBlock.linkedModules)
+    #     for n,m in self.model.named_modules(): 
+    #         if isinstance(m, nn.Linear): 
+    #             self.depBlock.convsAndFc.append(('fc', n))
+
+    #     for n,m in self.model.named_modules(): 
+    #         if self.is_conv_or_fc(m): 
+    #             self.layerSizes["{}.weight".format(n)] = list(m._parameters['weight'].size())
+    #     self.layersInOrder = list(self.layerSizes.keys())
+    # #}}}
+    
     def get_layer_params(self):
     #{{{
         for p in self.model.named_parameters():
@@ -113,8 +132,7 @@ class BasicPruning(ABC):
 
         for n,m in self.model.named_modules(): 
             if self.is_conv_or_fc(m): 
-                self.layerSizes["{}.weight".format(n)] = list(m._parameters['weight'].size())
-        self.layersInOrder = list(self.layerSizes.keys())
+                self.layerSizes["{}".format(n)] = list(m._parameters['weight'].size())
     #}}}
 
     def log_pruned_channels(self, rootFolder, params, totalPrunedPerc, channelsPruned): 
@@ -182,24 +200,48 @@ class BasicPruning(ABC):
         minIdx = np.argmin(array[np.nonzero(array)]) 
         return (minIdx, array[minIdx])     
     
+    # def inc_prune_rate(self, layerName):
+    # #{{{
+    #     lParam = str(layerName) + '.weight'
+    #     
+    #     # remove 1 output filter from current layer
+    #     self.layerSizes[lParam][0] -= 1 
+
+    #     nextLayerName = self.layersInOrder[self.layersInOrder.index(lParam) + 1]
+    #     nextLayerSize = self.layerSizes[nextLayerName]
+    #     currLayerSize = self.layerSizes[lParam]
+    #     paramsPruned = currLayerSize[1]*currLayerSize[2]*currLayerSize[3]
+    #     # check if FC layer
+    #     if len(nextLayerSize) == 2: 
+    #         paramsPruned += nextLayerSize[0]
+    #     else:
+    #         paramsPruned += nextLayerSize[0]*nextLayerSize[2]*nextLayerSize[3]
+    #         # remove 1 input activation from next layer
+    #         self.layerSizes[nextLayerName][1] -= 1
+    #     
+    #     return (100.* paramsPruned / self.totalParams)
+    # #}}}
+    
     def inc_prune_rate(self, layerName):
     #{{{
-        breakpoint()
-        lParam = str(layerName) + '.weight'
+        lParam = str(layerName)
+        
         # remove 1 output filter from current layer
         self.layerSizes[lParam][0] -= 1 
 
-        nextLayerName = self.layersInOrder[self.layersInOrder.index(lParam) + 1]
-        nextLayerSize = self.layerSizes[nextLayerName]
-        currLayerSize = self.layerSizes[lParam]
-        paramsPruned = currLayerSize[1]*currLayerSize[2]*currLayerSize[3]
-        # check if FC layer
-        if len(nextLayerSize) == 2: 
-            paramsPruned += nextLayerSize[0]
-        else:
-            paramsPruned += nextLayerSize[0]*nextLayerSize[2]*nextLayerSize[3]
-            # remove 1 input activation from next layer
-            self.layerSizes[nextLayerName][1] -= 1
+        nextLayerNames = self.depBlock.linkedConvAndFc[lParam]
+        for nextLayer in nextLayerNames:
+            nextLayerSize = self.layerSizes[nextLayer]
+            currLayerSize = self.layerSizes[lParam]
+            paramsPruned = currLayerSize[1]*currLayerSize[2]*currLayerSize[3]
+            
+            # check if FC layer
+            if len(nextLayerSize) == 2: 
+                paramsPruned += nextLayerSize[0]
+            else:
+                paramsPruned += nextLayerSize[0]*nextLayerSize[2]*nextLayerSize[3]
+                # remove 1 input activation from next layer
+                self.layerSizes[nextLayer][1] -= 1
         
         return (100.* paramsPruned / self.totalParams)
     #}}}

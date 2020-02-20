@@ -19,6 +19,10 @@ class DependencyCalculator(ABC):
     @abstractmethod
     def external_dependency(self, module, mType, convs, ds):
         pass
+    
+    # @abstractmethod
+    # def get_connected_layers(self): 
+    #     pass
 #}}}
 
 class Basic(DependencyCalculator):
@@ -37,6 +41,40 @@ class Basic(DependencyCalculator):
     def external_dependency(self, module, mType, convs, ds):
         """Basic conv blocks don't have external dependencies"""
         return False,None
+
+    def get_internal_connections(self, name, module, convs, ds): 
+        """Basic conv is just connected to the next module, has no internal connectivity"""
+        return {name: []}
+    
+    def get_interface_layers(self, name, module, convs, ds): 
+        """Basic conv is just connected to the next module, has no internal connectivity"""
+        return [name] 
+#}}}
+
+class Linear(DependencyCalculator):
+#{{{
+    def __init__(self):
+        pass
+    
+    def dependent_conv(self, layerName, convs): 
+        """Basic conv itself is the dependent conv"""
+        return layerName
+    
+    def internal_dependency(self, module, mType, convs, ds):
+        """Basic conv blocks don't have internal dependencies"""
+        return False,None
+    
+    def external_dependency(self, module, mType, convs, ds):
+        """Basic conv blocks don't have external dependencies"""
+        return False,None
+
+    def get_internal_connections(self, name, module, convs, ds): 
+        """Basic conv is just connected to the next module, has no internal connectivity"""
+        return {name: []}
+    
+    def get_interface_layers(self, name, module, convs, ds): 
+        """Basic conv is just connected to the next module, has no internal connectivity"""
+        return [name] 
 #}}}
 
 class Residual(DependencyCalculator):
@@ -45,8 +83,8 @@ class Residual(DependencyCalculator):
         pass
     
     def dependent_conv(self, layerName, convs): 
-        """convs variable only has 1 conv with residuals"""
-        return "{}.{}".format(layerName, convs[0])
+        """dependent convolution is only the last convolution"""
+        return "{}.{}".format(layerName, convs[-1])
 
     def internal_dependency(self, module, mType, convs, ds):
         """Residual blocks don't have internal dependencies"""
@@ -59,16 +97,59 @@ class Residual(DependencyCalculator):
         Some modules implement downsampling as just a nn.Sequential that's empty, so checks deeper to see if there is actually a conv inside
         Returns whether dependency exists and list of dependent layers
         """
-        
+        dependentLayers = [convs[-1]] 
         childrenAreDsLayers = [(c in ds) for c in list(module._modules.keys())]
         if any(childrenAreDsLayers):
             #check if empty sequential
             idx = childrenAreDsLayers.index(True)
             layerName = list(module._modules.keys())[idx]
-            return not DependencyBlock.check_children(module._modules[layerName], [nn.Conv2d]),[convs[0]]
+            return not DependencyBlock.check_children(module._modules[layerName], [nn.Conv2d]), dependentLayers 
         else:
-            return True, [convs[0]]
+            return True, dependentLayers
     #}}}
+    
+    def get_internal_connections(self, name, module, convs, ds): 
+    #{{{
+        nextLayers = {}
+        for n,m in module.named_modules(): 
+            if isinstance(m, nn.Conv2d): 
+                _n = "{}.{}".format(name,n)
+                if n in convs:
+                    idx = convs.index(n)
+                    if idx != len(convs)-1:
+                        nextLayers[_n] = ["{}.{}".format(name, convs[idx+1])]
+                    else:
+                        nextLayers[_n] = []
+                
+                elif any(x in n for x in ds): 
+                    idx = [x in n for x in ds].index(True)
+                    if idx != len(ds)-1:
+                        nextLayers[_n] = ["{}.{}".format(name, ds[idx+1])]
+                
+                else:
+                    print("ERROR : Detected conv in residual block that is not part of either main branch or residual branch")
+                    sys.exit()
+        return nextLayers
+    #}}}
+   
+    def get_interface_layers(self, name, module, convs, ds): 
+    #{{{
+        interfaceLayers = ["{}.{}".format(name, convs[0])]
+        
+        # only want first ds layer as this is the interface layer
+        # assumption ds layers are listed in order --> ds[0]
+        for n,m in module.named_modules(): 
+            if ds[0] == n and DependencyBlock.check_children(m, [nn.Conv2d]): 
+                if isinstance(m, nn.Conv2d): 
+                    lName = n
+                else:
+                    idx = [isinstance(m, nn.Conv2d) for k,m in m._modules.items()].index(True)
+                    subName = list(m._modules.keys())[idx]
+                    lName = "{}.{}".format(n,subName)
+                interfaceLayers.append("{}.{}".format(name, lName))
+        return interfaceLayers
+    #}}}
+
 #}}}
 
 class MBConv(DependencyCalculator):
@@ -128,11 +209,12 @@ class DependencyBlock(object):
 
         if hasattr(self, 'depCalcs'):
             self.depCalcs['basic'] = Basic()
+            self.depCalcs['linear'] = Linear()
         else: 
-            self.depCalcs = {'basic': Basic()}
+            self.depCalcs = {'basic': Basic(), 'linear': Linear()}
         
-        self.linkedModules = self.create_modules_graph()
-        # self.linkedConvAndFc = self.create_layer_graph()
+        self.linkedModules, linkedModulesWithFc = self.create_modules_graph()
+        self.linkedConvAndFc = self.create_layer_graph(linkedModulesWithFc)
     #}}}
     
     @classmethod
@@ -178,31 +260,73 @@ class DependencyBlock(object):
     def check_inst(cls, module, instances): 
         """Checks if module is of one of the types in list instances"""
         return any(isinstance(module, inst) for inst in instances)
+    
+    def get_convs_and_ds(self, mName, mType, m): 
+    #{{{
+        if isinstance(m, nn.Conv2d):
+            return [mName], [] 
+        elif isinstance(m, nn.Linear): 
+            return [], []
+        else:
+            convs = self.convs[self.types.index(mType)]
+            ds = self.dsLayers[self.types.index(mType)]
+            return convs, ds
+    #}}}
 
     def create_modules_graph(self): 
     #{{{
         """
-        Returns a list which has order of convs and modules which have an instance of module in instances in the entire network
+        Returns a list which has order of modules which have an instance of module in instances in the entire network
         eg. conv1 -> module1(which has as an mb_conv) -> conv2 -> module2 ...    
         """
+        linkedConvModules = []
         linkedModules = []
         for n,m in self.model.module.named_children(): 
             if not DependencyBlock.check_children(m, self.instances):
-                if isinstance(m,nn.Conv2d):
-                    linkedModules.append(('basic',"module.{}".format(n)))
+                name = "module.{}".format(n)
+                if isinstance(m, nn.Conv2d):
+                    linkedConvModules.append(('basic', name))
+                    linkedModules.append((name, 'basic', m))
+
+                elif isinstance(m, nn.Linear): 
+                    linkedModules.append((name, 'linear', m))
             else:
                 for _n,_m in m.named_modules():
                     if DependencyBlock.check_inst(_m, self.instances):
+                        name = "module.{}.{}".format(n,_n)
                         idx = self.instances.index(type(_m))
                         mType = self.types[idx]
-                        linkedModules.append((mType, "module.{}.{}".format(n,_n)))
+                        linkedConvModules.append((mType, name))
+                        linkedModules.append((name, mType, _m))
         
-        return linkedModules
+        return linkedConvModules, linkedModules
     #}}}
 
-    def create_layer_graph(self): 
+    def create_layer_graph(self, linkedModulesWithFc): 
     #{{{
-        breakpoint() 
+        """
+        Returns a list which has connectivity between all convs and FCs in the network 
+        """
+        linkedLayers = {}
+        for i in range(len(linkedModulesWithFc)-1):
+            # get current module details
+            mName, mType, m = linkedModulesWithFc[i]
+            convs, ds = self.get_convs_and_ds(mName, mType, m) 
+            
+            # get next module details
+            mNextName, mNextType, mNext = linkedModulesWithFc[i+1]
+            convsNext, dsNext = self.get_convs_and_ds(mNextName, mNextType, mNext) 
+            
+            connected = self.depCalcs[mType].get_internal_connections(mName, m, convs, ds)
+            connectedTo = self.depCalcs[mNextType].get_interface_layers(mNextName, mNext, convsNext, dsNext)
+            
+            for k,v in connected.items(): 
+                if v == []: 
+                    connected[k] = connectedTo
+            
+            linkedLayers.update(connected)
+       
+        return linkedLayers
     #}}}
 
     def get_dependencies(self):

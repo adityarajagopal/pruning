@@ -23,7 +23,7 @@ def conv3x3(in_planes, out_planes, stride=1):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
 
-@basic_block(lType='residual_basic', convs=['conv2'], downsampling=['downsample'])
+@basic_block(lType='residual_basic', convs=['conv1', 'conv2'], downsampling=['downsample'])
 class BasicBlock(nn.Module):
 #{{{
     expansion = 1
@@ -58,7 +58,7 @@ class BasicBlock(nn.Module):
 #}}}
 
 
-@bottleneck(lType='residual_bottleneck', convs=['conv3'], downsampling=['downsample'])
+@bottleneck(lType='residual_bottleneck', convs=['conv1', 'conv2', 'conv3'], downsampling=['downsample'])
 class Bottleneck(nn.Module):
 #{{{
     expansion = 4

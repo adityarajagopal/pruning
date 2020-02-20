@@ -244,7 +244,8 @@ def residual(writer, modName, module):
     #{{{
         if isinstance(m, nn.Conv2d): 
             idx = writer.depBlk.instances.index(type(module))
-            writer.addRelu = (n != writer.depBlk.convs[idx][0])
+            # writer.addRelu = (n != writer.depBlk.convs[idx][0])
+            writer.addRelu = (n != writer.depBlk.convs[idx][-1])
             nn_conv2d(writer, fullName, m)
 
         elif isinstance(m, nn.BatchNorm2d): 
