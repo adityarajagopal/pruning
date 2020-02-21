@@ -14,7 +14,7 @@ import sys
 import torch.nn.functional as F
 import time
 
-from src.ar4414.pruning.pruners.decorators import basic_block, bottleneck
+from src.ar4414.pruning.pruners.decorators import basic_block, bottleneck, skip
 
 __all__ = ['resnet']
 
@@ -57,7 +57,6 @@ class BasicBlock(nn.Module):
         return out
 #}}}
 
-
 @bottleneck(lType='residual_bottleneck', convs=['conv1', 'conv2', 'conv3'], downsampling=['downsample'])
 class Bottleneck(nn.Module):
 #{{{
@@ -97,7 +96,6 @@ class Bottleneck(nn.Module):
 
         return out
 #}}}
-
 
 class ResNet(nn.Module):
 

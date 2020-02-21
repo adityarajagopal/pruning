@@ -207,39 +207,4 @@ class MobileNetV2PruningDependency(BasicPruning):
         
         super().__init__(params, model)
     #}}}
-    
-    # def inc_prune_rate(self, layerName):
-    # #{{{
-    #     lType, lName = zip(*self.depBlock.convsAndFc)
-    #     lParam = str(layerName) + '.weight'
-    #     self.layerSizes[lParam][0] -= 1 
-
-    #     nextLayerName = self.layersInOrder[self.layersInOrder.index(lParam) + 1]
-    #     nextLayerSize = self.layerSizes[nextLayerName]
-    #     currLayerSize = self.layerSizes[lParam]
-    #     paramsPruned = currLayerSize[1]*currLayerSize[2]*currLayerSize[3]
-    #     # check if FC layer
-    #     if len(nextLayerSize) == 2: 
-    #         paramsPruned += nextLayerSize[0]
-    #     elif ('layers' in nextLayerName) and ('conv2' in nextLayerName):
-    #         paramsPruned += nextLayerSize[2]*nextLayerSize[3]
-    #     else:
-    #         paramsPruned += nextLayerSize[0]*nextLayerSize[2]*nextLayerSize[3]
-    #         self.layerSizes[nextLayerName][1] -= 1
-    #     
-    #     return (100.* paramsPruned / self.totalParams)
-    # #}}}
-
-    def prune_layer(self, lParam):
-    #{{{   
-        if 'conv' in lParam:
-            return True
-        else:
-            return False
-    #}}}
-
-    def skip_layer(self, lName):
-    #{{{
-        return False
-    #}}}
 #}}}

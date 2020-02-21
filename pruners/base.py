@@ -98,25 +98,6 @@ class BasicPruning(ABC):
         self.importPath = 'src.ar4414.pruning.{}.{}'.format('.'.join(dirName.split('/')), self.fileName.split('.')[0])
     #}}} 
     
-    # def get_layer_params(self):
-    # #{{{
-    #     for p in self.model.named_parameters():
-    #         paramsInLayer = 1
-    #         for dim in p[1].size():
-    #             paramsInLayer *= dim
-    #         self.totalParams += paramsInLayer
-    #     
-    #     self.depBlock.convsAndFc = copy.deepcopy(self.depBlock.linkedModules)
-    #     for n,m in self.model.named_modules(): 
-    #         if isinstance(m, nn.Linear): 
-    #             self.depBlock.convsAndFc.append(('fc', n))
-
-    #     for n,m in self.model.named_modules(): 
-    #         if self.is_conv_or_fc(m): 
-    #             self.layerSizes["{}.weight".format(n)] = list(m._parameters['weight'].size())
-    #     self.layersInOrder = list(self.layerSizes.keys())
-    # #}}}
-    
     def get_layer_params(self):
     #{{{
         for p in self.model.named_parameters():
@@ -195,28 +176,6 @@ class BasicPruning(ABC):
         minIdx = np.argmin(array[np.nonzero(array)]) 
         return (minIdx, array[minIdx])     
     
-    # def inc_prune_rate(self, layerName):
-    # #{{{
-    #     lParam = str(layerName) + '.weight'
-    #     
-    #     # remove 1 output filter from current layer
-    #     self.layerSizes[lParam][0] -= 1 
-
-    #     nextLayerName = self.layersInOrder[self.layersInOrder.index(lParam) + 1]
-    #     nextLayerSize = self.layerSizes[nextLayerName]
-    #     currLayerSize = self.layerSizes[lParam]
-    #     paramsPruned = currLayerSize[1]*currLayerSize[2]*currLayerSize[3]
-    #     # check if FC layer
-    #     if len(nextLayerSize) == 2: 
-    #         paramsPruned += nextLayerSize[0]
-    #     else:
-    #         paramsPruned += nextLayerSize[0]*nextLayerSize[2]*nextLayerSize[3]
-    #         # remove 1 input activation from next layer
-    #         self.layerSizes[nextLayerName][1] -= 1
-    #     
-    #     return (100.* paramsPruned / self.totalParams)
-    # #}}}
-    
     def inc_prune_rate(self, layerName):
     #{{{
         lParam = str(layerName)
@@ -270,14 +229,20 @@ class BasicPruning(ABC):
     #{{{
         localRanking = {} 
         globalRanking = []
-        
+
         # create global ranking
+        layers = []
         for p in model.named_parameters():
         #{{{
-            if self.prune_layer(p[0]):
-                layerName = '.'.join(p[0].split('.')[:-1])
-                if self.skip_layer(layerName):
-                    continue
+            layerName = '.'.join(p[0].split('.')[:-1])
+            if layerName in self.depBlock.linkedConvAndFc.keys() and layerName not in layers:
+                netInst = type(self.model.module)
+                try:
+                    if layerName in self.depBlock.ignore[netInst]:
+                        continue 
+                except (AttributeError, KeyError): 
+                    pass
+                layers.append(layerName)
             
                 pNp = p[1].data.cpu().numpy()
             
@@ -312,21 +277,25 @@ class BasicPruning(ABC):
             # if layer not in group, just remove filter from layer 
             # if layer is in a dependent group remove corresponding filter from each layer
             depLayers = [layerName] if depLayers == [] else depLayers
-            for layerName in depLayers:
-                if len(localRanking[layerName]) <= pruningLimit:
-                    listIdx += 1
-                    continue
-            
-                # if filter has already been pruned, continue
-                # could happen to due to dependencies
-                if filterNum in self.channelsToPrune[layerName]:
-                    listIdx += 1
-                    continue 
-                
-                localRanking[layerName].pop(0)
-                self.channelsToPrune[layerName].append(filterNum)
-                
-                currentPruneRate += self.inc_prune_rate(layerName) 
+            netInst = type(self.model.module)
+            if not any(x in self.depBlock.ignore[netInst] for x in depLayers):
+                for layerName in depLayers:
+                    # case where you want to skip layers
+                    # if layers are dependent, skipping one means skipping all the dependent layers
+                    if len(localRanking[layerName]) <= pruningLimit:
+                        listIdx += 1
+                        continue
+               
+                    # if filter has already been pruned, continue
+                    # could happen to due to dependencies
+                    if filterNum in self.channelsToPrune[layerName]:
+                        listIdx += 1
+                        continue 
+                    
+                    localRanking[layerName].pop(0)
+                    self.channelsToPrune[layerName].append(filterNum)
+                    
+                    currentPruneRate += self.inc_prune_rate(layerName) 
             
             listIdx += 1
 
@@ -418,18 +387,4 @@ class BasicPruning(ABC):
         else:
             return False
     #}}}
-    
-    # function that selects all the layers to be pruned (currently only convs)
-    # used in structure_l1_weight to go through layers that are to be pruned
-    # lParam is from loop over named_parameters()
-    @abstractmethod
-    def prune_layer(self, lParam):
-        pass
-        
-    # function that specifies conv layers to skip when pruning
-    # used in structure_l1_weight
-    # lName here is module name, so doesn't have 'weight'/'bias' keyword
-    @abstractmethod
-    def skip_layer(self, lName):
-        pass
 #}}}

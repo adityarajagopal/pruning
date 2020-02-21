@@ -336,6 +336,15 @@ class DependencyBlock(object):
             setattr(cls, 'dependentLayers', {'type':[lType], 'instance':[blockInst], 'conv':[convs], 'downsample':[ds]})
     #}}}
 
+    @classmethod
+    def skip_layers(cls, blockInst, **kwargs): 
+    #{{{
+        if hasattr(cls, 'ignore'):
+            cls.ignore.update({blockInst : ['module.{}'.format(x) for x in kwargs['convs']]})
+        else:
+            cls.ignore = {blockInst : ['module.{}'.format(x) for x in kwargs['convs']]}
+    #}}}
+
     @classmethod 
     def register_dependency_calculator(cls, blockName, calcFunc):
     #{{{

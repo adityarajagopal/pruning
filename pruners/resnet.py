@@ -446,17 +446,4 @@ class ResNet20PruningDependency(BasicPruning):
         
         super().__init__(params, model)
     #}}}
-
-    def prune_layer(self, lParam):
-    #{{{
-        if 'conv' in lParam:
-            return True
-        else:
-            return False
-    #}}}
-
-    def skip_layer(self, lName):
-    #{{{
-        return False
-    #}}}
 #}}}

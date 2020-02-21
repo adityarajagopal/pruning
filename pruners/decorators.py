@@ -61,3 +61,11 @@ def fire(**kwargs):
         return block
     return decorator
 #}}}
+
+def skip(**kwargs): 
+#{{{
+    def decorator(block): 
+        dependencies.DependencyBlock.skip_layers(block, **kwargs)
+        return block 
+    return decorator
+#}}}

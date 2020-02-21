@@ -6,7 +6,7 @@ import numpy as np
 import torch.optim as optim
 import math
 
-from src.ar4414.pruning.pruners.decorators import fire
+from src.ar4414.pruning.pruners.decorators import fire, skip
 
 @fire(lType='fire', convs=['conv1', 'conv2', 'conv3'])
 class fire(nn.Module):
@@ -40,7 +40,6 @@ class fire(nn.Module):
         out = self.relu2(out)
         return out
 #}}}
-
 
 class SqueezeNet(nn.Module):
     def __init__(self, num_classes=10):
