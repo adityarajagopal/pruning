@@ -13,3 +13,4 @@ graphs/
 test.py 
 dev.pth.tar
 master.pth.tar
+*.yml
