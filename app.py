@@ -1,6 +1,4 @@
 import src.ar4414.pruning.gop_calculator as gopSrc
-import src.ar4414.pruning.fbs_channel_probability as fbsChanSrc
-import src.ar4414.pruning.entropy as entropySrc
 import src.ar4414.pruning.param_parser as ppSrc 
 import src.ar4414.pruning.model_creator as mcSrc
 import src.ar4414.pruning.inference as inferenceSrc

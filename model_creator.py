@@ -38,7 +38,9 @@ class ModelCreator(mcSrc.ModelCreator):
     def load_pretrained(self, params, model):
     #{{{
         if params.resume or params.branch or params.entropy or params.pruneFilters: 
-            checkpoint = torch.load(params.pretrained)
+            device_id = params.gpu_list[0]
+            location = 'cuda:'+str(device_id)
+            checkpoint = torch.load(params.pretrained, map_location=location)
             model.load_state_dict(checkpoint)
 
         elif params.fbsPruning:
