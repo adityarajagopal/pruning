@@ -163,7 +163,6 @@ class BasicPruning(ABC):
                 prunedModel = self.import_pruned_model()
                 prunedModel = self.transfer_weights(model, prunedModel)
                 optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
-
                 return channelsPruned, prunedModel, optimiser
             
             # pruning based on activations 

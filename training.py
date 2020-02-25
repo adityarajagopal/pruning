@@ -2,6 +2,7 @@ import sys
 import time
 from tqdm import tqdm
 import numpy as np
+import gc
 
 import torch.autograd
 import torch
@@ -58,7 +59,7 @@ class Trainer(trainingSrc.Trainer):
     def static_finetune_l1_weights(self, params, pruner, checkpointer, train_loader, test_loader, valLoader, model, criterion, optimiser, inferer):  
     #{{{
         print('Epoch,\tLR,\tTrain_Loss,\tTrain_Top1,\tTrain_Top5,\tTest_Loss,\tTest_Top1,\tTest_Top5,\tVal_Loss,\tVal_Top1,\tVal_Top5')
-        
+
         for epoch in tqdm(range(params.start_epoch, params.finetuneBudget), desc='training', leave=False) : 
             params.curr_epoch = epoch
             state = self.update_lr(params, optimiser)
