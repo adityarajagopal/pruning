@@ -278,7 +278,11 @@ class BasicPruning(ABC):
             # if layer is in a dependent group remove corresponding filter from each layer
             depLayers = [layerName] if depLayers == [] else depLayers
             netInst = type(self.model.module)
-            if not any(x in self.depBlock.ignore[netInst] for x in depLayers):
+            if hasattr(self.depBlock, 'ignore'): 
+                ignoreLayers = any(x in self.depBlock.ignore[netInst] for x in depLayers)
+            else:
+                ignoreLayers = False
+            if not ignoreLayers:
                 for layerName in depLayers:
                     # case where you want to skip layers
                     # if layers are dependent, skipping one means skipping all the dependent layers
