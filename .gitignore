@@ -5,6 +5,7 @@ __pycache__
 */__pycache__
 runs/
 logs/
+configs/*
 configs/baseline_tests
 configs/random_init_tests
 configs/validation_prune
@@ -14,3 +15,4 @@ test.py
 dev.pth.tar
 master.pth.tar
 *.yml
+models/pruned/*

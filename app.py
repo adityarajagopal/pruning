@@ -25,17 +25,14 @@ import time
 
 import configparser as cp
 
-import tensorboardX as tbx
-
 import torch
 import torch.cuda
 import torch.nn as nn
 
-import matplotlib.pyplot as plt
-import matplotlib
+# import matplotlib.pyplot as plt
+# import matplotlib
 import math
 import numpy as np
-import pandas as pd
 
 class Application(appSrc.Application):
     def main(self):
@@ -194,90 +191,90 @@ class Application(appSrc.Application):
             #}}}
         #}}}
 
-        elif self.params.entropy == True:
-        #{{{
-            print('=========Baseline Accuracy==========')
-            testStats = self.run_inference()
-            print('==========================')
-            
-            #{{{
-            # if self.params.entropyLocalPruning == True:            
-            #     prunePercentages = [x/100.0 for x in range(10,100,10)]
-            #     # for pp in prunePercentages:
-            #     for pp in [0.7, 0.8, 0.9]:
-            #         for n,m in self.model.named_modules():
-            #             if isinstance(m, nn.Conv2d):
-            #                 if n in ['module.conv3', 'module.conv4', 'module.conv5']:
-            #                     entropySrc.EntropyLocalPruner(n, m, self.params, pp)
-            #         
-            #         print('==========No finetune accuracy after pruning {}%==========='.format(pp*100.0))
-            #         self.run_inference()
-            #}}}
-            
-            if self.params.entropyGlobalPruning == True:
-            #{{{
-                if self.params.finetune == True:
-                    self.pruner = entropySrc.EntropyGlobalPruner(self.model, self.params, self.params.pruningPerc, [])
-                    self.run_finetune()
+        # elif self.params.entropy == True:
+        # #{{{
+        #     print('=========Baseline Accuracy==========')
+        #     testStats = self.run_inference()
+        #     print('==========================')
+        #     
+        #     #{{{
+        #     # if self.params.entropyLocalPruning == True:            
+        #     #     prunePercentages = [x/100.0 for x in range(10,100,10)]
+        #     #     # for pp in prunePercentages:
+        #     #     for pp in [0.7, 0.8, 0.9]:
+        #     #         for n,m in self.model.named_modules():
+        #     #             if isinstance(m, nn.Conv2d):
+        #     #                 if n in ['module.conv3', 'module.conv4', 'module.conv5']:
+        #     #                     entropySrc.EntropyLocalPruner(n, m, self.params, pp)
+        #     #         
+        #     #         print('==========No finetune accuracy after pruning {}%==========='.format(pp*100.0))
+        #     #         self.run_inference()
+        #     #}}}
+        #     
+        #     if self.params.entropyGlobalPruning == True:
+        #     #{{{
+        #         if self.params.finetune == True:
+        #             self.pruner = entropySrc.EntropyGlobalPruner(self.model, self.params, self.params.pruningPerc, [])
+        #             self.run_finetune()
 
-                else:
-                #{{{
-                    prunePercs = [10, 40, 80]
-                    
-                    if self.params.plotChannels:
-                        # channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d)}
-                        channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d) if l in ['module.conv3', 'module.conv4', 'module.conv5']}
-                        fig,ax = plt.subplots(len(prunePercs), len(channels.keys()), sharex=True, sharey=True)
-                        fig.add_subplot(111, frameon=False)
-                    
-                    for i, pp in enumerate(prunePercs):
-                        egp = entropySrc.EntropyGlobalPruner(self.model, self.params, pp, ['module.conv3', 'module.conv4', 'module.conv5'])
-                        channelsPruned = egp.channelsToPrune
-                        loss, top1, top5 = self.run_inference()
-                        print('==========================')
-                        tmp = [len(x) for l,x in channelsPruned.items()]
-                        print(sum(tmp))
-                        
-                        if self.params.plotChannels:
-                            for j,(l,x) in enumerate(channels.items()):
-                                # if l not in channelsPruned.keys():
-                                #     continue
-                                
-                                y = [0 for t in x]                             
-                                for t in channelsPruned[l]:
-                                    y[t] = 1
-                                ax[i][j].bar(x,y)
-                                ax[i][j].get_yaxis().set_ticks([])
-                                
-                                if i == len(channels.keys()) - 1:
-                                    ax[i][j].set_xlabel('Layer-{}'.format(l.split('.')[1]))
-                            
-                            ax[i][0].set_ylabel('Pruned  = {}% \n Top1 = {:.2f}%'.format(pp*100, top1))
-                        
-                    if self.params.plotChannels:
-                        plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
-                        plt.xlabel('\nChannel Number')
-                        plt.title('Channels taken when pruning based on Entropy')
-                        plt.show()
-                #}}}
-            #}}}
-            
-            else:
-            #{{{
-                calculators = []
-                layerNames = []
-                for n,m in self.model.named_modules():
-                    if isinstance(m, nn.Conv2d):                                  
-                        calculators.append(entropySrc.Entropy(n, m, self.params, min(self.params.numBatches, len(self.test_loader))))
-                        calculators[-1].register_hooks()
-                        layerNames.append(n)
-                        
-                self.inferer.run_n_minibatches(self.params, self.test_loader, self.model, self.params.numBatches)
+        #         else:
+        #         #{{{
+        #             prunePercs = [10, 40, 80]
+        #             
+        #             if self.params.plotChannels:
+        #                 # channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d)}
+        #                 channels = {l:list(range(m.out_channels)) for l,m in self.model.named_modules() if isinstance(m, nn.Conv2d) if l in ['module.conv3', 'module.conv4', 'module.conv5']}
+        #                 fig,ax = plt.subplots(len(prunePercs), len(channels.keys()), sharex=True, sharey=True)
+        #                 fig.add_subplot(111, frameon=False)
+        #             
+        #             for i, pp in enumerate(prunePercs):
+        #                 egp = entropySrc.EntropyGlobalPruner(self.model, self.params, pp, ['module.conv3', 'module.conv4', 'module.conv5'])
+        #                 channelsPruned = egp.channelsToPrune
+        #                 loss, top1, top5 = self.run_inference()
+        #                 print('==========================')
+        #                 tmp = [len(x) for l,x in channelsPruned.items()]
+        #                 print(sum(tmp))
+        #                 
+        #                 if self.params.plotChannels:
+        #                     for j,(l,x) in enumerate(channels.items()):
+        #                         # if l not in channelsPruned.keys():
+        #                         #     continue
+        #                         
+        #                         y = [0 for t in x]                             
+        #                         for t in channelsPruned[l]:
+        #                             y[t] = 1
+        #                         ax[i][j].bar(x,y)
+        #                         ax[i][j].get_yaxis().set_ticks([])
+        #                         
+        #                         if i == len(channels.keys()) - 1:
+        #                             ax[i][j].set_xlabel('Layer-{}'.format(l.split('.')[1]))
+        #                     
+        #                     ax[i][0].set_ylabel('Pruned  = {}% \n Top1 = {:.2f}%'.format(pp*100, top1))
+        #                 
+        #             if self.params.plotChannels:
+        #                 plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+        #                 plt.xlabel('\nChannel Number')
+        #                 plt.title('Channels taken when pruning based on Entropy')
+        #                 plt.show()
+        #         #}}}
+        #     #}}}
+        #     
+        #     else:
+        #     #{{{
+        #         calculators = []
+        #         layerNames = []
+        #         for n,m in self.model.named_modules():
+        #             if isinstance(m, nn.Conv2d):                                  
+        #                 calculators.append(entropySrc.Entropy(n, m, self.params, min(self.params.numBatches, len(self.test_loader))))
+        #                 calculators[-1].register_hooks()
+        #                 layerNames.append(n)
+        #                 
+        #         self.inferer.run_n_minibatches(self.params, self.test_loader, self.model, self.params.numBatches)
 
-                logger = entropySrc.EntropyLogger(self.params, calculators, layerNames) 
-                logger.log_entropies(testStats)
-            #}}}
-        #}}}
+        #         logger = entropySrc.EntropyLogger(self.params, calculators, layerNames) 
+        #         logger.log_entropies(testStats)
+        #     #}}}
+        # #}}}
         
         elif self.params.fbsPruning == True:
         #{{{
