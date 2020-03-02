@@ -106,9 +106,13 @@ class BasicPruning(ABC):
                 paramsInLayer *= dim
             self.totalParams += paramsInLayer
         
+        self.notPruned = 0
         for n,m in self.model.named_modules(): 
             if self.is_conv_or_fc(m): 
                 self.layerSizes["{}".format(n)] = list(m._parameters['weight'].size())
+            else: 
+                if m._parameters:
+                    self.notPruned += np.prod(m._parameters['weight'].size())
     #}}}
 
     def log_pruned_channels(self, rootFolder, params, totalPrunedPerc, channelsPruned): 
@@ -200,7 +204,11 @@ class BasicPruning(ABC):
                 # remove 1 input activation from next layer if it is not a dw conv
                 if groups == 1:
                     self.layerSizes[nextLayer][1] -= 1
-        
+            
+        newParams = sum([np.prod(x) for k,x in self.layerSizes.items()])
+        newParams += self.notPruned
+        paramsPruned = self.totalParams - newParams
+
         return (100.* paramsPruned / self.totalParams)
     #}}}
     
@@ -298,7 +306,8 @@ class BasicPruning(ABC):
                     localRanking[layerName].pop(0)
                     self.channelsToPrune[layerName].append(filterNum)
                     
-                    currentPruneRate += self.inc_prune_rate(layerName) 
+                    # currentPruneRate += self.inc_prune_rate(layerName) 
+                    currentPruneRate = self.inc_prune_rate(layerName) 
             
             listIdx += 1
 
