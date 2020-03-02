@@ -16,3 +16,6 @@ dev.pth.tar
 master.pth.tar
 *.yml
 models/pruned/*
+
+models/cifar/eff*
+configs/eff*
