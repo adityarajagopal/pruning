@@ -1,39 +1,38 @@
+import gc
 import sys
 import time
-from tqdm import tqdm
-import numpy as np
-import gc
-
-import torch.autograd
-import torch
 
 import src.utils as utils
 import src.training as trainingSrc
+from src.ar4414.pruning.timers import Timer
+
+import numpy as np
+from tqdm import tqdm
+
+import torch
+import torch.autograd
+import torch.autograd.profiler as profiler
 
 class Trainer(trainingSrc.Trainer):
     def __init__(self, params):
         super().__init__()
         self.fbsPruning = params.fbsPruning
+        self.mbTimer = Timer("Minibatch")
+        self.pruneTimer = Timer("Pruning")
 
     def train(self, model, criterion, optimiser, inputs, targets) : 
     #{{{
         model.train()
-
-        outputs = model(inputs) 
-        loss = criterion(outputs, targets)
-
-        if self.fbsPruning == True:
-            for x in model.named_buffers():
-                if 'g_x' in x[0]:
-                    loss += 1e-8 * x[1]
+        
+        with self.mbTimer:
+            outputs = model(inputs) 
+            loss = criterion(outputs, targets)
+            model.zero_grad() 
+            loss.backward() 
+            optimiser.step()
         
         prec1, prec5 = utils.accuracy(outputs.data, targets.data) 
-    
-        model.zero_grad() 
-        loss.backward() 
-
-        optimiser.step()
-
+        
         return (loss, prec1, prec5)
     #}}} 
     
@@ -68,7 +67,8 @@ class Trainer(trainingSrc.Trainer):
             if params.pruneFilters == True and epoch == params.pruneAfter: 
                 checkpointer.save_model_only(model.state_dict(), params.printOnly, 'pre_pruning')
                 tqdm.write('Pruning Network')
-                channelsPruned, model, optimiser = pruner.prune_model(model)
+                with self.pruneTimer:
+                    channelsPruned, model, optimiser = pruner.prune_model(model)
                 totalPrunedPerc, _, _ = pruner.prune_rate(model)
                 tqdm.write('Pruned Percentage = {:.2f}%'.format(totalPrunedPerc))
                 summary = pruner.log_pruned_channels(checkpointer.root, params, totalPrunedPerc, channelsPruned)
@@ -78,6 +78,11 @@ class Trainer(trainingSrc.Trainer):
             top5 = utils.AverageMeter()
 
             self.batch_iter(model, criterion, optimiser, train_loader, params, losses, top1, top5)
+                
+            self.mbTimer.update_stats(epoch, sum(self.mbTimer.timestep))
+            self.pruneTimer.update_stats(epoch, sum(self.pruneTimer.timestep))
+            self.mbTimer.reset()
+            self.pruneTimer.reset()
 
             params.train_loss = losses.avg        
             params.train_top1 = top1.avg        
@@ -210,51 +215,3 @@ class Trainer(trainingSrc.Trainer):
             return
     #}}}
     
-    #{{{
-    # def finetune_newtork(self, params, pruner, checkpointer, train_loader, test_loader, valLoader, model, criterion, optimiser, inferer):  
-    #     print('Epoch,\tLR,\tTrain_Loss,\tTrain_Top1,\tTrain_Top5,\tTest_Loss,\tTest_Top1,\tTest_Top5,\tVal_Loss,\tVal_Top1,\tVal_Top5')
-    #     
-    #     for epoch in tqdm(range(params.start_epoch, params.epochs), desc='training', leave=False) : 
-    #         params.curr_epoch = epoch
-    #         state = self.update_lr(params, optimiser)
-    # 
-    #         losses = utils.AverageMeter()
-    #         top1 = utils.AverageMeter()
-    #         top5 = utils.AverageMeter()
-
-    #         self.batch_iter(model, criterion, optimiser, train_loader, params, losses, top1, top5)
-
-    #         params.train_loss = losses.avg        
-    #         params.train_top1 = top1.avg        
-    #         params.train_top5 = top5.avg        
-    #         
-    #         # perform pruning 
-    #         # if (params.pruneWeights == True or params.pruneFilters == True) and ((epoch+1) % params.pruneAfter == 0): 
-    #         if (params.pruneWeights == True or params.pruneFilters == True) and (epoch = params.finetuneBudget): 
-    #             tqdm.write('Pruning Network')
-    #             model = pruner.prune_model(model)
-    #             params.pruningPerc += params.prunePercIncrement
-    #             totalPrunedPerc = pruner.prune_rate(model, True)
-    #             tqdm.write('Pruned Percentage = {}'.format(totalPrunedPerc))
-    #             # checkpointer.log_prune_rate(params, totalPrunedPerc)
-    #             pruner.log_prune_rate(checkpointer.root, params, totalPrunedPerc)
-    #             params.prunePercPerLayer = []
-
-    #         if params.fbsPruning == True and ((epoch + 1) % params.pruneAfter == 0):
-    #             params.unprunedRatio -= (params.prunePercIncrement / 100.0)
-    #             # return if pruning become lower than lower bound
-    #             if params.unprunedRatio <= params.unprunedLB: 
-    #                 return
-    #             
-    #             tqdm.write('Pruning Network with FBS')
-    #             model = pruner.prune_model(model)
-    #             tqdm.write('Pruned Percentage = {}'.format(1.0 - params.unprunedRatio))
-    # 
-    #         # get test loss
-    #         params.test_loss, params.test_top1, params.test_top5 = inferer.test_network(params, test_loader, model, criterion, optimiser)
-    #         params.val_loss, params.val_top1, params.val_top5 = inferer.test_network(params, valLoader, model, criterion, optimiser)
-
-    #         checkpointer.save_checkpoint(model.state_dict(), optimiser.state_dict(), params)
-    #         
-    #         tqdm.write("{},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f},\t{:10.5f}".format(epoch, params.lr, params.train_loss, params.train_top1, params.train_top5, params.test_loss, params.test_top1, params.test_top5, params.val_loss, params.val_top1, params.val_top5))
-    #}}}
