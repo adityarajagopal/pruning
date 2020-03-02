@@ -9,26 +9,39 @@ import src.model_creator as mcSrc
 
 class ModelCreator(mcSrc.ModelCreator):
 #{{{
+    def setup_optimiser(self, params, model):
+        if params.optimiser == 'sgd':
+            return torch.optim.SGD(model.parameters(), lr=params.lr, momentum=params.momentum, weight_decay=params.weight_decay)
+        elif params.optimiser == 'rmsprop':
+            return torch.optim.RMSprop(model.parameters(), lr=params.lr, momentum=params.momentum, weight_decay=params.weight_decay)
+    
     def read_model(self, params):
     #{{{
         if params.dataset == 'cifar10' : 
             import src.ar4414.pruning.models.cifar as models 
             num_classes = 10
+            scale = 224/32
     
         elif params.dataset == 'cifar100' : 
             import src.ar4414.pruning.models.cifar as models 
             num_classes = 100
+            scale = 224/32
     
         else : 
             import src.ar4414.pruning.models.imagenet as models 
             num_classes = 1000
+            scale = 1 
     
         print("Creating Model %s" % params.arch)
         
         if 'resnet' in params.arch:
-            model = models.__dict__[params.arch](
-                        num_classes=num_classes,
-                        depth=params.depth)
+            if 'cifar' in params.dataset:
+                model = models.__dict__[params.arch](num_classes=num_classes, depth=params.depth)
+            else:
+                model = models.__dict__['resnet{}'.format(params.depth)](pretrained=False, progress=False)
+        elif 'efficientnet' in params.arch: 
+            #TODO: make all the parameters below configurable
+            model = models.__dict__[params.arch](num_classes=num_classes, scale=scale)
         else:
             model = models.__dict__[params.arch](num_classes=num_classes)
 

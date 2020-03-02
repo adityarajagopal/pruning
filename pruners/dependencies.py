@@ -9,6 +9,7 @@ class DependencyCalculator(ABC):
     def __init__(self):
         pass
 
+    # three methods below used in dependency calculation for pruning
     @abstractmethod
     def dependent_conv(self, layerName, convs): 
         pass
@@ -21,9 +22,21 @@ class DependencyCalculator(ABC):
     def external_dependency(self, module, mType, convs, ds):
         pass
     
-    # @abstractmethod
-    # def get_connected_layers(self): 
-    #     pass
+    # methods below used for incremental pruning percentage calculation
+    @abstractmethod
+    def get_internal_connections(self, name, module, convs, ds): 
+        """
+        Returns a dictionary where keys are each layer within the module
+        and values a list with the names of the layers it is connected to     
+        """
+        pass
+    
+    @abstractmethod
+    def get_interface_layers(self, name, module, convs, ds): 
+        """
+        Returns the layers that are directly connected to the input of the module
+        """
+        pass
 #}}}
 
 class Basic(DependencyCalculator):
@@ -58,7 +71,7 @@ class Linear(DependencyCalculator):
         pass
     
     def dependent_conv(self, layerName, convs): 
-        """Basic conv itself is the dependent conv"""
+        """No convs inside"""
         return layerName
     
     def internal_dependency(self, module, mType, convs, ds):
@@ -157,7 +170,6 @@ class Residual(DependencyCalculator):
                 interfaceLayers.append(("{}.{}".format(name, lName), groups))
         return interfaceLayers
     #}}}
-
 #}}}
 
 class MBConv(DependencyCalculator):

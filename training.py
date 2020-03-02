@@ -1,11 +1,12 @@
+import gc
 import sys
 import time
-from tqdm import tqdm
-import numpy as np
-import gc
 
-import torch.autograd
 import torch
+import torch.autograd
+
+from tqdm import tqdm
+from pytorch_memlab import profile 
 
 import src.utils as utils
 import src.training as trainingSrc
@@ -14,11 +15,43 @@ class Trainer(trainingSrc.Trainer):
     def __init__(self, params):
         super().__init__()
         self.fbsPruning = params.fbsPruning
+    
+    def update_lr(self, params, optimiser) : 
+    #{{{
+        # update learning rate
+
+        # first check if a custom scheduler is provided
+        if params.lrScheduler is not None: 
+            if not hasattr(self, 'lrScheduler'):
+                if params.lrScheduler == 'step':
+                    self.lrScheduler = torch.optim.lr_scheduler.StepLR(optimiser, step_size=params.stepSize, gamma=params.gamma)
+            else:
+                self.lrScheduler.step()
+                params.lr = self.lrScheduler.get_lr()[0]
+        
+        # if not use lr schedule
+        elif params.lr_schedule != [] : 
+            # get epochs to change at and lr at each of those changes
+            # ::2 gets every other element starting at 0 
+            change_epochs = params.lr_schedule[::2]
+            new_lrs = params.lr_schedule[1::2]
+            epoch = params.curr_epoch
+    
+            if epoch in change_epochs : 
+                new_lr = new_lrs[change_epochs.index(epoch)]
+                if new_lr == -1 :
+                    params.lr *= params.gamma
+                else : 
+                    params.lr = new_lr
+             
+            for param_group in optimiser.param_groups : 
+                param_group['lr'] = params.lr
+    
+        return params
+    #}}}
 
     def train(self, model, criterion, optimiser, inputs, targets) : 
     #{{{
-        model.train()
-
         outputs = model(inputs) 
         loss = criterion(outputs, targets)
 
@@ -29,21 +62,21 @@ class Trainer(trainingSrc.Trainer):
         
         prec1, prec5 = utils.accuracy(outputs.data, targets.data) 
     
-        model.zero_grad() 
+        optimiser.zero_grad() 
         loss.backward() 
-
         optimiser.step()
 
-        return (loss, prec1, prec5)
+        return (loss.item(), prec1.item(), prec5.item())
     #}}} 
     
     def batch_iter(self, model, criterion, optimiser, train_loader, params, losses, top1, top5):
     #{{{
+        model.train()
         for batch_idx, (inputs, targets) in tqdm(enumerate(train_loader), total=len(train_loader)-1, desc='epoch', leave=False): 
             # move inputs and targets to GPU
-            if params.use_cuda : 
-                inputs, targets = inputs.cuda(), targets.cuda()
-            inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
+            device = 'cuda:'+str(params.gpuList[0])
+            if params.use_cuda: 
+                inputs, targets = inputs.cuda(device, non_blocking=True), targets.cuda(device, non_blocking=True)
             
             # train model
             loss, prec1, prec5 = self.train(model, criterion, optimiser, inputs, targets)

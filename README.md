@@ -47,3 +47,11 @@ Multiple configurations possible. Base parameters are as follows:
 - Retrain: False
 * will prune model specified in Pretrained to pruning percentage sepcified by Pruning_Perc and report inference statistics 
 
+**Pruning a Custom Network** 
+==============================
+- If network has a special module, and this module has a conv, a decorator needs to be created (decorators.py)
+
+sub-heading
+-----------------------
+text
+

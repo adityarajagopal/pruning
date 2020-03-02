@@ -9,6 +9,10 @@ import src.param_parser as ppSrc
 class Params(ppSrc.Params) : 
     def __init__(self, config_file) : 
         super().__init__(config_file)
+
+        self.optimiser = config_file.get('training_hyperparameters', 'optimiser', fallback='sgd')
+        self.stepSize = config_file.getint('training_hyperparameters', 'step_size', fallback=None)
+        self.lrScheduler = config_file.get('training_hyperparameters', 'lr_scheduler', fallback=None)
         
         self.subsetName = config_file.get('pruning_hyperparameters', 'sub_name', fallback='subset1')
         self.sub_classes = config_file.get('pruning_hyperparameters', 'sub_classes').split() 
