@@ -19,6 +19,7 @@ class Trainer(trainingSrc.Trainer):
         self.fbsPruning = params.fbsPruning
         self.mbTimer = Timer("Minibatch")
         self.pruneTimer = Timer("Pruning")
+        self.dataTimer = Timer("Data-loading")
 
     def train(self, model, criterion, optimiser, inputs, targets) : 
     #{{{
@@ -40,9 +41,10 @@ class Trainer(trainingSrc.Trainer):
     #{{{
         for batch_idx, (inputs, targets) in tqdm(enumerate(train_loader), total=len(train_loader)-1, desc='epoch', leave=False): 
             # move inputs and targets to GPU
-            if params.use_cuda : 
-                inputs, targets = inputs.cuda(), targets.cuda()
-            inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
+            device = 'cuda:'+str(params.gpuList[0])
+            with self.dataTimer:
+                if params.use_cuda : 
+                    inputs, targets = inputs.cuda(device, non_blocking=True), targets.cuda(device, non_blocking=True)
             
             # train model
             loss, prec1, prec5 = self.train(model, criterion, optimiser, inputs, targets)
@@ -58,6 +60,16 @@ class Trainer(trainingSrc.Trainer):
     def static_finetune_l1_weights(self, params, pruner, checkpointer, train_loader, test_loader, valLoader, model, criterion, optimiser, inferer):  
     #{{{
         print('Epoch,\tLR,\tTrain_Loss,\tTrain_Top1,\tTrain_Top5,\tTest_Loss,\tTest_Top1,\tTest_Top5,\tVal_Loss,\tVal_Top1,\tVal_Top5')
+            
+        def update_timers():
+        #{{{
+            self.mbTimer.update_stats(epoch, sum(self.mbTimer.timestep))
+            self.pruneTimer.update_stats(epoch, sum(self.pruneTimer.timestep))
+            self.dataTimer.update_stats(epoch, sum(self.dataTimer.timestep))
+            self.mbTimer.reset()
+            self.pruneTimer.reset()
+            self.dataTimer.reset()
+        #}}}
 
         for epoch in tqdm(range(params.start_epoch, params.finetuneBudget), desc='training', leave=False) : 
             params.curr_epoch = epoch
@@ -78,11 +90,8 @@ class Trainer(trainingSrc.Trainer):
             top5 = utils.AverageMeter()
 
             self.batch_iter(model, criterion, optimiser, train_loader, params, losses, top1, top5)
-                
-            self.mbTimer.update_stats(epoch, sum(self.mbTimer.timestep))
-            self.pruneTimer.update_stats(epoch, sum(self.pruneTimer.timestep))
-            self.mbTimer.reset()
-            self.pruneTimer.reset()
+
+            update_timers()
 
             params.train_loss = losses.avg        
             params.train_top1 = top1.avg        
