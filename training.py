@@ -10,8 +10,6 @@ import numpy as np
 from tqdm import tqdm
 
 import torch
-import torch.autograd
-import torch.autograd.profiler as profiler
 
 class Trainer(trainingSrc.Trainer):
     def __init__(self, params):

@@ -1,24 +1,25 @@
+from src.ar4414.pruning.timers import Timer
 import src.ar4414.pruning.param_parser as ppSrc 
 import src.ar4414.pruning.model_creator as mcSrc
+import src.ar4414.pruning.training as trainingSrc
 import src.ar4414.pruning.inference as inferenceSrc
 import src.ar4414.pruning.checkpointing as checkpointingSrc
-import src.ar4414.pruning.training as trainingSrc
 
 import src.ar4414.pruning.pruners.base as pruningSrc
 from src.ar4414.pruning.pruners.alexnet import AlexNetPruning
+from src.ar4414.pruning.pruners.squeezenet import SqueezeNetPruning 
 from src.ar4414.pruning.pruners.resnet import ResNet20PruningDependency as ResNetPruning
 from src.ar4414.pruning.pruners.mobilenetv2 import MobileNetV2PruningDependency as MobileNetV2Pruning 
-from src.ar4414.pruning.pruners.squeezenet import SqueezeNetPruning 
 
 import src.app as appSrc
 import src.input_preprocessor as preprocSrc
 
 import os
-import random
 import sys
 import json
-import subprocess
 import time
+import random
+import subprocess
 
 import configparser as cp
 
@@ -37,6 +38,11 @@ class Application(appSrc.Application):
         self.setup_tee_printing()
         self.setup_pruners()
 
+        if self.params.profilePruning: 
+            # setting class attribute enabled will set enabled 
+            # true for all objects of this class
+            Timer.enabled = True
+
         if self.params.pruneFilters == True:
         #{{{
             print('=========Baseline Accuracy==========')
@@ -47,6 +53,16 @@ class Application(appSrc.Application):
             #{{{
                 # run finetuning
                 self.run_finetune()
+
+                # if timers have been set, log timers 
+                if self.params.profilePruning: 
+                #{{{
+                    data = {'training':None, 'inference':None}
+                    data['training'] = {epoch:self.trainer.dataTimer.stats[epoch] + time + self.trainer.pruneTimer.stats[epoch] for epoch,time in self.trainer.mbTimer.stats.items()} 
+                    data['inference'] = self.inferer.infTimer.stats['minibatch_time']
+                    logDir = 'profiling_logs/tx2/{}/{}/{}'.format(self.params.arch, self.params.dataset, int(self.params.pruningPerc))
+                    Timer.log_dict(logDir, data)
+                #}}}
             #}}}
 
             elif self.params.retrain:

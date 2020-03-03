@@ -13,6 +13,7 @@ class Params(ppSrc.Params) :
         self.subsetName = config_file.get('pruning_hyperparameters', 'sub_name', fallback='subset1')
         self.sub_classes = config_file.get('pruning_hyperparameters', 'sub_classes').split() 
         self.logs = config_file.get('pruning_hyperparameters', 'logs', fallback=None)
+        self.profilePruning = config_file.getboolean('pruning_hyperparameters', 'profile_pruning', fallback=False)
         
         self.getGops = config_file.getboolean('pruning_hyperparameters', 'get_gops')
         self.inferenceGops = config_file.getboolean('pruning_hyperparameters', 'inference_gops', fallback=None)

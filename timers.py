@@ -1,7 +1,11 @@
+import os
 import sys
 import time
+import subprocess
 from tqdm import tqdm
 from contextlib import contextmanager
+
+import torch
 
 @contextmanager
 def timer(description): 
@@ -11,7 +15,7 @@ def timer(description):
     tqdm.write("[{}] : {}s".format(description, end-start))
 
 class Timer(object): 
-    enabled = True
+    enabled = False
     
     def __init__(self, description):
         self.desc = description 
@@ -26,6 +30,16 @@ class Timer(object):
         if self.enabled:
             self.end = time.perf_counter()
             self.timestep.append(self.end - self.start)
+    
+    @staticmethod
+    def log_dict(logDir, dataDict): 
+    #{{{
+        completePath = "{}/{}".format(os.getcwd(), logDir)
+        cmd = "mkdir -p {}".format(completePath)         
+        subprocess.check_call(cmd, shell=True)
+        print("Saving timing logs to : {}".format(completePath))
+        torch.save(dataDict, "{}/timing_data.pth.tar".format(completePath))
+    #}}}
     
     def reset(self): 
         if self.enabled: 
