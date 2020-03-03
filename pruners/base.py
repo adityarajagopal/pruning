@@ -205,7 +205,8 @@ class BasicPruning(ABC):
                 if groups == 1:
                     self.layerSizes[nextLayer][1] -= 1
             
-        self.currParams -= paramsPruned
+            self.currParams -= paramsPruned
+        
         return (100. * (1. - self.currParams / self.totalParams))
     #}}}
     
