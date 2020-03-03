@@ -43,10 +43,11 @@ class Application(appSrc.Application):
         self.setup_dataset()
         self.setup_model()
         self.setup_tee_printing()
-        self.setup_pruners()
+        # self.setup_pruners()
 
         if self.params.getGops: 
         #{{{
+            self.setup_pruners()
             logs = self.params.logs
             with open(logs, 'r') as jFile:
                 logs = json.load(jFile)    
@@ -117,6 +118,7 @@ class Application(appSrc.Application):
 
         elif self.params.prunedTestAcc:
         #{{{
+            self.setup_pruners()
             logs = self.params.logs
             with open(logs, 'r') as jFile:
                 logs = json.load(jFile)    
@@ -168,6 +170,7 @@ class Application(appSrc.Application):
         
         elif self.params.pruneFilters == True:
         #{{{
+            self.setup_pruners()
             print('=========Baseline Accuracy==========')
             testStats = self.run_inference()
             print('==========================')
@@ -333,6 +336,8 @@ class Application(appSrc.Application):
             self.pruner = SqueezeNetPruning(self.params, self.model)
             self.netName = 'SqueezeNet'
             self.trainableLayers = ['module.conv2']
+        elif 'efficientnet' in self.params.arch:
+            pass
         else:
             raise ValueError("Pruning not implemented for architecture ({})".format(self.params.arch))
     #}}}

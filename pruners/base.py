@@ -106,9 +106,13 @@ class BasicPruning(ABC):
                 paramsInLayer *= dim
             self.totalParams += paramsInLayer
         
+        self.notPruned = 0
         for n,m in self.model.named_modules(): 
             if self.is_conv_or_fc(m): 
                 self.layerSizes["{}".format(n)] = list(m._parameters['weight'].size())
+            else: 
+                if m._parameters:
+                    self.notPruned += np.prod(m._parameters['weight'].size())
     #}}}
 
     def log_pruned_channels(self, rootFolder, params, totalPrunedPerc, channelsPruned): 
@@ -163,7 +167,6 @@ class BasicPruning(ABC):
                 prunedModel = self.import_pruned_model()
                 prunedModel = self.transfer_weights(model, prunedModel)
                 optimiser = torch.optim.SGD(prunedModel.parameters(), lr=self.params.lr, momentum=self.params.momentum, weight_decay=self.params.weight_decay)
-
                 return channelsPruned, prunedModel, optimiser
             
             # pruning based on activations 
@@ -201,8 +204,9 @@ class BasicPruning(ABC):
                 # remove 1 input activation from next layer if it is not a dw conv
                 if groups == 1:
                     self.layerSizes[nextLayer][1] -= 1
-        
-        return (100.* paramsPruned / self.totalParams)
+            
+        self.currParams -= paramsPruned
+        return (100. * (1. - self.currParams / self.totalParams))
     #}}}
     
     def prune_rate(self, pModel):
@@ -263,6 +267,7 @@ class BasicPruning(ABC):
     #{{{
         currentPruneRate = 0
         listIdx = 0
+        self.currParams = self.totalParams
         while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(globalRanking)):
             layerName, filterNum, _ = globalRanking[listIdx]
 
@@ -278,7 +283,11 @@ class BasicPruning(ABC):
             # if layer is in a dependent group remove corresponding filter from each layer
             depLayers = [layerName] if depLayers == [] else depLayers
             netInst = type(self.model.module)
-            if not any(x in self.depBlock.ignore[netInst] for x in depLayers):
+            if hasattr(self.depBlock, 'ignore'): 
+                ignoreLayers = any(x in self.depBlock.ignore[netInst] for x in depLayers)
+            else:
+                ignoreLayers = False
+            if not ignoreLayers:
                 for layerName in depLayers:
                     # case where you want to skip layers
                     # if layers are dependent, skipping one means skipping all the dependent layers
@@ -295,7 +304,7 @@ class BasicPruning(ABC):
                     localRanking[layerName].pop(0)
                     self.channelsToPrune[layerName].append(filterNum)
                     
-                    currentPruneRate += self.inc_prune_rate(layerName) 
+                    currentPruneRate = self.inc_prune_rate(layerName) 
             
             listIdx += 1
 

@@ -16,3 +16,4 @@ master.pth.tar
 
 configs/eff*
 models/cifar/eff*
+*.yml
