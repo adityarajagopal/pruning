@@ -13,3 +13,6 @@ graphs/
 test.py 
 dev.pth.tar
 master.pth.tar
+
+configs/eff*
+models/cifar/eff*
