@@ -20,6 +20,8 @@ cpRoot = os.path.join(base, 'logs/{}/cifar100/{}/l1_prune')
 
 cmd = 'mkdir -p ' + configPath
 subprocess.check_call(cmd, shell=True)
+cmd = 'mkdir -p ' + runFileBase
+subprocess.check_call(cmd, shell=True)
 
 for netCount, net in enumerate(nets):
     testCount = 0
@@ -27,7 +29,7 @@ for netCount, net in enumerate(nets):
     config.read(configFile)
             
     repeats = 5
-    gpu = netCount % 3 
+    gpu = str(netCount % 3)
     runFile = os.path.join(runFileBase, 'run_{}.sh'.format(gpu))
     
     config['training_hyperparameters']['print_only'] = "False"
