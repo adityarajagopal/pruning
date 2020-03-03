@@ -13,7 +13,7 @@ graphs/
 test.py 
 dev.pth.tar
 master.pth.tar
-*.yml
 
-models/cifar/eff*
 configs/eff*
+models/cifar/eff*
+*.yml
