@@ -205,11 +205,8 @@ class BasicPruning(ABC):
                 if groups == 1:
                     self.layerSizes[nextLayer][1] -= 1
             
-        newParams = sum([np.prod(x) for k,x in self.layerSizes.items()])
-        newParams += self.notPruned
-        paramsPruned = self.totalParams - newParams
-
-        return (100.* paramsPruned / self.totalParams)
+        self.currParams -= paramsPruned
+        return (100. * (1. - self.currParams / self.totalParams))
     #}}}
     
     def prune_rate(self, pModel):
@@ -270,6 +267,7 @@ class BasicPruning(ABC):
     #{{{
         currentPruneRate = 0
         listIdx = 0
+        self.currParams = self.totalParams
         while (currentPruneRate < self.params.pruningPerc) and (listIdx < len(globalRanking)):
             layerName, filterNum, _ = globalRanking[listIdx]
 
@@ -306,7 +304,6 @@ class BasicPruning(ABC):
                     localRanking[layerName].pop(0)
                     self.channelsToPrune[layerName].append(filterNum)
                     
-                    # currentPruneRate += self.inc_prune_rate(layerName) 
                     currentPruneRate = self.inc_prune_rate(layerName) 
             
             listIdx += 1

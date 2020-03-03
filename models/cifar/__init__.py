@@ -10,4 +10,3 @@ from .vgg_gated import *
 from .cifarnet import *
 from .mobilenetv2 import *
 from .squeezenet import *
-from .efficientnet import *
