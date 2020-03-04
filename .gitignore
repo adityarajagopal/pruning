@@ -5,6 +5,7 @@ __pycache__
 */__pycache__
 runs/
 logs/
+profiling_logs/
 configs/l1_prune
 configs/baseline_tests
 configs/random_init_tests
