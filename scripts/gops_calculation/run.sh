@@ -1,4 +1,4 @@
-python main.py --config-file /home/ar4414/pytorch_training/src/ar4414/pruning/configs/gops_calculation/resnet_0.ini
+# python main.py --config-file /home/ar4414/pytorch_training/src/ar4414/pruning/configs/gops_calculation/resnet_0.ini
 python main.py --config-file /home/ar4414/pytorch_training/src/ar4414/pruning/configs/gops_calculation/resnet_1.ini
 python main.py --config-file /home/ar4414/pytorch_training/src/ar4414/pruning/configs/gops_calculation/resnet_2.ini
 python main.py --config-file /home/ar4414/pytorch_training/src/ar4414/pruning/configs/gops_calculation/resnet_3.ini
