@@ -154,6 +154,7 @@ class Application(appSrc.Application):
             logs = logs[self.params.arch][self.params.subsetName]
             prunePercs = list(logs.keys())
             prunePercs.remove('base_path')
+            prunePercs.remove('unpruned_inference')
 
             for pp in prunePercs:
                 if pp == 0.:
