@@ -43,8 +43,13 @@ def parse_arguments():
     
     # add network to logs.json
     parser.add_argument('--add_network', action='store_true', help='add a network to logs')
-    parser.add_argument('--name', type=str, help='name of network to add')
     parser.add_argument('--pre_ft_path', type=str, default=None, help='path to model before finetuning')
+    
+    # add dataset to all networks in logs.json
+    parser.add_argument('--add_dataset', action='store_true', help='add a dataset to all networks in logs')
+    
+    # common arguments between above 2 
+    parser.add_argument('--name', type=str, help='name of network/dataset to add')
     parser.add_argument('--base_folder', type=str, help='folder name where timestamped logs are to be placed')
     
     # update logs.json with timestamps
@@ -126,6 +131,14 @@ if __name__ == '__main__':
     #{{{
         print("==> Updating json with new network")
         logs = log_updater.add_network(logs, args.name, datasets, args.base_folder, args.pre_ft_path)
+        with open(logsJson, 'w') as jFile:
+            logs = json.dump(logs, jFile, indent=2)
+    #}}}
+
+    if args.add_dataset: 
+    #{{{
+        print("==> Updating json with new dataset")
+        logs = log_updater.add_dataset(logs, args.name, args.base_folder)
         with open(logsJson, 'w') as jFile:
             logs = json.dump(logs, jFile, indent=2)
     #}}}
