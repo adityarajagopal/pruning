@@ -14,7 +14,7 @@ config = cp.ConfigParser()
 # base = '/home/ar4414/pytorch_training/src/ar4414/pruning/'
 base = '/home/nvidia/ar4414/pytorch_training/src/ar4414/pruning'
 
-configPath = os.path.join(base, 'configs')
+configPath = os.path.join(base, 'configs', 'tx2_timing')
 runFileBase = os.path.join(base, 'scripts')
 # cpRoot = os.path.join(base, 'logs/{}/cifar100/{}/data_agnostic_l1_prune')
 
@@ -23,11 +23,10 @@ subprocess.check_call(cmd, shell=True)
 
 for netCount, net in enumerate(nets):
     testCount = 0
-    configFile = '/home/ar4414/pytorch_training/src/ar4414/pruning/configs/' + str(net) + '.ini' 
+    configFile = os.path.join(base, 'configs', str(net)+'.ini')
     config.read(configFile)
             
     repeats = 1
-    # gpu = "2" if (net == 'mobilenetv2' or net == 'resnet') else "3"
     gpu = "0" 
     runFile = os.path.join(runFileBase, 'run_{}.sh'.format(gpu))
     
@@ -37,11 +36,13 @@ for netCount, net in enumerate(nets):
     config['pytorch_parameters']['resume'] = "False"
     config['pytorch_parameters']['branch'] = "False"
     config['pytorch_parameters']['evaluate'] = "False"
-    config['pytorch_parameters']['pretrained'] = "/home/nvidia/ar4414/pretrained/{}/cifar100.pth.tar".format(net)
+    netName = net if 'resnet' not in net else 'resnet20'
+    config['pytorch_parameters']['pretrained'] = "/home/nvidia/ar4414/pretrained/{}/cifar100.pth.tar".format(netName)
     
     config['pruning_hyperparameters']['get_gops'] = "False"
     config['pruning_hyperparameters']['inference_gops'] = "False"
     
+    config['pruning_hyperparameters']['profile_pruning'] = "True"
     config['pruning_hyperparameters']['prune_filters'] = "True"
     config['pruning_hyperparameters']['finetune'] = "True"
     config['pruning_hyperparameters']['static'] = "True"
