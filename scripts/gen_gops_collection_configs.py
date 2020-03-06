@@ -6,8 +6,10 @@ import configparser as cp
 
 nets = ['resnet', 'mobilenetv2', 'alexnet', 'squeezenet']
 pruningPercs = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95]
-subset = ['subset1', 'aquatic']
-sub_classes = ["large_man-made_outdoor_things large_natural_outdoor_scenes vehicles_1 vehicles_2 trees small_mammals people", "aquatic_mammals fish", ""]
+# subset = ['subset1', 'aquatic']
+# sub_classes = ["large_man-made_outdoor_things large_natural_outdoor_scenes vehicles_1 vehicles_2 trees small_mammals people", "aquatic_mammals fish", ""]
+subset = ['entire_dataset']
+sub_classes = ['']
 batchSize = []
 ftBudget = []
 lrSchedule = []

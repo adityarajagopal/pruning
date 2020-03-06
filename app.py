@@ -60,6 +60,10 @@ class Application(appSrc.Application):
                     for run in log[pp]:
                         finetunePath = os.path.join(log['base_path'], "pp_{}/{}/orig".format(pp, run))
                         
+                        # check if gops file already exists and skip re-calculation if it does
+                        if os.path.isfile(os.path.join(finetunePath, 'gops.json')):
+                            continue
+                        
                         # get inference gops for pruned model
                         self.model, self.optimiser = self.pruner.get_random_init_model(finetunePath)
                         _,tfg,_,_ = gopSrc.calc_inference_gops(self)
@@ -73,6 +77,10 @@ class Application(appSrc.Application):
                 for pp in prunedPercs:
                     for run in log[pp]:
                         finetunePath = os.path.join(log['base_path'], "pp_{}/{}/orig".format(pp, run))
+
+                        # check if gops file already exists and skip re-calculation if it does
+                        if os.path.isfile(os.path.join(finetunePath, 'gops.json')):
+                            continue
                         
                         #get unpruned training gops
                         _,tfg,_,tbg = gopSrc.calc_training_gops(self)

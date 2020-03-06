@@ -31,7 +31,8 @@ def get_gops(basePath, log, perEpoch=False):
     numBatches = math.ceil(datasetSizes[dataset][subset]/batchSize)
 
     infGops = gops['inf'] / batchSize
-    ftGops = [(numBatches * gops['ft']['unpruned']) if epoch < pruneAfter else (numBatches * gops['ft']['pruned']) for epoch in range(epochs)]
+    # ftGops = [(numBatches * gops['ft']['unpruned']) if epoch < pruneAfter else (numBatches * gops['ft']['pruned']) for epoch in range(epochs)]
+    ftGops = [gops['ft']['unpruned'] if epoch < pruneAfter else gops['ft']['pruned'] for epoch in range(epochs)]
     epochFtGops = list(np.cumsum(np.array(ftGops)))
     totalFtGops = epochFtGops[-1]
 

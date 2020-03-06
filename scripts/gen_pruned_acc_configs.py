@@ -1,7 +1,7 @@
 import os
-import configparser as cp
-import subprocess
 import sys
+import subprocess
+import configparser as cp
 
 nets = ['resnet', 'mobilenetv2', 'alexnet', 'squeezenet']
 pruningPercs = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95]
@@ -10,16 +10,20 @@ sub_classes = ["large_man-made_outdoor_things large_natural_outdoor_scenes vehic
 batchSize = []
 ftBudget = []
 lrSchedule = []
-configPath = '/home/ar4414/pytorch_training/src/ar4414/pruning/configs/pruned_acc'
-runFileBase = '/home/ar4414/pytorch_training/src/ar4414/pruning/scripts/'
+base = '/home/ar4414/pytorch_training/src/ar4414/pruning' 
+testName = 'pruned_acc'
+configPath = os.path.join(base, 'configs', testName)
+runFileBase = os.path.join(base, 'scripts', testName) 
 config = cp.ConfigParser()
 
 cmd = 'mkdir -p ' + configPath
 subprocess.check_call(cmd, shell=True)
+cmd = 'mkdir -p ' + runFileBase
+subprocess.check_call(cmd, shell=True)
 
 for netCount, net in enumerate(nets):
     testCount = 0
-    configFile = '/home/ar4414/pytorch_training/src/ar4414/pruning/configs/' + str(net) + '.ini'
+    configFile = os.path.join(base, 'configs', str(net) + '.ini')
     config.read(configFile)
             
     config['training_hyperparameters']['print_only'] = "True"
@@ -29,7 +33,7 @@ for netCount, net in enumerate(nets):
     config['pytorch_parameters']['branch'] = "False"
     config['pytorch_parameters']['evaluate'] = "False"
     
-    config['pruning_hyperparameters']['logs'] = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/subset_agnostic_logs.json"
+    config['pruning_hyperparameters']['logs'] = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/logs.json"
     
     config['pruning_hyperparameters']['get_gops'] = "False"
     config['pruning_hyperparameters']['inference_gops'] = "False"
@@ -41,6 +45,7 @@ for netCount, net in enumerate(nets):
     
     config['pruning_hyperparameters']['no_finetune_channels_pruned'] = "False"
     
+    config['pruning_hyperparameters']['profile_pruning'] = "False"
     config['pruning_hyperparameters']['prune_filters'] = "False"
     config['pruning_hyperparameters']['finetune'] = "False"
     config['pruning_hyperparameters']['static'] = "False"
@@ -52,7 +57,7 @@ for netCount, net in enumerate(nets):
         config['pruning_hyperparameters']['sub_name'] = ss
         config['pruning_hyperparameters']['sub_classes'] = sub_classes[ssCount]
         
-        runFileName = 'run_pruned_acc.sh'
+        runFileName = 'run.sh'
         runFile = os.path.join(runFileBase, runFileName)
 
         testConfig = os.path.join(configPath, str(net) + '_' + str(testCount) + '.ini')
@@ -64,6 +69,7 @@ for netCount, net in enumerate(nets):
         
         testCount += 1
 
+os.chmod(runFile, 0o755)
 
 
 
