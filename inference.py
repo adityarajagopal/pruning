@@ -1,4 +1,5 @@
 import sys
+import pdb
 import numpy as np
 from tqdm import tqdm
 
@@ -9,6 +10,11 @@ import src.inference as infSrc
 from src.ar4414.pruning.timers import Timer
 
 class Inferer(infSrc.Inferer):
+    def __init__(self): 
+        super().__init__()
+        self.infTimer = Timer('Inference')
+        self.dataTimer = Timer('DataLoading')
+    
     def run_n_minibatches(self, params, test_loader, model, numMB) :  
         #{{{
         model.eval()
@@ -50,19 +56,19 @@ class Inferer(infSrc.Inferer):
         top1 = utils.AverageMeter()
         top5 = utils.AverageMeter()
 
-        self.infTimer = Timer('Inference')
-    
         for batch_idx, (inputs, targets) in tqdm(enumerate(test_loader), total=len(test_loader)-1, desc='inference', leave=False) : 
             # move inputs and targets to GPU
             with torch.no_grad():
                 device = 'cuda:' + str(params.gpuList[0])
                 if params.use_cuda : 
-                    inputs, targets = inputs.cuda(device, non_blocking=True), targets.cuda(device, non_blocking=True)
+                    with self.dataTimer:
+                        inputs, targets = inputs.cuda(device, non_blocking=True), targets.cuda(device, non_blocking=True)
                 
                 # perform inference 
                 with self.infTimer:
                     outputs = model(inputs) 
-
+                    torch.cuda.synchronize(0)
+                
                 loss = criterion(outputs, targets)
             
             prec1, prec5 = utils.accuracy(outputs.data, targets.data)
@@ -70,9 +76,11 @@ class Inferer(infSrc.Inferer):
             losses.update(loss.item()) 
             top1.update(prec1.item()) 
             top5.update(prec5.item())
-
-        self.infTimer.update_stats('minibatch_time', np.mean(self.infTimer.timestep))
+        
+        self.infTimer.acc_stats(params.curr_epoch, [np.mean(self.infTimer.timestep)])
+        self.dataTimer.acc_stats(params.curr_epoch, [np.mean(self.dataTimer.timestep)])
         self.infTimer.reset()
+        self.dataTimer.reset()
 
         # if params.evaluate == True or (params.finetune == False and (params.entropy or params.pruneFilters)): 
         # if params.evaluate or params.entropy or (params.pruneFilters and not params.finetune): 

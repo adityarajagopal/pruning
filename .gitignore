@@ -18,5 +18,7 @@ master.pth.tar
 *.yml
 models/pruned/*
 
+profiling_logs/
+
 models/cifar/eff*
 configs/eff*

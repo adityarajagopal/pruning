@@ -38,11 +38,6 @@ class Application(appSrc.Application):
         self.setup_tee_printing()
         self.setup_pruners()
 
-        if self.params.profilePruning: 
-            # setting class attribute enabled will set enabled 
-            # true for all objects of this class
-            Timer.enabled = True
-
         if self.params.pruneFilters == True:
         #{{{
             print('=========Baseline Accuracy==========')
@@ -51,18 +46,37 @@ class Application(appSrc.Application):
 
             if self.params.finetune:
             #{{{
+                if self.params.profilePruning: 
+                    # setting class attribute enabled will set enabled 
+                    # true for all objects of this class
+                    Timer.enabled = True
+                
                 # run finetuning
                 self.run_finetune()
 
                 # if timers have been set, log timers 
                 if self.params.profilePruning: 
                 #{{{
-                    data = {'training':None, 'inference':None}
-                    data['training'] = {epoch:self.trainer.dataTimer.stats[epoch] + time + self.trainer.pruneTimer.stats[epoch] for epoch,time in self.trainer.mbTimer.stats.items()} 
-                    data['inference'] = self.inferer.infTimer.stats['minibatch_time']
+                    data = {'training':{'minibatch':None, 'pruning':None, 'data':None}, 'inference':{'minibatch':None, 'data':None}}
+                    
+                    data['training']['minibatch'] = self.trainer.mbTimer.stats
+                    data['training']['pruning'] = self.trainer.pruneTimer.stats
+                    data['training']['data'] = self.trainer.dataTimer.stats
+
+                    def get_summarised_inference_times(stats): 
+                        unprunedInfTime = []
+                        prunedInfTime = []
+                        [unprunedInfTime.append(np.mean(time)) if epoch < self.params.pruneAfter else prunedInfTime.append(np.mean(time)) for epoch, time in stats.items()]
+                        return {'0':[np.mean(unprunedInfTime), np.mean(prunedInfTime)]}
+
+                    data['inference']['minibatch'] = get_summarised_inference_times(self.inferer.infTimer.stats)
+                    data['inference']['data'] = get_summarised_inference_times(self.inferer.dataTimer.stats)
+
                     logDir = 'profiling_logs/tx2/{}/{}/{}'.format(self.params.arch, self.params.dataset, int(self.params.pruningPerc))
+                    
                     Timer.log_dict(logDir, data)
                 #}}}
+
             #}}}
 
             elif self.params.retrain:
@@ -78,6 +92,30 @@ class Application(appSrc.Application):
                 print('Pruned Percentage = {:.2f}%, NewModelSize = {:.2f}MB, OrigModelSize = {:.2f}MB'.format(pruneRate, prunedSize, origSize))
                 self.inferer.test_network(self.params, self.test_loader, prunedModel, self.criterion, optimiser)
                 print('==========================')
+                
+                if self.params.profilePruning: 
+                #{{{
+                    if self.params.profilePruning: 
+                        # setting class attribute enabled will set enabled 
+                        # true for all objects of this class
+                        Timer.enabled = True
+                
+                    self.inferer.test_network(self.params, self.test_loader, self.model, self.criterion, self.optimiser)
+                    self.inferer.test_network(self.params, self.test_loader, prunedModel, self.criterion, optimiser)
+                   
+                    logDir = 'profiling_logs/tx2/{}/{}/{}'.format(self.params.arch, self.params.dataset, int(self.params.pruningPerc))
+                    logFile = os.path.join(logDir, 'timing_data.pth.tar')
+                    if os.path.isfile(logFile): 
+                        data = torch.load(logFile)
+                    else:
+                        data = {'inference':{'minibatch':None, 'data':None}}
+                        print('CRITICAL_WARNING : no previous finetuning files found, so storing logs with only inference profiling data')
+                    
+                    data['inference']['minibatch'] = self.inferer.infTimer.stats
+                    data['inference']['data'] = self.inferer.dataTimer.stats
+
+                    Timer.log_dict(logDir, data)
+                #}}}
             #}}}
         #}}}
 

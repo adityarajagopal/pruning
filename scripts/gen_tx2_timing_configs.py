@@ -15,10 +15,11 @@ config = cp.ConfigParser()
 base = '/home/nvidia/ar4414/pytorch_training/src/ar4414/pruning'
 
 configPath = os.path.join(base, 'configs', 'tx2_timing')
-runFileBase = os.path.join(base, 'scripts')
-# cpRoot = os.path.join(base, 'logs/{}/cifar100/{}/data_agnostic_l1_prune')
+runFileBase = os.path.join(base, 'scripts', 'tx2_timing')
 
 cmd = 'mkdir -p ' + configPath
+subprocess.check_call(cmd, shell=True)
+cmd = 'mkdir -p ' + runFileBase
 subprocess.check_call(cmd, shell=True)
 
 for netCount, net in enumerate(nets):
@@ -31,6 +32,7 @@ for netCount, net in enumerate(nets):
     runFile = os.path.join(runFileBase, 'run_{}.sh'.format(gpu))
     
     config['training_hyperparameters']['print_only'] = "True"
+    config['training_hyperparameters']['test_batch'] = "128"
     
     config['pytorch_parameters']['gpu_id'] = gpu
     config['pytorch_parameters']['resume'] = "False"
@@ -44,31 +46,30 @@ for netCount, net in enumerate(nets):
     
     config['pruning_hyperparameters']['profile_pruning'] = "True"
     config['pruning_hyperparameters']['prune_filters'] = "True"
-    config['pruning_hyperparameters']['finetune'] = "True"
-    config['pruning_hyperparameters']['static'] = "True"
+    config['pruning_hyperparameters']['finetune'] = "False"
+    config['pruning_hyperparameters']['static'] = "False"
     config['pruning_hyperparameters']['retrain'] = "False"
-    config['pruning_hyperparameters']['finetune_budget'] = "30"
+    config['pruning_hyperparameters']['finetune_budget'] = "10"
     config['pruning_hyperparameters']['prune_after'] = "5"
+        
+    config['pruning_hyperparameters']['sub_name'] = 'aquatic'
+    config['pruning_hyperparameters']['sub_classes'] = sub_classes[1]
 
-    for ssCount, ss in enumerate(subset):
-        config['pruning_hyperparameters']['sub_name'] = ss
-        config['pruning_hyperparameters']['sub_classes'] = sub_classes[ssCount]
-        # config['pytorch_parameters']['checkpoint_path'] = cpRoot.format(net, ss) 
+    for ppCount, pp in enumerate(pruningPercs):
+        config['pruning_hyperparameters']['pruning_perc'] = str(pp)
+        config['pytorch_parameters']['test_name'] = 'pp_{}'.format(pp)
 
-        for ppCount, pp in enumerate(pruningPercs):
-            config['pruning_hyperparameters']['pruning_perc'] = str(pp)
-            config['pytorch_parameters']['test_name'] = 'pp_{}'.format(pp)
+        testConfig = os.path.join(configPath, str(net) + '_' + str(testCount) + '.ini')
+        with open(testConfig, 'w+') as tcFile:
+            config.write(tcFile)
+        
+        with open(runFile, 'a+') as rFile:
+            for i in range(repeats):
+                rFile.write('python main.py --config-file ' + testConfig + '\n')
+        
+        testCount += 1
 
-            testConfig = os.path.join(configPath, str(net) + '_' + str(testCount) + '.ini')
-            with open(testConfig, 'w+') as tcFile:
-                config.write(tcFile)
-            
-            with open(runFile, 'a+') as rFile:
-                for i in range(repeats):
-                    rFile.write('python main.py --config-file ' + testConfig + '\n')
-            
-            testCount += 1
-
+os.chmod(runFile, 0o755)
 
 
 

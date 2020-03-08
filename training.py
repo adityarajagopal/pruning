@@ -40,8 +40,8 @@ class Trainer(trainingSrc.Trainer):
         for batch_idx, (inputs, targets) in tqdm(enumerate(train_loader), total=len(train_loader)-1, desc='epoch', leave=False): 
             # move inputs and targets to GPU
             device = 'cuda:'+str(params.gpuList[0])
-            with self.dataTimer:
-                if params.use_cuda : 
+            if params.use_cuda : 
+                with self.dataTimer:
                     inputs, targets = inputs.cuda(device, non_blocking=True), targets.cuda(device, non_blocking=True)
             
             # train model
@@ -61,9 +61,9 @@ class Trainer(trainingSrc.Trainer):
             
         def update_timers():
         #{{{
-            self.mbTimer.update_stats(epoch, sum(self.mbTimer.timestep))
-            self.pruneTimer.update_stats(epoch, sum(self.pruneTimer.timestep))
-            self.dataTimer.update_stats(epoch, sum(self.dataTimer.timestep))
+            self.mbTimer.update_stats(epoch, self.mbTimer.timestep)
+            self.pruneTimer.update_stats(epoch, self.pruneTimer.timestep)
+            self.dataTimer.update_stats(epoch, self.dataTimer.timestep)
             self.mbTimer.reset()
             self.pruneTimer.reset()
             self.dataTimer.reset()

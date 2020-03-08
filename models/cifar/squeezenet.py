@@ -88,7 +88,7 @@ class SqueezeNet(nn.Module):
         x = self.conv2(x)
         x = self.avg_pool(x)
         x = self.softmax(x)
-        return x.squeeze()
+        return x.squeeze(2).squeeze(2)
 
 def squeezenet(**kwargs):
     return SqueezeNet(**kwargs)

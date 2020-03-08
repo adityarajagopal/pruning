@@ -1,5 +1,6 @@
 import os
 import sys
+import pdb
 import time
 import subprocess
 from tqdm import tqdm
@@ -48,3 +49,10 @@ class Timer(object):
     def update_stats(self, key, value): 
         if self.enabled:
             self.stats[key] = value
+    
+    def acc_stats(self, key, value): 
+        if self.enabled:
+            if key in self.stats.keys(): 
+                self.stats[key] += value 
+            else:
+                self.stats[key] = value
