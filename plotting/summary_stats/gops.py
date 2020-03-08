@@ -31,7 +31,8 @@ def get_gops(basePath, log, perEpoch=False):
     numBatches = math.ceil(datasetSizes[dataset][subset]/batchSize)
 
     infGops = gops['inf'] / batchSize
-    ftGops = [(numBatches * gops['ft']['unpruned']) if epoch < pruneAfter else (numBatches * gops['ft']['pruned']) for epoch in range(epochs)]
+    # ftGops = [(numBatches * gops['ft']['unpruned']) if epoch < pruneAfter else (numBatches * gops['ft']['pruned']) for epoch in range(epochs)]
+    ftGops = [gops['ft']['unpruned'] if epoch < pruneAfter else gops['ft']['pruned'] for epoch in range(epochs)]
     epochFtGops = list(np.cumsum(np.array(ftGops)))
     totalFtGops = epochFtGops[-1]
 
@@ -41,9 +42,9 @@ def get_gops(basePath, log, perEpoch=False):
         return (infGops, totalFtGops, gops['mem']['pruned'])
 #}}}
 
-def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc=None):
+def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc=None, time=False):
 #{{{
-    xAxis = 'InferenceGops'
+    xAxis = 'InferenceGops' if not time else 'InferenceTime'
     yAxis = 'AvgTestAcc'
 
     subsets = set(list(summaryData['Dataset']))
@@ -57,7 +58,9 @@ def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc=None):
         
         ax = data.plot.scatter(x=xAxis, y=yAxis, ax=axes[net][dataset][1], label=label, title=title)
         
-        ax.set_xlabel('Inference GOps')
+        xlabel = 'Inference GOps' if not time else 'Inference Time per image (ms)'
+        # ax.set_xlabel('Inference GOps')
+        ax.set_xlabel(xlabel)
         ax.set_ylabel('Test Accuracy (%)')
     
     for (subset, net), data in subsetAgnosticSummaryData.groupby(['Subset', 'Network']):
@@ -66,7 +69,8 @@ def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc=None):
             labelIdx = 0 if pp == "0" else 1 if count == 1 else 2
             marker = 'x' if pp == "0" else '+'
             
-            axes[net][subset][1].plot([float(points['InferenceGops'])], [float(points['TestAcc'])], label=labels[labelIdx], marker=marker, markersize=4, color='red', linestyle="None")
+            # axes[net][subset][1].plot([float(points['InferenceGops'])], [float(points['TestAcc'])], label=labels[labelIdx], marker=marker, markersize=4, color='red', linestyle="None")
+            axes[net][subset][1].plot([float(points[xAxis])], [float(points['TestAcc'])], label=labels[labelIdx], marker=marker, markersize=4, color='red', linestyle="None")
             axes[net][subset][1].legend()
 
     if saveLoc is not None:

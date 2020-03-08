@@ -1,26 +1,33 @@
 import os
-import configparser as cp
-import subprocess
 import sys
+import stat
+import subprocess
+import configparser as cp
 
 nets = ['resnet', 'mobilenetv2', 'alexnet', 'squeezenet']
 pruningPercs = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95]
-# subset = ['subset1', 'aquatic', 'entire_dataset']
-subset = ['subset1', 'aquatic']
-sub_classes = ["large_man-made_outdoor_things large_natural_outdoor_scenes vehicles_1 vehicles_2 trees small_mammals people", "aquatic_mammals fish", ""]
+# subset = ['subset1', 'aquatic']
+# sub_classes = ["large_man-made_outdoor_things large_natural_outdoor_scenes vehicles_1 vehicles_2 trees small_mammals people", "aquatic_mammals fish", ""]
+subset = ['entire_dataset']
+sub_classes = ['']
 batchSize = []
 ftBudget = []
 lrSchedule = []
-configPath = '/home/ar4414/pytorch_training/src/ar4414/pruning/configs/gops_calculation'
-runFileBase = '/home/ar4414/pytorch_training/src/ar4414/pruning/scripts/'
+
+base = '/home/ar4414/pytorch_training/src/ar4414/pruning'
+testName = 'gops_calculation'
+configPath = os.path.join(base, 'configs', testName)
+runFileBase = os.path.join(base, 'scripts', testName)
 config = cp.ConfigParser()
 
 cmd = 'mkdir -p ' + configPath
 subprocess.check_call(cmd, shell=True)
+cmd = 'mkdir -p ' + runFileBase 
+subprocess.check_call(cmd, shell=True)
 
 for netCount, net in enumerate(nets):
     testCount = 0
-    configFile = '/home/ar4414/pytorch_training/src/ar4414/pruning/configs/' + str(net) + '.ini'
+    configFile = os.path.join(base, 'configs', str(net) + '.ini')
     config.read(configFile)
             
     config['training_hyperparameters']['print_only'] = "True"
@@ -30,6 +37,7 @@ for netCount, net in enumerate(nets):
     config['pytorch_parameters']['branch'] = "False"
     config['pytorch_parameters']['evaluate'] = "False"
     
+    config['pruning_hyperparameters']['logs'] = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/logs.json"
     config['pruning_hyperparameters']['get_gops'] = "True"
     
     config['pruning_hyperparameters']['prune_filters'] = "False"
@@ -45,7 +53,7 @@ for netCount, net in enumerate(nets):
         
         for t in range(2): 
             config['pruning_hyperparameters']['inference_gops'] = "False" if t == 1 else "True"
-            runFileName = 'run_gops.sh'
+            runFileName = 'run.sh'
             runFile = os.path.join(runFileBase, runFileName)
 
             testConfig = os.path.join(configPath, str(net) + '_' + str(testCount) + '.ini')
@@ -57,7 +65,6 @@ for netCount, net in enumerate(nets):
             
             testCount += 1
 
-
-
+os.chmod(runFile, 0o755)
 
 

@@ -15,6 +15,14 @@ def add_network(logs, networkName, datasets, baseFolder, preFtModel):
     return logs
 #}}}
 
+def add_dataset(logs, datasetName, baseFolder):  
+#{{{
+    for net, value in logs.items(): 
+        value.update({datasetName:{'base_path': '/home/ar4414/pytorch_training/src/ar4414/pruning/logs/{}/cifar100/{}/{}'.format(net, datasetName, baseFolder)}})
+
+    return logs
+#}}}
+
 def update_timestamps(logs, networks, datasets, prunePercs, asOf=None):
 #{{{
     if asOf is None:
@@ -31,7 +39,10 @@ def update_timestamps(logs, networks, datasets, prunePercs, asOf=None):
             basePath = logs[net][dataset]['base_path']
             logFiles = logs[net][dataset]
             for pp in prunePercs:
-                timeStamps = os.listdir(os.path.join(basePath,"pp_{}".format(pp)))  
+                try:
+                    timeStamps = os.listdir(os.path.join(basePath,"pp_{}".format(pp)))  
+                except FileNotFoundError:
+                    continue
                 timeStamps = list(filter(lambda x: x >= date, timeStamps))
                 if len(timeStamps) > 0:
                     if pp in logFiles.keys():

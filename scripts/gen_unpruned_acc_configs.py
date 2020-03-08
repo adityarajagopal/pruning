@@ -10,25 +10,30 @@ sub_classes = ["large_man-made_outdoor_things large_natural_outdoor_scenes vehic
 batchSize = []
 ftBudget = []
 lrSchedule = []
-configPath = '/home/ar4414/pytorch_training/src/ar4414/pruning/configs/unpruned_acc'
-runFileBase = '/home/ar4414/pytorch_training/src/ar4414/pruning/scripts/'
+base = '/home/ar4414/pytorch_training/src/ar4414/pruning/'
+testName = 'unpruned_acc'
+configPath = os.path.join(base, 'configs', testName)
+runFileBase = os.path.join(base, 'scripts', testName)
 config = cp.ConfigParser()
 
 cmd = 'mkdir -p ' + configPath
 subprocess.check_call(cmd, shell=True)
+cmd = 'mkdir -p ' + runFileBase 
+subprocess.check_call(cmd, shell=True)
 
 for netCount, net in enumerate(nets):
     testCount = 0
-    configFile = '/home/ar4414/pytorch_training/src/ar4414/pruning/configs/' + str(net) + '.ini'
+    configFile = os.path.join(base, 'configs', str(net) + '.ini')
     config.read(configFile)
             
     config['training_hyperparameters']['print_only'] = "True"
     
-    config['pytorch_parameters']['gpu_id'] = "0"
+    config['pytorch_parameters']['gpu_id'] = "1"
     config['pytorch_parameters']['resume'] = "False"
     config['pytorch_parameters']['branch'] = "False"
     config['pytorch_parameters']['evaluate'] = "False"
     
+    config['pruning_hyperparameters']['logs'] = "/home/ar4414/pytorch_training/src/ar4414/pruning/logs/logs.json"
     config['pruning_hyperparameters']['get_gops'] = "False"
     config['pruning_hyperparameters']['inference_gops'] = "False"
     
@@ -47,7 +52,7 @@ for netCount, net in enumerate(nets):
         config['pruning_hyperparameters']['sub_name'] = ss
         config['pruning_hyperparameters']['sub_classes'] = sub_classes[ssCount]
         
-        runFileName = 'run_unpruned_acc.sh'
+        runFileName = 'run.sh'
         runFile = os.path.join(runFileBase, runFileName)
 
         testConfig = os.path.join(configPath, str(net) + '_' + str(testCount) + '.ini')
@@ -59,6 +64,7 @@ for netCount, net in enumerate(nets):
         
         testCount += 1
 
+os.chmod(runFile, 0o755)
 
 
 

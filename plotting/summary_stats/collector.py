@@ -1,26 +1,31 @@
-import sys
 import os
-import itertools
+import sys 
 import math
 import json
+import glob
 import argparse
+import itertools
+
+import configparser as cp
 
 import torch
-import torch.nn as nn
-import pandas as pd
 import numpy as np
+import pandas as pd
+import torch.nn as nn
 import matplotlib.pyplot as plt
 
 import src.ar4414.pruning.plotting.summary_stats.acc as accSrc
 import src.ar4414.pruning.plotting.summary_stats.gops as gopSrc
-import src.ar4414.pruning.plotting.summary_stats.channel_diff as channeDiffSrc
+import src.ar4414.pruning.plotting.summary_stats.timing as timingSrc
 import src.ar4414.pruning.plotting.summary_stats.l1_norms as l1NormsSrc
+import src.ar4414.pruning.plotting.summary_stats.channel_diff as channeDiffSrc
 
 def summary_statistics(logs, networks, datasets, prunePercs):
 #{{{    
     # data refers to runs that have been pruned based on finetuning on the dataset
     data = {'Network':[], 'Dataset':[], 'PrunePerc':[], 'AvgTestAcc':[], 'StdTestAcc':[], 'PreFtDiff':[], 'PostFtDiff':[], 'InferenceGops':[], 'FinetuneGops':[], 'Memory(MB)':[]}
     
+    pruneAfter = -1
     for network in networks:
         for dataset in datasets:
             for pp in prunePercs:
@@ -37,9 +42,16 @@ def summary_statistics(logs, networks, datasets, prunePercs):
                 for i,run in enumerate(runs): 
                     log = 'pp_{}/{}/orig'.format(pp, run)
     
-                   # extract pruned channels 
+                    # extract pruned channels 
                     channelsPruned = channeDiffSrc.get_pruned_channels(basePath, log)
                     tmpPruned.append(channelsPruned)
+                    
+                    # get epochs after which pruning was performed
+                    if pruneAfter == -1:
+                        config = cp.ConfigParser() 
+                        configFile = glob.glob(os.path.join(basePath, log, '*.ini'))[0]
+                        config.read(configFile)
+                        pruneAfter = config.getint('pruning_hyperparameters', 'prune_after')
 
                     # extract accuracy 
                     accFile = os.path.join(basePath, log, 'log.csv')
@@ -70,7 +82,7 @@ def summary_statistics(logs, networks, datasets, prunePercs):
     
     df = pd.DataFrame(data)
 
-    return df
+    return df, pruneAfter
 #}}}
 
 def subset_agnostic_summary_statistics(logs, networks, datasets, prunePercs, subsetAgnosticLogs):
@@ -101,6 +113,7 @@ def subset_agnostic_summary_statistics(logs, networks, datasets, prunePercs, sub
 
 def per_epoch_statistics(logs, networks, datasets, prunePercs):
 #{{{
+    pruneAfter = -1
     data = {net:{subset:{pp:None for pp in prunePercs} for subset in datasets} for net in networks}
     for network in networks:
         for dataset in datasets:
@@ -110,6 +123,13 @@ def per_epoch_statistics(logs, networks, datasets, prunePercs):
 
                 for i,run in enumerate(runs):
                     log = 'pp_{}/{}/orig'.format(pp, run)
+    
+                    # get epochs after which pruning was performed
+                    if pruneAfter == -1:
+                        config = cp.ConfigParser() 
+                        configFile = glob.glob(os.path.join(basePath, log, '*.ini'))[0]
+                        config.read(configFile)
+                        pruneAfter = config.getint('pruning_hyperparameters', 'prune_after')
                     
                     #get epochs and acc per epoch
                     accFile = os.path.join(basePath, log, 'log.csv')
@@ -118,7 +138,6 @@ def per_epoch_statistics(logs, networks, datasets, prunePercs):
 
                     #get gops by epoch
                     gops, modelSize = gopSrc.get_gops(basePath, log, perEpoch=True)
-                    
                     tmpPerEpochStats['Ft_Gops'] = gops                                        
 
                     if i == 0:
@@ -128,10 +147,10 @@ def per_epoch_statistics(logs, networks, datasets, prunePercs):
                 
                 perEpochStats = perEpochStats.groupby(perEpochStats.index).mean()
                 perEpochStats['Epoch'] += 1
-                
+
                 data[network][dataset][pp] = perEpochStats
     
-    return data
+    return data, pruneAfter
 #}}}
 
 def l1_norm_statistics(logs, networks, datasets, prunePercs): 
@@ -181,6 +200,41 @@ def l1_norm_statistics(logs, networks, datasets, prunePercs):
             data[network][dataset]['stats'] = l1NormStats
             
     return data
+#}}}
+
+def timing_statistics(pruneAfter, logPath, networks, datasets, prunePercs, totalEpochs=30): 
+#{{{
+    inferenceData = {net:{pp:{} for pp in prunePercs} for net in networks}
+    trainingData = {net:{pp:{} for pp in prunePercs} for net in networks}
+
+    for net in networks: 
+        unprunedTraining = []
+        prunedTraining = []
+
+        for dataset in datasets: 
+            for count,pp in enumerate(prunePercs): 
+                logFile = os.path.join(logPath, net, dataset, pp, 'timing_data.pth.tar')
+                log = torch.load(logFile) 
+                
+                # inference times
+                unprunedTime = 1000.*(log['inference']['minibatch'][0][0] / 128)
+                prunedTime = 1000.*(log['inference']['minibatch'][0][1] / 128)
+
+                if count == 0:
+                    inferenceData[net]['0'] = unprunedTime
+                inferenceData[net][pp] = prunedTime
+
+                # finetune times
+                trainMbTimes = {epoch: np.mean(times) for epoch, times in log['training']['minibatch'].items()}                
+                [unprunedTraining.append(time) if epoch < pruneAfter else prunedTraining.append(time) for epoch,time in trainMbTimes.items()]
+                unprunedFt = np.mean(unprunedTraining)
+                prunedFt = np.mean(prunedTraining)
+                #TODO : make this 30 also be read from file 
+                ftTimes = np.cumsum([unprunedFt if epoch < pruneAfter else prunedFt for epoch in range(totalEpochs)])
+                ftTime = {'Epoch':list(range(1,totalEpochs+1)), 'FtTime':ftTimes}
+                trainingData[net][pp] = pd.DataFrame(ftTime)
+    
+    return inferenceData, trainingData
 #}}}
 
 

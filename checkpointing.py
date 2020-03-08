@@ -73,7 +73,8 @@ class Checkpointer(cpSrc.Checkpointer) :
     def restore_state(self, params): 
     #{{{
         # get state to load from
-        if params.resume == True or params.branch == True or params.getGops == True or params.entropy == True : 
+        # if params.resume == True or params.branch == True or params.getGops == True or params.entropy == True : 
+        if params.resume == True or params.branch == True or params.entropy == True : 
         #{{{
             file_to_load = params.pretrained.replace('model', 'state')        
             device = 'cuda:' + str(params.gpu_id)
@@ -117,16 +118,16 @@ class Checkpointer(cpSrc.Checkpointer) :
         elif params.evaluate == True : 
             pass 
 
-        elif params.getGops == True:
-        #{{{
-            params.arch = prev_state_dict['arch']
-            if 'prune_weights' in prev_state_dict.keys():
-                params.pruneWeights = prev_state_dict['prune_weights']
+        # elif params.getGops == True:
+        # #{{{
+        #     params.arch = prev_state_dict['arch']
+        #     if 'prune_weights' in prev_state_dict.keys():
+        #         params.pruneWeights = prev_state_dict['prune_weights']
 
-            if 'prune_filters' in prev_state_dict.keys():
-                params.pruneFilters = prev_state_dict['prune_filters']
-            # params.__dict__.update(**prev_state_dict)
-        #}}} 
+        #     if 'prune_filters' in prev_state_dict.keys():
+        #         params.pruneFilters = prev_state_dict['prune_filters']
+        #     # params.__dict__.update(**prev_state_dict)
+        # #}}} 
         
         # if all false, start from epoch 0 and use config file 
         else : 

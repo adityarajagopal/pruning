@@ -6,6 +6,7 @@ __pycache__
 runs/
 logs/
 profiling_logs/
+configs/l1_prune
 configs/baseline_tests
 configs/random_init_tests
 configs/validation_prune
@@ -14,6 +15,8 @@ graphs/
 test.py 
 dev.pth.tar
 master.pth.tar
+
+scripts/l1_prune
 
 configs/eff*
 models/cifar/eff*

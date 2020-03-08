@@ -1,9 +1,10 @@
-import sys
 import os
+import sys
+import json
 
 import torch.nn
-import torch.backends
 import torchvision 
+import torch.backends
 
 import src.model_creator as mcSrc
 
@@ -85,7 +86,20 @@ class ModelCreator(mcSrc.ModelCreator):
             location = 'cuda:'+str(device_id)
             checkpoint = torch.load(params.pretrained, map_location=location)
             model.load_state_dict(checkpoint)
+
+        elif params.noFtChannelsPruned: 
+            device_id = params.gpu_list[0]
+            location = 'cuda:'+str(device_id)
             
+            # get model from logs
+            logs = params.logs
+            with open(logs, 'r') as jFile:
+                logs = json.load(jFile)    
+            preTrainedModel = logs[params.arch]['pre_ft_model']
+            
+            checkpoint = torch.load(preTrainedModel, map_location=location)
+            model.load_state_dict(checkpoint)
+
         torch.backends.cudnn.benchmark = True
         print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
 
