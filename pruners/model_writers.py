@@ -14,7 +14,7 @@ class Writer(object):
         self.toWrite = {'modules':[], 'forward':[]}
         self.modelDesc = open(modelFile, 'w+')
 
-        self.returnStatement = "return {}.squeeze()" if 'squeezenet' == self.netName.lower() else "return {}"
+        self.returnStatement = "return {}.squeeze(2).squeeze(2)" if 'squeezenet' == self.netName.lower() else "return {}"
         
         baseWriters = {'basic': nn_conv2d, 'relu': nn_relu, 'maxpool2d':nn_maxpool2d, 'avgpool2d':nn_avgpool2d, 'adaptiveavgpool2d':nn_adaptiveavgpool2d, 'batchnorm2d': nn_batchnorm2d, 'linear': nn_linear, 'logsoftmax': nn_logsoftmax}
         if hasattr(self, 'writers'):
