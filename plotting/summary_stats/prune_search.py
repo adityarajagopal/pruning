@@ -33,24 +33,27 @@ def single_search(perEpochData, currCost, targetAcc, pruneAfter):
 
     # remove cost of finetuning as this happens only once
     gops = np.array(list(perEpochData['Ft_Gops'])) - perEpochData['Ft_Gops'][pruneAfter-1]
-    
     currTotalGops = currCost['Gops'][-1]
     cost = {'Gops': currCost['Gops'] + list(currTotalGops + gops[pruneAfter:]), 'TestAcc': currCost['TestAcc'] + testAccs[pruneAfter:]}
+    
+    if 'Ft_Time' in list(perEpochData.columns):
+        time = np.array(list(perEpochData['Ft_Time'])) - perEpochData['Ft_Time'][pruneAfter-1]
+        currTotalTime = currCost['Time'][-1]
+        cost['Time'] = currCost['Time'] + list(currTotalTime + time[pruneAfter:])
     
     if int(bestTestAcc) < int(targetAcc):
         retVal = -1
     else:
         retVal = 1
-    
+
     return retVal, cost, bestTestAcc
 #}}}
 
-def bin_search_cost(logs, networks, datasets, prunePercs, mode='memory_opt'):
+def bin_search_cost(logs, networks, datasets, prunePercs, mode='memory_opt', profLogPath=None):
 #{{{
     # perform binary search to find pruning percentage that give no accuracy loss
     data = {net:{subset:None for subset in datasets} for net in networks}
     initPp = 50                     
-    pruneAfter = 5
     ppToSearch = [int(x) for x in prunePercs]
 
     for net in networks:
@@ -61,17 +64,33 @@ def bin_search_cost(logs, networks, datasets, prunePercs, mode='memory_opt'):
             uB = ppToSearch[-1]
             lB = ppToSearch[0]
             bestPp = 0
-            
+
             # find best test accuracy and gops obtained after initial 5 epochs of finetuning
-            perEpochData = collector.per_epoch_statistics(logs, networks, datasets, [str(initPp)])[net][subset][str(initPp)]
+            # perEpochData, pruneAfter = collector.per_epoch_statistics(logs, networks, datasets, [str(initPp)], profLogs)[net][subset][str(initPp)]
+            aggPerEpochData, pruneAfter = collector.per_epoch_statistics(logs, networks, datasets, [str(initPp)])
+            perEpochData = aggPerEpochData[net][subset][str(initPp)]
+            
+            if profLogPath is not None:
+                _, ftTime =collector.timing_statistics(pruneAfter, profLogPath, [net], ['cifar100'], [str(initPp)])  
+                perEpochData['Ft_Time'] = ftTime[net][str(initPp)]['FtTime']
+                cost = {'Time':list(perEpochData['Ft_Time'])[:pruneAfter], 'Gops':list(perEpochData['Ft_Gops'])[:pruneAfter], 'TestAcc':list(perEpochData['Test_Top1'])[:pruneAfter]}
+            else:
+                cost = {'Gops':list(perEpochData['Ft_Gops'])[:pruneAfter], 'TestAcc':list(perEpochData['Test_Top1'])[:pruneAfter]}
+
             targetAcc = max(list(perEpochData['Test_Top1'])[:pruneAfter])
-            cost = {'Gops':list(perEpochData['Ft_Gops'])[:pruneAfter], 'TestAcc':list(perEpochData['Test_Top1'])[:pruneAfter]}
             state = 0
             bestTestAcc = targetAcc
             
             # perform binary search
             while not check_stopping(mode, state, prevPp, currPp):
-                perEpochData = collector.per_epoch_statistics(logs, networks, datasets, [str(currPp)])[net][subset][str(currPp)]
+                # perEpochData, pruneAfter = collector.per_epoch_statistics(logs, networks, datasets, [str(currPp)], profLogs)[net][subset][str(currPp)]
+                aggPerEpochData, pruneAfter = collector.per_epoch_statistics(logs, networks, datasets, [str(currPp)])
+                perEpochData = aggPerEpochData[net][subset][str(currPp)]
+                
+                if profLogPath is not None:
+                    _, ftTime =collector.timing_statistics(pruneAfter, profLogPath, [net], ['cifar100'], [str(currPp)])  
+                    perEpochData['Ft_Time'] = ftTime[net][str(currPp)]['FtTime']
+                
                 state, cost, highestTestAcc = single_search(perEpochData, cost, targetAcc, pruneAfter)
                 
                 # prune less
@@ -94,7 +113,7 @@ def bin_search_cost(logs, networks, datasets, prunePercs, mode='memory_opt'):
     return data 
 #}}}
 
-def plot_bin_search_cost(data, saveLoc=None):
+def plot_bin_search_cost(data, saveLoc=None, time=False):
 #{{{
     nets = list(data.keys())
     subsets = list(data[nets[0]].keys())
@@ -104,12 +123,21 @@ def plot_bin_search_cost(data, saveLoc=None):
             cost = data[net][subset]['cost']
             bestPp = data[net][subset]['best_pp']
             bestTestAcc = data[net][subset]['best_acc']
-            title = "Cost of finding best pruning percentage for {} on {} \n Best Pruning level = {}%".format(net.capitalize(), subset.capitalize(), bestPp)
-            ax = cost.plot(x='Gops', y='TestAcc', title=title)
-            ax.axhline(bestTestAcc, label='Best Test Accuracy', color='red')
-            ax.set_xlabel('Cost (GOps) of performing binary search to find best pruning level')
-            ax.set_ylabel('Test Top1 (%)')
-            ax.legend()
+            
+            if not time:
+                title = "Cost of finding best pruning percentage for {} on {} \n Best Pruning level = {}%".format(net.capitalize(), subset.capitalize(), bestPp)
+                ax = cost.plot(x='Gops', y='TestAcc', title=title)
+                ax.axhline(bestTestAcc, label='Best Test Accuracy', color='red')
+                ax.set_xlabel('Cost (GOps) of performing binary search to find best pruning level')
+                ax.set_ylabel('Test Top1 (%)')
+                ax.legend()
+            else:
+                title = "Binary Search cost of finding best pruning percentage for \n {} on {} \n Best Pruning level = {}%".format(net.capitalize(), subset.capitalize(), bestPp)
+                ax2 = cost.plot(x='Time', y='TestAcc', title=title)
+                ax2.axhline(bestTestAcc, label='Best Test Accuracy', color='red')
+                ax2.set_xlabel('Cost per minibatch (seconds) of on Nvidia Jetson TX2')
+                ax2.set_ylabel('Test Top1 (%)')
+                ax2.legend()
 
             if saveLoc is not None: 
                 plt.tight_layout()

@@ -10,41 +10,14 @@ import numpy as np
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 
-def get_gops(basePath, log, perEpoch=False):
+def get_raw_times(prof_logs):
 #{{{
-    datasetSizes = {'cifar100':{'entire_dataset':50000, 'subset1':20000, 'aquatic':5000}} 
-
-    gopsFile = os.path.join(basePath, log, 'gops.json')
-    with open(gopsFile, 'r') as jFile:
-        gops = json.load(jFile)    
-    
-    config = cp.ConfigParser() 
-    configFile = glob.glob(os.path.join(basePath, log, '*.ini'))[0]
-    config.read(configFile)
-    
-    dataset = config.get('dataset', 'dataset')
-    subset = config.get('pruning_hyperparameters', 'sub_name')
-    batchSize = config.getint('training_hyperparameters', 'train_batch')    
-    pruneAfter = config.getint('pruning_hyperparameters', 'prune_after')
-    epochs = config.getint('pruning_hyperparameters', 'finetune_budget')
-
-    numBatches = math.ceil(datasetSizes[dataset][subset]/batchSize)
-
-    infGops = gops['inf'] / batchSize
-    # ftGops = [(numBatches * gops['ft']['unpruned']) if epoch < pruneAfter else (numBatches * gops['ft']['pruned']) for epoch in range(epochs)]
-    ftGops = [gops['ft']['unpruned'] if epoch < pruneAfter else gops['ft']['pruned'] for epoch in range(epochs)]
-    epochFtGops = list(np.cumsum(np.array(ftGops)))
-    totalFtGops = epochFtGops[-1]
-
-    if perEpoch:
-        return (epochFtGops, gops['mem']['pruned'])
-    else:
-        return (infGops, totalFtGops, gops['mem']['pruned'])
+    breakpoint()
 #}}}
 
-def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc=None, time=False):
+def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc=None):
 #{{{
-    xAxis = 'InferenceGops' if not time else 'InferenceTime'
+    xAxis = 'InferenceGops'
     yAxis = 'AvgTestAcc'
 
     subsets = set(list(summaryData['Dataset']))
@@ -58,9 +31,7 @@ def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc=None, t
         
         ax = data.plot.scatter(x=xAxis, y=yAxis, ax=axes[net][dataset][1], label=label, title=title)
         
-        xlabel = 'Inference GOps' if not time else 'Inference Time per image (ms)'
-        # ax.set_xlabel('Inference GOps')
-        ax.set_xlabel(xlabel)
+        ax.set_xlabel('Inference GOps')
         ax.set_ylabel('Test Accuracy (%)')
     
     for (subset, net), data in subsetAgnosticSummaryData.groupby(['Subset', 'Network']):
@@ -69,8 +40,7 @@ def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc=None, t
             labelIdx = 0 if pp == "0" else 1 if count == 1 else 2
             marker = 'x' if pp == "0" else '+'
             
-            # axes[net][subset][1].plot([float(points['InferenceGops'])], [float(points['TestAcc'])], label=labels[labelIdx], marker=marker, markersize=4, color='red', linestyle="None")
-            axes[net][subset][1].plot([float(points[xAxis])], [float(points['TestAcc'])], label=labels[labelIdx], marker=marker, markersize=4, color='red', linestyle="None")
+            axes[net][subset][1].plot([float(points['InferenceGops'])], [float(points['TestAcc'])], label=labels[labelIdx], marker=marker, markersize=4, color='red', linestyle="None")
             axes[net][subset][1].legend()
 
     if saveLoc is not None:

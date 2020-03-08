@@ -37,7 +37,9 @@ def parse_arguments():
     parser.add_argument('--networks', type=str, nargs='+', default=None, help='name of networks to display')
     parser.add_argument('--subsets', type=str, nargs='+', default=None, help='name of subsets to display')
     parser.add_argument('--logs_json', type=str, default='/home/ar4414/pytorch_training/src/ar4414/pruning/logs/logs_v1.json', help='full file path of json file where logs summary to be placed')
+    parser.add_argument('--prof_logs', type=str, default=None, help='path to profiling logs - filepath after this should be <net>/<dataset>/<pruning_perc>/timing_data.pth.tar')
     
+    parser.add_argument('--silent', action='store_true', help="don't show figures")
     parser.add_argument('--save', action='store_true', help='save figures')
     parser.add_argument('--loc', type=str, default='recent', help='folder under graphs/ where images should be saved')
     
@@ -85,15 +87,21 @@ def get_save_location(args):
     saveLoc = None
     if args.save:
         if args.bin_search_cost:
-            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/bin_search_cost/{}/'.format(args.loc, args.mode)
+            if args.prof_logs is None:
+                saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/bin_search_cost/{}/'.format(args.loc, args.mode)
+            else:
+                saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/bin_search_cost_time/{}/'.format(args.loc, args.mode)
         elif args.inf_gops:
-            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/inference_gops/'.format(args.loc)
+            if args.prof_logs is None:
+                saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/inference_gops/'.format(args.loc)
+            else:
+                saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/inference_time/'.format(args.loc)
         elif args.pre_post_ft:
-            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/difference_in_channels_pruned/'.format(args.loc)
+            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/difference_in_channels_pruned_per_network_subset/'.format(args.loc)
         elif args.across_networks:
-            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/difference_in_channels_pruned_by_subset/'.format(args.loc)
+            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/difference_in_channels_pruned_per_subset/'.format(args.loc)
         elif args.l1_norm:
-            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/l1_norm/'.format(args.loc)
+            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/difference_in_l1_norm_of_weights/'.format(args.loc)
 
         print("Saving graphs to {}".format(saveLoc))
         if not os.path.isdir(saveLoc):
@@ -154,11 +162,24 @@ if __name__ == '__main__':
     if args.channel_diff or args.inf_gops or args.ft_gops:
     #{{{
         print("==> Collecting Accuracy and Gops statistics")
-        summaryData = collector.summary_statistics(logs, networks, datasets, prunePercs)
-
+        summaryData, pruneAfter = collector.summary_statistics(logs, networks, datasets, prunePercs)
+        
         with open(args.subset_agnostic_logs, 'r') as jFile:
             subsetAgnosticLogs = json.load(jFile)
         subsetAgnosticSummaryData = collector.subset_agnostic_summary_statistics(logs, networks, datasets, prunePercs, subsetAgnosticLogs)
+
+        if args.prof_logs is not None:
+            infTime, _ = collector.timing_statistics(pruneAfter, args.prof_logs, networks, ['cifar100'], prunePercs)  
+        
+            sdInf = []
+            for idx, row in summaryData.iterrows(): 
+                sdInf.append(infTime[row['Network']][str(row['PrunePerc'])])
+            summaryData['InferenceTime'] = sdInf
+            
+            sasdInf = []
+            for idx, row in subsetAgnosticSummaryData.iterrows(): 
+                sasdInf.append(infTime[row['Network']][str(row['PrunePerc'])])
+            subsetAgnosticSummaryData['InferenceTime'] = sasdInf
 
         if args.pretty_print:
             print(tabulate(summaryData, headers='keys', tablefmt='psql'))
@@ -169,7 +190,7 @@ if __name__ == '__main__':
         # plot inference gops vs accuracy tradeoff
         if args.inf_gops:
             print("==> Plotting GOps for inference vs best test top1 accuracy obtained")
-            gopSrc.plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc)
+            gopSrc.plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc, (args.prof_logs is not None))
     
         # plot difference in channels pruned by percentage pruned
         if args.pre_post_ft:
@@ -190,9 +211,9 @@ if __name__ == '__main__':
     if args.bin_search_cost:
     #{{{
         print("==> Performing binary search to get pruning percentage that gives no accuracy loss")
-        binSearchCost = searchSrc.bin_search_cost(logs, networks, datasets, prunePercs, args.mode)
+        binSearchCost = searchSrc.bin_search_cost(logs, networks, datasets, prunePercs, args.mode, args.prof_logs)
         saveLoc = get_save_location(args)
-        searchSrc.plot_bin_search_cost(binSearchCost, saveLoc)
+        searchSrc.plot_bin_search_cost(binSearchCost, saveLoc, (args.prof_logs is not None))
     #}}}
 
     if args.l1_norm:
@@ -220,6 +241,7 @@ if __name__ == '__main__':
         gopSrc.plot_ft_gops_by_epoch(gopsByEpochData, args.plot_as_line, args.acc_metric)
     #}}}
     
-    plt.show()
+    if not args.silent:
+        plt.show()
 #}}}
 
