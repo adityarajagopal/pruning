@@ -23,9 +23,10 @@ sys.path.append(parentDir[0])
 
 from src.ar4414.pruning.plotting import log_updater 
 from src.ar4414.pruning.plotting.summary_stats import collector 
-from src.ar4414.pruning.plotting.summary_stats import prune_search as searchSrc
 from src.ar4414.pruning.plotting.summary_stats import gops as gopSrc 
 from src.ar4414.pruning.plotting.summary_stats import l1_norms as l1NormsSrc
+from src.ar4414.pruning.plotting.summary_stats import tradeoff as tradeoffSrc
+from src.ar4414.pruning.plotting.summary_stats import prune_search as searchSrc
 from src.ar4414.pruning.plotting.summary_stats import channel_diff as channeDiffSrc
 
 def parse_arguments():
@@ -76,6 +77,8 @@ def parse_arguments():
     
     parser.add_argument('--bin_search_cost', action='store_true', help='plot cost of binary search')
     parser.add_argument('--mode', type=str, default='memory_opt', help='how to prioritse binary search : one of memory_opt or cost_opt')
+
+    parser.add_argument('--time_tradeoff', action='store_true', help='plot inf_time vs training_time for various points that match accuracy')
     
     args = parser.parse_args()
     
@@ -96,6 +99,8 @@ def get_save_location(args):
                 saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/inference_gops/'.format(args.loc)
             else:
                 saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/inference_time/'.format(args.loc)
+        elif args.time_tradeoff:
+            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/search_inf_time_tradeoff/'.format(args.loc)
         elif args.pre_post_ft:
             saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/difference_in_channels_pruned_per_network_subset/'.format(args.loc)
         elif args.across_networks:
@@ -216,6 +221,24 @@ if __name__ == '__main__':
         searchSrc.plot_bin_search_cost(binSearchCost, saveLoc, (args.prof_logs is not None))
     #}}}
 
+    if args.time_tradeoff:
+    #{{{
+        print('==> Plotting inference time vs training time tradeoff across points that produce no accuracy loss')
+        
+        with open(args.subset_agnostic_logs, 'r') as jFile:
+            subsetAgnosticLogs = json.load(jFile)
+        subsetAgnosticSummaryData = collector.subset_agnostic_summary_statistics(logs, networks, datasets, prunePercs, subsetAgnosticLogs)
+        targetData = subsetAgnosticSummaryData[subsetAgnosticSummaryData['PrunePerc'] == '0']
+        
+        binSearchMemoryOptimised = searchSrc.bin_search_cost(logs, networks, datasets, prunePercs, 'memory_opt', args.prof_logs, targetData)
+        infTime, _ = collector.timing_statistics(5, args.prof_logs, networks, ['cifar100'], prunePercs)  
+        
+        tradeoffPoints = tradeoffSrc.get_tradeoff_points(binSearchMemoryOptimised, infTime, targetData, 5)
+        
+        saveLoc = get_save_location(args)
+        tradeoffSrc.plot_tradeoff(tradeoffPoints, saveLoc)
+    #}}}
+    
     if args.l1_norm:
     #{{{
         print("==> L1-Norm Statistics")

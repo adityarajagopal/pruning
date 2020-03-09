@@ -1,15 +1,16 @@
-import sys
 import os
-import itertools
+import sys
 import math
 import json
 import argparse
+import itertools
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 
 import src.ar4414.pruning.plotting.summary_stats.collector as collector
 
@@ -49,7 +50,7 @@ def single_search(perEpochData, currCost, targetAcc, pruneAfter):
     return retVal, cost, bestTestAcc
 #}}}
 
-def bin_search_cost(logs, networks, datasets, prunePercs, mode='memory_opt', profLogPath=None):
+def bin_search_cost(logs, networks, datasets, prunePercs, mode='memory_opt', profLogPath=None, targetData=None):
 #{{{
     # perform binary search to find pruning percentage that give no accuracy loss
     data = {net:{subset:None for subset in datasets} for net in networks}
@@ -77,13 +78,20 @@ def bin_search_cost(logs, networks, datasets, prunePercs, mode='memory_opt', pro
             else:
                 cost = {'Gops':list(perEpochData['Ft_Gops'])[:pruneAfter], 'TestAcc':list(perEpochData['Test_Top1'])[:pruneAfter]}
 
-            targetAcc = max(list(perEpochData['Test_Top1'])[:pruneAfter])
+            if targetData is None:
+                targetAcc = max(list(perEpochData['Test_Top1'])[:pruneAfter])
+            else:
+                targetAcc = float(targetData.loc[(targetData['Network'] == net) & (targetData['Subset'] == subset)]['TestAcc'])
             state = 0
             bestTestAcc = targetAcc
+            epochCount = pruneAfter
+            epochData = []
             
             # perform binary search
             while not check_stopping(mode, state, prevPp, currPp):
                 # perEpochData, pruneAfter = collector.per_epoch_statistics(logs, networks, datasets, [str(currPp)], profLogs)[net][subset][str(currPp)]
+                epochCount += int(perEpochData['Epoch'].tail(1)) - pruneAfter
+                epochData.append((currPp, epochCount))
                 aggPerEpochData, pruneAfter = collector.per_epoch_statistics(logs, networks, datasets, [str(currPp)])
                 perEpochData = aggPerEpochData[net][subset][str(currPp)]
                 
@@ -107,8 +115,8 @@ def bin_search_cost(logs, networks, datasets, prunePercs, mode='memory_opt', pro
 
                 prevPp = currPp
                 currPp = 5 * math.ceil(tmp/5)  
-
-            data[net][subset] = {'cost':pd.DataFrame(cost), 'best_pp':bestPp, 'best_acc':bestTestAcc}
+            
+            data[net][subset] = {'cost':pd.DataFrame(cost), 'best_pp':bestPp, 'best_acc':bestTestAcc, 'target_acc':targetAcc, 'epoch_data':epochData}
     
     return data 
 #}}}
