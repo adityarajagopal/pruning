@@ -14,6 +14,30 @@ import torch.nn as nn
 
 import src.ar4414.pruning.plotting.summary_stats.collector as collector
 
+def get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, ptType): 
+#{{{
+    validEpochs = validPoints.index.values.tolist()
+    prunePercs = [list(filter(lambda x : x[1] >= epoch, searchEpochData))[0][0] for epoch in validEpochs]  
+    uniquePp = []
+    uniqueValidEpochs = []
+    for idx,pp in enumerate(prunePercs): 
+        if pp not in uniquePp:
+            uniquePp.append(pp)
+            uniqueValidEpochs.append(validEpochs[idx])
+    
+    dp = validPoints.loc[validPoints.index.isin(uniqueValidEpochs)]
+    inference = [inferenceTimes[net][str(pp)] for pp in uniquePp]
+    metric = []
+    types = []
+    for idx,row in dp.reset_index().iterrows(): 
+        metric.append(float(inference[idx]))
+        types.append(ptType)
+    dp['Metric'] = metric
+    dp['Type'] = types
+    
+    return dp
+#}}}
+
 def get_tradeoff_points(binSearchResults, inferenceTimes, unprunedData, pruneAfter): 
 #{{{
     nets = list(inferenceTimes.keys())
@@ -30,67 +54,35 @@ def get_tradeoff_points(binSearchResults, inferenceTimes, unprunedData, pruneAft
             
             # get values for unpruned network
             unprunedStats = unprunedData.loc[(unprunedData['Network'] == net) & (unprunedData['Subset'] == subset)] 
-            targetAcc = int(unprunedStats['TestAcc'])
+            targetAcc = float(unprunedStats['TestAcc'])
             baseMetric = float(inferenceTimes[net]['0'])
 
             # get points which match or exceed original accuracy
             validPoints = searchCost.loc[searchCost.index > pruneAfter-1].loc[searchCost['TestAcc'] >= targetAcc]
-            validEpochs = validPoints.index.values.tolist()
-            prunePercs = [list(filter(lambda x : x[1] >= epoch, searchEpochData))[0][0] for epoch in validEpochs]  
-            uniquePp = []
-            uniqueValidEpochs = []
-            for idx,pp in enumerate(prunePercs): 
-                if pp not in uniquePp:
-                    uniquePp.append(pp)
-                    uniqueValidEpochs.append(validEpochs[idx])
+            dpValid = get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, '>= Unpruned Network')
+
+            otherDatapoints = []
+            # get points which drop by <1%
+            condition1 = (searchCost['TestAcc'] < targetAcc) & (searchCost['TestAcc'] >= (targetAcc-1.0))
+            validPoints = searchCost.loc[searchCost.index > pruneAfter-1].loc[condition1]
+            otherDatapoints.append(get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, 'Error < 1%'))
             
-            dp = validPoints.loc[validPoints.index.isin(uniqueValidEpochs)]
-            inference = [inferenceTimes[net][str(pp)] for pp in uniquePp]
-            metric = []
-            types = []
-            for idx,row in dp.reset_index().iterrows(): 
-                metric.append(float(inference[idx]))
-                types.append('valid')
-            dp['Metric'] = metric
-            dp['Type'] = types
+            # get points which drop by <2%
+            condition2 = (searchCost['TestAcc'] < (targetAcc-1.0)) & (searchCost['TestAcc'] >= (targetAcc-2.0))
+            validPoints = searchCost.loc[searchCost.index > pruneAfter-1].loc[condition2]
+            otherDatapoints.append(get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, 'Error < 2%'))
             
-            basePoint = {'Type':'base', 'TestAcc':targetAcc, 'Time':0, 'Metric':baseMetric}
+            # get points which drop by <4%
+            condition3 = (searchCost['TestAcc'] < (targetAcc-2.0)) & (searchCost['TestAcc'] >= (targetAcc-4.0)) 
+            validPoints = searchCost.loc[searchCost.index > pruneAfter-1].loc[condition3]
+            otherDatapoints.append(get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, 'Error < 4%'))
+            
+            dp = dpValid
+            for x in otherDatapoints:
+                dp = dp.append(x)
+            
+            basePoint = {'Type':'Unpruned', 'TestAcc':targetAcc, 'Time':0, 'Metric':baseMetric}
             dp = dp.append(basePoint, ignore_index=True)
-
-            #{{{
-            # get best accuracy per precision searched
-            # bestAccs = []
-            # searchTime = []
-            # metric = []
-            # types = []
-            # excludeValidPoints = searchCost.loc[~(searchCost.index.isin(validEpochs)) & (searchCost.index > pruneAfter-1)]
-            # invalidEpochs = excludeValidPoints.index.values.tolist()
-            # initEpoch = invalidEpochs[0]
-            # for pp,epoch in searchEpochData: 
-            #     if initEpoch >= epoch:
-            #         continue
-            #     
-            #     indices = list(filter(lambda x : x >= initEpoch and x < epoch, invalidEpochs))   
-            #     infTime = inferenceTimes[net][str(pp)]
-            #     subPoints = excludeValidPoints.loc[excludeValidPoints.index.isin(indices)]
-            #     
-            #     if len(subPoints['TestAcc']) == 0:
-            #         initEpoch == epoch
-            #         continue
-            #     
-            #     bestAcc = subPoints['TestAcc'].max()
-            #     bestAccIdx = subPoints['TestAcc'].idxmax()
-            #     
-            #     types.append('invalid')
-            #     bestAccs.append(bestAcc)
-            #     searchTime.append(subPoints['Time'][bestAccIdx])
-            #     metric.append(float(infTime))
-
-            #     initEpoch = epoch
-            # 
-            # invalidPoints = pd.DataFrame({'Type':types, 'TestAcc':bestAccs, 'Time':searchTime, 'Metric':metric})
-            # dp = dp.append(invalidPoints)
-            #}}}
 
             dataPoints = dataPoints.append(dp)
             data[net][subset] = dataPoints
@@ -99,6 +91,14 @@ def get_tradeoff_points(binSearchResults, inferenceTimes, unprunedData, pruneAft
 
 def plot_tradeoff(data, saveLoc=None): 
 #{{{
+    colours = {
+                'Unpruned'            : 'blue',
+                '>= Unpruned Network' : 'green',
+                'Error < 1%'          : 'yellow',
+                'Error < 2%'          : 'orange',
+                'Error < 4%'          : 'red'
+              }
+    
     nets = list(data.keys()) 
     subsets = list(data[nets[0]].keys())
     for net in nets: 
@@ -108,9 +108,8 @@ def plot_tradeoff(data, saveLoc=None):
             ax[1].set_xlabel("Search Time (s)")
             ax[1].set_ylabel("Inference Time for searched model (s)")
             for ptType, pts in data[net][subset].groupby(['Type']): 
-                colour = 'blue' if ptType == 'base' else 'red' if ptType == 'invalid' else 'green'
-                label = 'No Pruning' if ptType == 'base' else 'Pruned Model'
-                ax[1].scatter(pts['Time'], pts['Metric'], color=colour, label=label)
+                label = ptType
+                ax[1].scatter(pts['Time'], pts['Metric'], color=colours[ptType], label=label)
                 ax[1].legend()
             
             if saveLoc is not None: 

@@ -101,6 +101,7 @@ def get_save_location(args):
                 saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/inference_time/'.format(args.loc)
         elif args.time_tradeoff:
             saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/search_inf_time_tradeoff/'.format(args.loc)
+            # saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/search_inf_time_tradeoff_v1/'.format(args.loc)
         elif args.pre_post_ft:
             saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/difference_in_channels_pruned_per_network_subset/'.format(args.loc)
         elif args.across_networks:
