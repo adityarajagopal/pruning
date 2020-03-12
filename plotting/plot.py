@@ -126,7 +126,7 @@ if __name__ == '__main__':
         sys.exit()
     
     networks = ['alexnet', 'mobilenetv2', 'resnet', 'squeezenet'] if args.networks is None else args.networks
-    datasets = ['subset1', 'aquatic'] if args.subsets is None else args.subsets
+    datasets = ['subset1', 'aquatic', 'indoors', 'natural', 'random1'] if args.subsets is None else args.subsets
     prunePercs = [str(i) for i in range(5,100,5)]
     logsJson = args.logs_json 
     
@@ -268,4 +268,5 @@ if __name__ == '__main__':
     if not args.silent:
         plt.show()
 #}}}
+
 

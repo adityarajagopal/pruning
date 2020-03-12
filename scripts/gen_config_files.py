@@ -4,15 +4,22 @@ import subprocess
 import sys
 
 nets = ['resnet', 'mobilenetv2', 'alexnet', 'squeezenet']
+lrSchedules = [
+                '0 0.01 10 -1 20 -1', 
+                '0 0.01 10 -1 20 -1', 
+                '0 0.001 10 -1 20 -1', 
+                '0 0.02 10 -1 20 -1'
+              ]
 pruningPercs = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95]
-subset = ['subset1', 'aquatic']
-sub_classes = ["large_man-made_outdoor_things large_natural_outdoor_scenes vehicles_1 vehicles_2 trees small_mammals people", "aquatic_mammals fish"]
-# subset = ['entire_dataset']
-# sub_classes = [""]
+subset = ['indoors', 'natural', 'random1']
+sub_classes = [
+                'food_containers household_electrical_devices household_furniture',
+                'flowers fruit_and_vegetables insects large_omnivores_and_herbivores medium_mammals non-insect_invertebrates small_mammals reptiles',
+                'aquatic_mammals fish flowers fruit_and_vegetables household_furniture large_man-made_outdoor_things large_omnivores_and_herbivores medium_mammals non-insect_invertebrates people reptiles trees vehicles_2'
+              ]
 config = cp.ConfigParser()
 
 base = '/home/ar4414/pytorch_training/src/ar4414/pruning/'
-# base = '/home/nvidia/ar4414/pytorch_training/src/ar4414/pruning'
 
 configPath = os.path.join(base, 'configs', 'l1_prune')
 runFileBase = os.path.join(base, 'scripts', 'l1_prune')
@@ -20,7 +27,10 @@ cpRoot = os.path.join(base, 'logs/{}/cifar100/{}/l1_prune')
 
 cmd = 'mkdir -p ' + configPath
 subprocess.check_call(cmd, shell=True)
+cmd = 'mkdir -p ' + runFileBase
+subprocess.check_call(cmd, shell=True)
 
+runFiles = []
 for netCount, net in enumerate(nets):
     testCount = 0
     configFile = os.path.join(base, 'configs', str(net) + '.ini')
@@ -29,10 +39,12 @@ for netCount, net in enumerate(nets):
     repeats = 5
     gpu = netCount % 3 
     runFile = os.path.join(runFileBase, 'run_{}.sh'.format(gpu))
+    runFiles.append(runFile)
     
     config['training_hyperparameters']['print_only'] = "False"
+    config['training_hyperparameters']['lr_schedule'] = lrSchedules[netCount] 
     
-    config['pytorch_parameters']['gpu_id'] = gpu
+    config['pytorch_parameters']['gpu_id'] = str(gpu)
     config['pytorch_parameters']['resume'] = "False"
     config['pytorch_parameters']['branch'] = "False"
     config['pytorch_parameters']['evaluate'] = "False"
@@ -66,7 +78,5 @@ for netCount, net in enumerate(nets):
             
             testCount += 1
 
-
-
-
+[os.chmod(rf,0o755) for rf in runFiles]
 

@@ -12,8 +12,6 @@ import matplotlib.pyplot as plt
 
 def get_gops(basePath, log, perEpoch=False):
 #{{{
-    datasetSizes = {'cifar100':{'entire_dataset':50000, 'subset1':20000, 'aquatic':5000}} 
-
     gopsFile = os.path.join(basePath, log, 'gops.json')
     with open(gopsFile, 'r') as jFile:
         gops = json.load(jFile)    
@@ -27,11 +25,16 @@ def get_gops(basePath, log, perEpoch=False):
     batchSize = config.getint('training_hyperparameters', 'train_batch')    
     pruneAfter = config.getint('pruning_hyperparameters', 'prune_after')
     epochs = config.getint('pruning_hyperparameters', 'finetune_budget')
-
-    numBatches = math.ceil(datasetSizes[dataset][subset]/batchSize)
+    
+    # not required anymore as ft gops is number of batches independent
+    # trainValSplit = config.getfloat('training_hyperparameters', 'train_val_split')
+    # numClasses = len(config.get('pruning_hyperparameters', 'sub_classes').split()) if subset != 'entire_dataset' else 100
+    # datasetSizes = {'cifar100':{'entire_dataset':50000, 'subset1':17500, 'aquatic':5000, 'indoors':6000, 'natural':16000, 'random1':26000}} 
+    # trainingImgsPerClass = 500
+    # numBatches = trainValSplit * (5*numClasses) * trainingImgsPerClass
+    # ftGops = [(numBatches * gops['ft']['unpruned']) if epoch < pruneAfter else (numBatches * gops['ft']['pruned']) for epoch in range(epochs)]
 
     infGops = gops['inf'] / batchSize
-    # ftGops = [(numBatches * gops['ft']['unpruned']) if epoch < pruneAfter else (numBatches * gops['ft']['pruned']) for epoch in range(epochs)]
     ftGops = [gops['ft']['unpruned'] if epoch < pruneAfter else gops['ft']['pruned'] for epoch in range(epochs)]
     epochFtGops = list(np.cumsum(np.array(ftGops)))
     totalFtGops = epochFtGops[-1]

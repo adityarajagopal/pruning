@@ -63,19 +63,19 @@ def get_tradeoff_points(binSearchResults, inferenceTimes, unprunedData, pruneAft
 
             otherDatapoints = []
             # get points which drop by <1%
-            condition1 = (searchCost['TestAcc'] < targetAcc) & (searchCost['TestAcc'] >= (targetAcc-1.0))
-            validPoints = searchCost.loc[searchCost.index > pruneAfter-1].loc[condition1]
-            otherDatapoints.append(get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, 'Error < 1%'))
+            # condition1 = (searchCost['TestAcc'] < targetAcc) & (searchCost['TestAcc'] >= (targetAcc-1.0))
+            # validPoints = searchCost.loc[searchCost.index > pruneAfter-1].loc[condition1]
+            # otherDatapoints.append(get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, 'Error < 1%'))
             
             # get points which drop by <2%
-            condition2 = (searchCost['TestAcc'] < (targetAcc-1.0)) & (searchCost['TestAcc'] >= (targetAcc-2.0))
-            validPoints = searchCost.loc[searchCost.index > pruneAfter-1].loc[condition2]
-            otherDatapoints.append(get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, 'Error < 2%'))
+            # condition2 = (searchCost['TestAcc'] < (targetAcc-1.0)) & (searchCost['TestAcc'] >= (targetAcc-2.0))
+            # validPoints = searchCost.loc[searchCost.index > pruneAfter-1].loc[condition2]
+            # otherDatapoints.append(get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, 'Error < 2%'))
             
             # get points which drop by <4%
-            condition3 = (searchCost['TestAcc'] < (targetAcc-2.0)) & (searchCost['TestAcc'] >= (targetAcc-4.0)) 
-            validPoints = searchCost.loc[searchCost.index > pruneAfter-1].loc[condition3]
-            otherDatapoints.append(get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, 'Error < 4%'))
+            # condition3 = (searchCost['TestAcc'] < (targetAcc-2.0)) & (searchCost['TestAcc'] >= (targetAcc-4.0)) 
+            # validPoints = searchCost.loc[searchCost.index > pruneAfter-1].loc[condition3]
+            # otherDatapoints.append(get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, 'Error < 4%'))
             
             dp = dpValid
             for x in otherDatapoints:
