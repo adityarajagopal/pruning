@@ -6,10 +6,10 @@ class SqueezeNet(nn.Module):
     def __init__(self, num_classes=10):
         super().__init__()
 
-        self.conv1 = nn.Conv2d(3, 85, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        self.bn1 = nn.BatchNorm2d(85, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv1 = nn.Conv2d(3, 86, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.bn1 = nn.BatchNorm2d(86, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
         self.maxpool1 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-        self.fire2_conv1 = nn.Conv2d(85, 15, kernel_size=(1, 1), stride=(1, 1))
+        self.fire2_conv1 = nn.Conv2d(86, 15, kernel_size=(1, 1), stride=(1, 1))
         self.fire2_bn1 = nn.BatchNorm2d(15, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
         self.fire2_conv2 = nn.Conv2d(15, 64, kernel_size=(1, 1), stride=(1, 1))
         self.fire2_bn2 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)

@@ -3,14 +3,33 @@ import configparser as cp
 import subprocess
 import sys
 
-nets = ['resnet', 'mobilenetv2', 'alexnet', 'squeezenet']
+# nets = ['alexnet', 'mobilenetv2', 'squeezenet', 'resnet']
+# lrSchedules = [
+#                 '0 0.0001 5 0.001 15 -1 25 -1',
+#                 '0 0.001 5 0.01 15 -1 25 -1', 
+#                 '0 0.0008 5 0.02 15 -1 25 -1',
+#                 '0 0.001 5 0.01 15 -1 25 -1'
+#               ]
+nets = ['mobilenetv2']
 lrSchedules = [
-                '0 0.01 10 -1 20 -1', 
-                '0 0.01 10 -1 20 -1', 
-                '0 0.001 10 -1 20 -1', 
-                '0 0.02 10 -1 20 -1'
+                '0 0.001 5 0.01 15 -1 25 -1'
               ]
-pruningPercs = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95]
+# lrSchedules = [
+#                 '0 0.001 10 -1 20 -1', 
+#                 '0 0.01 10 -1 20 -1', 
+#                 '0 0.02 10 -1 20 -1',
+#                 '0 0.01 10 -1 20 -1'
+#               ]
+# pruningPercs = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95]
+pruningPercs = [60,65,70,75,80,85,90,95]
+# subset = ['aquatic', 'subset1', 'indoors', 'natural', 'random1']
+# sub_classes = [
+#                 'aquatic_mammals fish',
+#                 'large_man-made_outdoor_things large_natural_outdoor_scenes vehicles_1 vehicles_2 trees small_mammals people',
+#                 'food_containers household_electrical_devices household_furniture',
+#                 'flowers fruit_and_vegetables insects large_omnivores_and_herbivores medium_mammals non-insect_invertebrates small_mammals reptiles',
+#                 'aquatic_mammals fish flowers fruit_and_vegetables household_furniture large_man-made_outdoor_things large_omnivores_and_herbivores medium_mammals non-insect_invertebrates people reptiles trees vehicles_2'
+#               ]
 subset = ['indoors', 'natural', 'random1']
 sub_classes = [
                 'food_containers household_electrical_devices household_furniture',
@@ -21,9 +40,10 @@ config = cp.ConfigParser()
 
 base = '/home/ar4414/pytorch_training/src/ar4414/pruning/'
 
-configPath = os.path.join(base, 'configs', 'l1_prune')
-runFileBase = os.path.join(base, 'scripts', 'l1_prune')
-cpRoot = os.path.join(base, 'logs/{}/cifar100/{}/l1_prune')
+testName = 'l1_prune'
+configPath = os.path.join(base, 'configs', testName)
+runFileBase = os.path.join(base, 'scripts', testName)
+cpRoot = os.path.join(base, 'logs/{}/cifar100/{}/{}')
 
 cmd = 'mkdir -p ' + configPath
 subprocess.check_call(cmd, shell=True)
@@ -37,7 +57,8 @@ for netCount, net in enumerate(nets):
     config.read(configFile)
             
     repeats = 5
-    gpu = netCount % 3 
+    # gpu = netCount % 3 
+    gpu = 1
     runFile = os.path.join(runFileBase, 'run_{}.sh'.format(gpu))
     runFiles.append(runFile)
     
@@ -62,7 +83,7 @@ for netCount, net in enumerate(nets):
     for ssCount, ss in enumerate(subset):
         config['pruning_hyperparameters']['sub_name'] = ss
         config['pruning_hyperparameters']['sub_classes'] = sub_classes[ssCount]
-        config['pytorch_parameters']['checkpoint_path'] = cpRoot.format(net, ss) 
+        config['pytorch_parameters']['checkpoint_path'] = cpRoot.format(net, ss, testName) 
 
         for ppCount, pp in enumerate(pruningPercs):
             config['pruning_hyperparameters']['pruning_perc'] = str(pp)

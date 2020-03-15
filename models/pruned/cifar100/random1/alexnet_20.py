@@ -12,9 +12,9 @@ class AlexNet(nn.Module):
         self.maxpool2d_2 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
         self.conv3 = nn.Conv2d(188, 313, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
         self.conv4 = nn.Conv2d(313, 218, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        self.conv5 = nn.Conv2d(218, 255, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.conv5 = nn.Conv2d(218, 254, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
         self.maxpool2d_3 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-        self.classifier = nn.Linear(in_features=255, out_features=100, bias=True)
+        self.classifier = nn.Linear(in_features=254, out_features=100, bias=True)
 
     def forward(self, x):
         x = self.conv1(x)
