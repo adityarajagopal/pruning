@@ -69,7 +69,9 @@ def parse_arguments():
     parser.add_argument('--across_networks', action='store_true', help='plot difference in channels before and after finetuning compared across networks')
     
     parser.add_argument('--inf_gops', action='store_true', help='plot inference gops vs test accuracy')
+    parser.add_argument('--error_bar', action='store_true', help='plot per network errorbar of all subsets')
     parser.add_argument('--subset_agnostic_logs', type=str, default='/home/ar4414/pytorch_training/src/ar4414/pruning/logs/subset_agnostic_logs.json', help='full file path of json file where logs for subset agnostic pruning was performed')
+
     
     parser.add_argument('--ft_epoch_gops', action='store_true', help='plot finetune gops vs test accuracy')
     parser.add_argument('--plot_as_line', type=str, nargs='+', default=None, help='pruning percentages to plot as a line')
@@ -95,13 +97,13 @@ def get_save_location(args):
             else:
                 saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/bin_search_cost_time/{}/'.format(args.loc, args.mode)
         elif args.inf_gops:
-            if args.prof_logs is None:
-                saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/inference_gops/'.format(args.loc)
+            if args.error_bar:
+                folderName = 'errorbar_inference_gops' if args.prof_logs is None else 'errorbar_inference_time'
             else:
-                saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/inference_time/'.format(args.loc)
+                folderName = 'inference_gops' if args.prof_logs is None else 'inference_time'
+            saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/{}/'.format(args.loc, folderName)
         elif args.time_tradeoff:
             saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/search_inf_time_tradeoff/'.format(args.loc)
-            # saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/search_inf_time_tradeoff_v1/'.format(args.loc)
         elif args.pre_post_ft:
             saveLoc = '/home/ar4414/pytorch_training/src/ar4414/pruning/graphs/{}/difference_in_channels_pruned_per_network_subset/'.format(args.loc)
         elif args.across_networks:
@@ -196,7 +198,10 @@ if __name__ == '__main__':
         # plot inference gops vs accuracy tradeoff
         if args.inf_gops:
             print("==> Plotting GOps for inference vs best test top1 accuracy obtained")
-            gopSrc.plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc, (args.prof_logs is not None))
+            if args.error_bar:
+                gopSrc.plot_inf_gops_vs_acc_errorbar(summaryData, subsetAgnosticSummaryData, saveLoc, (args.prof_logs is not None))
+            else:
+                gopSrc.plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc, (args.prof_logs is not None))
     
         # plot difference in channels pruned by percentage pruned
         if args.pre_post_ft:

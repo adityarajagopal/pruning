@@ -30,7 +30,7 @@ for netCount, net in enumerate(nets):
             
     config['training_hyperparameters']['print_only'] = "True"
     
-    config['pytorch_parameters']['gpu_id'] = "1"
+    config['pytorch_parameters']['gpu_id'] = "0"
     config['pytorch_parameters']['resume'] = "False"
     config['pytorch_parameters']['branch'] = "False"
     config['pytorch_parameters']['evaluate'] = "False"

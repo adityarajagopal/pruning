@@ -10,7 +10,7 @@ import sys
 #                 '0 0.0008 5 0.02 15 -1 25 -1',
 #                 '0 0.001 5 0.01 15 -1 25 -1'
 #               ]
-nets = ['mobilenetv2']
+nets = ['resnet']
 lrSchedules = [
                 '0 0.001 5 0.01 15 -1 25 -1'
               ]
@@ -21,7 +21,7 @@ lrSchedules = [
 #                 '0 0.01 10 -1 20 -1'
 #               ]
 # pruningPercs = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95]
-pruningPercs = [60,65,70,75,80,85,90,95]
+pruningPercs = [55,60,65,70,75,80,85,90,95]
 # subset = ['aquatic', 'subset1', 'indoors', 'natural', 'random1']
 # sub_classes = [
 #                 'aquatic_mammals fish',
@@ -58,7 +58,7 @@ for netCount, net in enumerate(nets):
             
     repeats = 5
     # gpu = netCount % 3 
-    gpu = 1
+    gpu = 0
     runFile = os.path.join(runFileBase, 'run_{}.sh'.format(gpu))
     runFiles.append(runFile)
     

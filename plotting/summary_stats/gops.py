@@ -7,6 +7,7 @@ import math
 import configparser as cp
 
 import numpy as np
+import pandas as pd
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 
@@ -82,6 +83,56 @@ def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc=None, t
                 plt.tight_layout()
                 figFile = os.path.join(saveLoc, '{}_{}.png'.format(net, subset))
                 plot[0].savefig(figFile)
+#}}}
+
+def plot_inf_gops_vs_acc_errorbar(summaryData, subsetAgnosticSummaryData, saveLoc=None, time=False):
+#{{{
+    xAxis = 'InferenceGops' if not time else 'InferenceTime'
+    yAxis = 'AvgTestAcc'
+    yErr = 'StdTestAcc'
+
+    subsets = set(list(summaryData['Dataset']))
+    networks = set(list(summaryData['Network']))
+    #plt.subplots returns fig,ax
+    axes = {net:plt.subplots(1,1) for net in networks} 
+    errorBars = {net:{'Type':[], 'PrunePerc':[], yAxis:[], yErr:[], xAxis:[]} for net in networks}
+
+    for (network, pp), data in summaryData.groupby(['Network', 'PrunePerc']):
+        errorBars[network]['Type'].append('Subset Aware Pruning')
+        errorBars[network]['PrunePerc'].append(pp)
+        errorBars[network][yAxis].append(data[yAxis].mean())
+        errorBars[network][yErr].append(data[yAxis].std())
+        errorBars[network][xAxis].append(data[xAxis].mean())
+
+    for (network, pp), data in subsetAgnosticSummaryData.groupby(['Network', 'PrunePerc']):
+        ptType = 'Subset Agnostic Pruning' if pp != '0' else 'Unpruned'
+        errorBars[network]['Type'].append(ptType)
+        errorBars[network]['PrunePerc'].append(int(pp))
+        errorBars[network][yAxis].append(data['TestAcc'].mean())
+        errorBars[network][yErr].append(data['TestAcc'].std())
+        errorBars[network][xAxis].append(data[xAxis].mean())
+
+    errorBarsDf = {net : pd.DataFrame(val) for net,val in errorBars.items()}
+    plotData = {
+                'Unpruned' : {'colour': 'red', 'marker': 'x'},
+                'Subset Agnostic Pruning' : {'colour':'blue', 'marker':'*'},
+                'Subset Aware Pruning' : {'colour':'green', 'marker':'o'}
+              }
+    
+    plt.rcParams['errorbar.capsize'] = 4
+    for net,df in errorBarsDf.items():
+        for ptType, data in df.groupby(['Type']):
+            title = 'Top1 Test Accuracy (Mean +/- Std %) \n for {} across subsets'.format(net.capitalize()) 
+            xlabel = 'Inference Ops (GOps)' if not time else 'Inference Time (ms)'
+            ax = data.plot.scatter(x=xAxis, y=yAxis, ax=axes[net][1], label=ptType, yerr=yErr, color=plotData[ptType]['colour'], marker=plotData[ptType]['marker'], title=title)
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel('Test Accuracy (%)')
+    
+    if saveLoc is not None:
+        for net,plot in axes.items(): 
+           plt.tight_layout()
+           figFile = os.path.join(saveLoc, '{}.png'.format(net))
+           plot[0].savefig(figFile)
 #}}}
 
 def plot_ft_gops_vs_acc(summaryData):
