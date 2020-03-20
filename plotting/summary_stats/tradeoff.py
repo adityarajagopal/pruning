@@ -14,6 +14,8 @@ import torch.nn as nn
 
 import src.ar4414.pruning.plotting.summary_stats.collector as collector
 
+datasetTranslate = {'aquatic':'aquatic', 'subset1':'outdoor', 'indoors':'indoor', 'natural':'natural', 'random1':'random'}
+
 def get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, ptType): 
 #{{{
     validEpochs = validPoints.index.values.tolist()
@@ -53,7 +55,8 @@ def get_tradeoff_points(binSearchResults, inferenceTimes, unprunedData, pruneAft
             searchEpochData = binSearchResults[net][subset]['epoch_data']
             
             # get values for unpruned network
-            unprunedStats = unprunedData.loc[(unprunedData['Network'] == net) & (unprunedData['Subset'] == subset)] 
+            # unprunedStats = unprunedData.loc[(unprunedData['Network'] == net) & (unprunedData['Subset'] == subset)] 
+            unprunedStats = unprunedData.loc[(unprunedData['Network'] == net) & (unprunedData['Subset'] == datasetTranslate[subset])] 
             targetAcc = float(unprunedStats['TestAcc'])
             baseMetric = float(inferenceTimes[net]['0'])
 
@@ -92,11 +95,11 @@ def get_tradeoff_points(binSearchResults, inferenceTimes, unprunedData, pruneAft
 def plot_tradeoff(data, saveLoc=None): 
 #{{{
     colours = {
-                'Unpruned'            : 'blue',
+                'Unpruned'            : 'red',
                 '>= Unpruned Network' : 'green',
                 'Error < 1%'          : 'yellow',
                 'Error < 2%'          : 'orange',
-                'Error < 4%'          : 'red'
+                'Error < 4%'          : 'dark red'
               }
     
     nets = list(data.keys()) 

@@ -19,9 +19,13 @@ import src.ar4414.pruning.plotting.summary_stats.gops as gopSrc
 import src.ar4414.pruning.plotting.summary_stats.timing as timingSrc
 import src.ar4414.pruning.plotting.summary_stats.l1_norms as l1NormsSrc
 import src.ar4414.pruning.plotting.summary_stats.channel_diff as channeDiffSrc
+    
+datasetTranslate = {'aquatic':'aquatic', 'subset1':'outdoor', 'indoors':'indoor', 'natural':'natural', 'random1':'random'}
 
 def summary_statistics(logs, networks, datasets, prunePercs):
 #{{{    
+    global datasetTranslate
+    
     # data refers to runs that have been pruned based on finetuning on the dataset
     data = {'Network':[], 'Dataset':[], 'PrunePerc':[], 'AvgTestAcc':[], 'StdTestAcc':[], 'PreFtDiff':[], 'PostFtDiff':[], 'InferenceGops':[], 'FinetuneGops':[], 'Memory(MB)':[]}
     
@@ -68,9 +72,10 @@ def summary_statistics(logs, networks, datasets, prunePercs):
                 pDiffPerRun, pDiffBetweenRuns = channeDiffSrc.compute_differences(preFtChannelsPruned, tmpPruned)
                 avgTestAcc = np.mean(tmpAcc) 
                 stdTestAcc = np.std(tmpAcc)
-                
+
                 data['Network'].append(network)
-                data['Dataset'].append(dataset)
+                data['Dataset'].append(datasetTranslate[dataset])
+                # data['Dataset'].append(dataset)
                 data['PrunePerc'].append(int(pp))
                 data['AvgTestAcc'].append(avgTestAcc)
                 data['StdTestAcc'].append(stdTestAcc)
@@ -87,16 +92,19 @@ def summary_statistics(logs, networks, datasets, prunePercs):
 
 def subset_agnostic_summary_statistics(logs, networks, datasets, prunePercs, subsetAgnosticLogs):
 #{{{
+    global datasetTranslate
+
     # data refers to runs that have not been pruned or pruned without finetuning on the subset 
     data = {'Network':[], 'Subset':[], 'PrunePerc':[], 'TestAcc':[], 'InferenceGops':[]}
 
     prunePercs = ['0'] + prunePercs
-    
+                
     for network in networks:
         for subset in datasets:
             for pp in prunePercs:
                 data['Network'].append(network)
-                data['Subset'].append(subset)
+                # data['Subset'].append(subset)
+                data['Subset'].append(datasetTranslate[subset])
                 data['PrunePerc'].append(pp)
                 if pp == '0':
                     data['TestAcc'].append(logs[network][subset]['unpruned_inference']['test_top1'])

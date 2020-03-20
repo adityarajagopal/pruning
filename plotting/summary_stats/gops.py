@@ -11,6 +11,36 @@ import pandas as pd
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 
+def test_accuracy_max_delta(summaryData, subsetAgnosticSummaryData): 
+#{{{
+    meanDeltas = []
+    maxDeltas = []
+    # globalDeltas = None
+    
+    for (subset, net), data in summaryData.groupby(['Dataset', 'Network']): 
+        subsetAwareAccs = []
+        subsetAgnosticAccs = []
+        prunePercs = []
+        
+        for pp, data in data.groupby(['PrunePerc']):
+            subsetAwareAccs.append(float(data['AvgTestAcc']))
+            case = ((subsetAgnosticSummaryData['Subset'] == subset) & (subsetAgnosticSummaryData['Network'] == net) & (subsetAgnosticSummaryData['PrunePerc'] == str(pp)))
+            subsetAgnosticAccs.append(float(subsetAgnosticSummaryData.loc[case]['TestAcc']))
+            prunePercs.append(int(pp))
+        
+        deltas = np.array(subsetAwareAccs) - np.array(subsetAgnosticAccs)
+        meanDeltas.append(np.mean(deltas))
+        maxDeltas.append(np.max(deltas))
+        
+        # if globalDeltas is None:
+        #     globalDeltas = pd.DataFrame({p:[] for p in prunePercs})
+        # globalDeltas = globalDeltas.append({p:deltas[i] for i,p in enumerate(prunePercs)}, ignore_index=True)
+
+    # means = globalDeltas.mean()
+    # plt.bar(list(means.index), list(means), yerr=list(globalDeltas.std())) 
+    print('Mean Delta = {}, Max Delta = {}'.format(np.mean(meanDeltas), np.max(maxDeltas))) 
+#}}}
+
 def get_gops(basePath, log, perEpoch=False):
 #{{{
     gopsFile = os.path.join(basePath, log, 'gops.json')
@@ -53,17 +83,15 @@ def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc=None, t
 
     subsets = set(list(summaryData['Dataset']))
     networks = set(list(summaryData['Network']))
-    #plt.subplots returns fig,ax
     axes = {net:{subset:plt.subplots(1,1) for subset in subsets} for net in networks} 
 
     for (dataset, net), data in summaryData.groupby(['Dataset', 'Network']):
         title = 'Top1 Test Accuracy (%) for {} on {}'.format(net.capitalize(), dataset.capitalize()) 
         label = 'Subset Aware Pruning'
         
-        ax = data.plot.scatter(x=xAxis, y=yAxis, ax=axes[net][dataset][1], label=label, title=title)
+        ax = data.plot.scatter(x=xAxis, y=yAxis, ax=axes[net][dataset][1], label=label, title=title, color='green')
         
         xlabel = 'Inference GOps' if not time else 'Inference Time per image (ms)'
-        # ax.set_xlabel('Inference GOps')
         ax.set_xlabel(xlabel)
         ax.set_ylabel('Test Accuracy (%)')
     
@@ -71,10 +99,9 @@ def plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc=None, t
         for count, (pp, points) in enumerate(data.groupby(['PrunePerc'])):
             labels = ['Subset Agnostic Unpruned', 'Subset Agnostic Pruning', '']
             labelIdx = 0 if pp == "0" else 1 if count == 1 else 2
-            marker = 'x' if pp == "0" else '+'
+            colour = 'red' if pp == "0" else 'orange'
             
-            # axes[net][subset][1].plot([float(points['InferenceGops'])], [float(points['TestAcc'])], label=labels[labelIdx], marker=marker, markersize=4, color='red', linestyle="None")
-            axes[net][subset][1].plot([float(points[xAxis])], [float(points['TestAcc'])], label=labels[labelIdx], marker=marker, markersize=4, color='red', linestyle="None")
+            axes[net][subset][1].plot([float(points[xAxis])], [float(points['TestAcc'])], label=labels[labelIdx], marker='o', markersize=4, color=colour, linestyle="None")
             axes[net][subset][1].legend()
 
     if saveLoc is not None:
@@ -93,7 +120,6 @@ def plot_inf_gops_vs_acc_errorbar(summaryData, subsetAgnosticSummaryData, saveLo
 
     subsets = set(list(summaryData['Dataset']))
     networks = set(list(summaryData['Network']))
-    #plt.subplots returns fig,ax
     axes = {net:plt.subplots(1,1) for net in networks} 
     errorBars = {net:{'Type':[], 'PrunePerc':[], yAxis:[], yErr:[], xAxis:[]} for net in networks}
 
@@ -114,15 +140,15 @@ def plot_inf_gops_vs_acc_errorbar(summaryData, subsetAgnosticSummaryData, saveLo
 
     errorBarsDf = {net : pd.DataFrame(val) for net,val in errorBars.items()}
     plotData = {
-                'Unpruned' : {'colour': 'red', 'marker': 'x'},
-                'Subset Agnostic Pruning' : {'colour':'blue', 'marker':'*'},
+                'Unpruned' : {'colour': 'red', 'marker': 'o'},
+                'Subset Agnostic Pruning' : {'colour':'orange', 'marker':'o'},
                 'Subset Aware Pruning' : {'colour':'green', 'marker':'o'}
               }
     
     plt.rcParams['errorbar.capsize'] = 4
     for net,df in errorBarsDf.items():
         for ptType, data in df.groupby(['Type']):
-            title = 'Top1 Test Accuracy (Mean +/- Std %) \n for {} across subsets'.format(net.capitalize()) 
+            title = 'Top1 Test Accuracy (Mean +/- Std %) \n for {} across all subsets'.format(net.capitalize()) 
             xlabel = 'Inference Ops (GOps)' if not time else 'Inference Time (ms)'
             ax = data.plot.scatter(x=xAxis, y=yAxis, ax=axes[net][1], label=ptType, yerr=yErr, color=plotData[ptType]['colour'], marker=plotData[ptType]['marker'], title=title)
             ax.set_xlabel(xlabel)

@@ -201,6 +201,7 @@ if __name__ == '__main__':
             if args.error_bar:
                 gopSrc.plot_inf_gops_vs_acc_errorbar(summaryData, subsetAgnosticSummaryData, saveLoc, (args.prof_logs is not None))
             else:
+                gopSrc.test_accuracy_max_delta(summaryData, subsetAgnosticSummaryData)
                 gopSrc.plot_inf_gops_vs_acc(summaryData, subsetAgnosticSummaryData, saveLoc, (args.prof_logs is not None))
     
         # plot difference in channels pruned by percentage pruned

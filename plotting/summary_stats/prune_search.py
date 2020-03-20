@@ -14,6 +14,8 @@ import torch.nn as nn
 
 import src.ar4414.pruning.plotting.summary_stats.collector as collector
 
+datasetTranslate = {'aquatic':'aquatic', 'subset1':'outdoor', 'indoors':'indoor', 'natural':'natural', 'random1':'random'}
+
 def check_stopping(mode, state, prevPp, currPp):
 #{{{
     if mode == 'memory_opt':
@@ -52,6 +54,8 @@ def single_search(perEpochData, currCost, targetAcc, pruneAfter):
 
 def bin_search_cost(logs, networks, datasets, prunePercs, mode='memory_opt', profLogPath=None, targetData=None):
 #{{{
+    global datasetTranslate
+    
     # perform binary search to find pruning percentage that give no accuracy loss
     data = {net:{subset:None for subset in datasets} for net in networks}
     initPp = 50                     
@@ -81,7 +85,8 @@ def bin_search_cost(logs, networks, datasets, prunePercs, mode='memory_opt', pro
             if targetData is None:
                 targetAcc = max(list(perEpochData['Test_Top1'])[:pruneAfter])
             else:
-                targetAcc = float(targetData.loc[(targetData['Network'] == net) & (targetData['Subset'] == subset)]['TestAcc'])
+                # targetAcc = float(targetData.loc[(targetData['Network'] == net) & (targetData['Subset'] == subset)]['TestAcc'])
+                targetAcc = float(targetData.loc[(targetData['Network'] == net) & (targetData['Subset'] == datasetTranslate[subset])]['TestAcc'])
             state = 0
             bestTestAcc = targetAcc
             epochCount = pruneAfter
