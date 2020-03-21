@@ -7,14 +7,14 @@ import itertools
 
 import numpy as np
 import pandas as pd
+from matplotlib import rc 
 import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
 
+from src.ar4414.pruning.plotting.config import datasetTranslate
 import src.ar4414.pruning.plotting.summary_stats.collector as collector
-
-datasetTranslate = {'aquatic':'aquatic', 'subset1':'outdoor', 'indoors':'indoor', 'natural':'natural', 'random1':'random'}
 
 def get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, ptType): 
 #{{{
@@ -36,6 +36,7 @@ def get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, ptT
         types.append(ptType)
     dp['Metric'] = metric
     dp['Type'] = types
+    dp['PruningLevel'] = uniquePp
     
     return dp
 #}}}
@@ -49,7 +50,7 @@ def get_tradeoff_points(binSearchResults, inferenceTimes, unprunedData, pruneAft
 
     for net in nets:
         for subset in subsets:
-            dataPoints = pd.DataFrame({'Type':[], 'TestAcc':[], 'Time':[], 'Metric':[]})
+            dataPoints = pd.DataFrame({'Type':[], 'PruningLevel':[], 'TestAcc':[], 'Time':[], 'Metric':[]})
             
             searchCost = binSearchResults[net][subset]['cost'].drop(columns=['Gops'])
             searchEpochData = binSearchResults[net][subset]['epoch_data']
@@ -63,7 +64,6 @@ def get_tradeoff_points(binSearchResults, inferenceTimes, unprunedData, pruneAft
             # get points which match or exceed original accuracy
             validPoints = searchCost.loc[searchCost.index > pruneAfter-1].loc[searchCost['TestAcc'] >= targetAcc]
             dpValid = get_data_valid_points(net, validPoints, searchEpochData, inferenceTimes, '>= Unpruned Network')
-
             otherDatapoints = []
             # get points which drop by <1%
             # condition1 = (searchCost['TestAcc'] < targetAcc) & (searchCost['TestAcc'] >= (targetAcc-1.0))
@@ -102,6 +102,8 @@ def plot_tradeoff(data, saveLoc=None):
                 'Error < 4%'          : 'dark red'
               }
     
+    labels = {'Unpruned' : "$\mathcal{M}_\mathcal{D}$ on $\mathcal{C}'$", '>= Unpruned Network' : "$\mathcal{M}_\mathcal{D}'$ on $\mathcal{C}'$"}
+    
     nets = list(data.keys()) 
     subsets = list(data[nets[0]].keys())
     for net in nets: 
@@ -112,8 +114,14 @@ def plot_tradeoff(data, saveLoc=None):
             ax[1].set_ylabel("Inference Time for searched model (s)")
             for ptType, pts in data[net][subset].groupby(['Type']): 
                 label = ptType
-                ax[1].scatter(pts['Time'], pts['Metric'], color=colours[ptType], label=label)
+                ax[1].scatter(pts['Time'], pts['Metric'], color=colours[ptType], label=labels[ptType])
                 ax[1].legend()
+                if ptType is not 'Unpruned':
+                    for idx, time in enumerate(list(pts['Time'])):
+                        text = "{} %".format(str(pts['PruningLevel'][idx]))
+                        loc = (time, pts['Metric'][idx])
+                        textOffsetPixels = (-30,-20)
+                        ax[1].annotate(text, loc, xytext=textOffsetPixels, textcoords='offset pixels')
             
             if saveLoc is not None: 
                 plt.tight_layout()

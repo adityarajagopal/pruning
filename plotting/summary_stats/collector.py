@@ -14,13 +14,12 @@ import pandas as pd
 import torch.nn as nn
 import matplotlib.pyplot as plt
 
+from src.ar4414.pruning.plotting.config import datasetTranslate
 import src.ar4414.pruning.plotting.summary_stats.acc as accSrc
 import src.ar4414.pruning.plotting.summary_stats.gops as gopSrc
 import src.ar4414.pruning.plotting.summary_stats.timing as timingSrc
 import src.ar4414.pruning.plotting.summary_stats.l1_norms as l1NormsSrc
 import src.ar4414.pruning.plotting.summary_stats.channel_diff as channeDiffSrc
-    
-datasetTranslate = {'aquatic':'aquatic', 'subset1':'outdoor', 'indoors':'indoor', 'natural':'natural', 'random1':'random'}
 
 def summary_statistics(logs, networks, datasets, prunePercs):
 #{{{    

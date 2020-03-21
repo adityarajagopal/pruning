@@ -12,9 +12,8 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 
+from src.ar4414.pruning.plotting.config import datasetTranslate
 import src.ar4414.pruning.plotting.summary_stats.collector as collector
-
-datasetTranslate = {'aquatic':'aquatic', 'subset1':'outdoor', 'indoors':'indoor', 'natural':'natural', 'random1':'random'}
 
 def check_stopping(mode, state, prevPp, currPp):
 #{{{
