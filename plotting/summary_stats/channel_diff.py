@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from src.ar4414.pruning.plotting.config import datasetTranslate
+
 def get_pruned_channels(basePath, log):
 #{{{
     logFile = os.path.join(basePath, log, 'pruned_channels.json')
@@ -50,7 +52,7 @@ def plot_channel_diff_by_pp(summaryData, saveLoc=None):
 #{{{
     for (dataset, net), data in summaryData.groupby(['Dataset', 'Network']):
         ax = plt.subplots(1,1)[1]
-        data.plot.bar(x='PrunePerc', y=['PreFtDiff', 'PostFtDiff'], title='Difference in Channels Pruned for {} on {}'.format(net, dataset), ax=ax)
+        data.plot.bar(x='PrunePerc', y=['PreFtDiff', 'PostFtDiff'], label=['Epoch 0 vs epoch $n_f$','Amongst models at epoch $n_f$'], title='Difference in Channels Pruned for {} on {}'.format(net.capitalize(), dataset.capitalize()), ax=ax)
         ax.set_xlabel('Pruning Percentage (%)')
         ax.set_ylabel('Percentage Difference in Channels Pruned (%)')
 
@@ -71,7 +73,7 @@ def plot_channel_diff_by_subset(summaryData, saveLoc=None):
         newDf = pd.DataFrame(transformedData)
         newDf.plot.bar(x='pp', title='Difference in Channels Pruned with finetuning on the {} subset'.format(subset.capitalize()), ax=ax)
         ax.set_xlabel('Pruning Percentage (%)')
-        ax.set_ylabel('Percentage Difference in Channels Pruned before and after finetuning (%)')
+        ax.set_ylabel('Percentage Difference in Channels Pruned \n before and after finetuning (%)')
 
         if saveLoc is not None:
             plt.tight_layout
