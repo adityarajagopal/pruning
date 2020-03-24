@@ -231,6 +231,7 @@ if __name__ == '__main__':
     if args.time_tradeoff:
     #{{{
         print('==> Plotting inference time vs training time tradeoff across points that produce no accuracy loss')
+        summaryData, pruneAfter = collector.summary_statistics(logs, networks, datasets, prunePercs)
         
         with open(args.subset_agnostic_logs, 'r') as jFile:
             subsetAgnosticLogs = json.load(jFile)
@@ -238,9 +239,9 @@ if __name__ == '__main__':
         targetData = subsetAgnosticSummaryData[subsetAgnosticSummaryData['PrunePerc'] == '0']
         
         binSearchMemoryOptimised = searchSrc.bin_search_cost(logs, networks, datasets, prunePercs, 'memory_opt', args.prof_logs, targetData)
-        infTime, _ = collector.timing_statistics(5, args.prof_logs, networks, ['cifar100'], prunePercs)  
+        infTime, _ = collector.timing_statistics(pruneAfter, args.prof_logs, networks, ['cifar100'], prunePercs)  
         
-        tradeoffPoints = tradeoffSrc.get_tradeoff_points(binSearchMemoryOptimised, infTime, targetData, 5)
+        tradeoffPoints = tradeoffSrc.get_tradeoff_points(summaryData, binSearchMemoryOptimised, infTime, targetData, pruneAfter)
         
         saveLoc = get_save_location(args)
         tradeoffSrc.plot_tradeoff(tradeoffPoints, saveLoc)
