@@ -1,3 +1,9 @@
+**A**utomated **D**ata-aware **P**runing and re**T**raining (**ADaPT**)
+=======================================================================
+This is the open-source tool connected to the paper "*Now that I can see, I can improve:* Enabling data-driven finetuning of CNNs on the edge 
+The README goes through various settings in the config files that allow to perform automated pruning and retarining of CNNs
+The pruners/ folder has all the details on pruning CNNs
+
 # Pruning Configurations 
 As you go down the config file, within the pruning_hyperpamaters section, each true before will cancel out the following true or falses, i.e. priority is top down.
 This README has details of the main pruning framework. Details on scripts available are in a README in the scripts folder and plotting options are in a README in the plotting folder. 
@@ -59,5 +65,5 @@ Multiple configurations possible. Base parameters are as follows:
     * setting this to true will perform the binary search algorithm described in the paper "Now that I can see, I can improve : Enabling data-driven finetuning of CNNs on the edge"
     * the other settings that need to be set are 'Pruning_After'(*n<sub>f</sub>* in paper), 'Finetune_Budget(*n<sub>r</sub>* in paper)'
 - Currently the values of *p<sub>l</sub>* is fixed to 5%, *p<sub>u</sub>* is fixed to 95% and *p<sub>i</sub>* is fixed to 5% corresponding to the paper.
-- The **Lr_Schedule** term works the same as usual and cycles through the desired learning rates after n<sub>f</sub> everytime a new iteration of binary search is performed. 
+- The **Lr_Schedule** term works the same as usual and cycles through the desired learning rates after n<sub>f</sub> epochs everytime a new iteration of binary search is performed. 
 
