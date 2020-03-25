@@ -8,9 +8,9 @@ class ResNet20(nn.Module):
 
         self.conv1 = nn.Conv2d(3, 11, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
         self.bn1 = nn.BatchNorm2d(11, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        self.layer1_0_conv1 = nn.Conv2d(11, 14, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-        self.layer1_0_bn1 = nn.BatchNorm2d(14, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        self.layer1_0_conv2 = nn.Conv2d(14, 11, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        self.layer1_0_conv1 = nn.Conv2d(11, 13, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        self.layer1_0_bn1 = nn.BatchNorm2d(13, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.layer1_0_conv2 = nn.Conv2d(13, 11, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
         self.layer1_0_bn2 = nn.BatchNorm2d(11, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
         self.layer1_1_conv1 = nn.Conv2d(11, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
         self.layer1_1_bn1 = nn.BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)

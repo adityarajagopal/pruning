@@ -41,6 +41,8 @@ class Params(ppSrc.Params) :
         if self.static:
             self.pruneAfter = config_file.getint('pruning_hyperparameters', 'prune_after', fallback=-2) 
         self.finetuneBudget = config_file.getint('pruning_hyperparameters', 'finetune_budget', fallback=0) 
+
+        self.binSearch = config_file.getboolean('pruning_hyperparameters', 'binary_search', fallback=False)
        
         self.pruneWeights = config_file.getboolean('pruning_hyperparameters', 'prune_weights')
         self.pruneFilters = config_file.getboolean('pruning_hyperparameters', 'prune_filters')

@@ -1,41 +1,40 @@
-import src.ar4414.pruning.gop_calculator as gopSrc
-import src.ar4414.pruning.fbs_channel_probability as fbsChanSrc
-import src.ar4414.pruning.entropy as entropySrc
-import src.ar4414.pruning.param_parser as ppSrc 
-import src.ar4414.pruning.model_creator as mcSrc
-import src.ar4414.pruning.inference as inferenceSrc
-import src.ar4414.pruning.checkpointing as checkpointingSrc
-import src.ar4414.pruning.training as trainingSrc
-
-import src.ar4414.pruning.pruners.base as pruningSrc
-from src.ar4414.pruning.pruners.alexnet import AlexNetPruning
-from src.ar4414.pruning.pruners.resnet import ResNet20PruningDependency as ResNetPruning
-from src.ar4414.pruning.pruners.mobilenetv2 import MobileNetV2PruningDependency as MobileNetV2Pruning 
-from src.ar4414.pruning.pruners.squeezenet import SqueezeNetPruning 
-
-import src.app as appSrc
-import src.input_preprocessor as preprocSrc
-
 import os
-import random
 import sys
 import json
-import subprocess
 import time
-
-import configparser as cp
-
-import tensorboardX as tbx
+import random
+import subprocess
 
 import torch
 import torch.cuda
 import torch.nn as nn
 
-import matplotlib.pyplot as plt
-import matplotlib
 import math
+import matplotlib
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+
+import configparser as cp
+
+import src.ar4414.pruning.param_parser as ppSrc 
+import src.ar4414.pruning.entropy as entropySrc
+import src.ar4414.pruning.model_creator as mcSrc
+import src.ar4414.pruning.training as trainingSrc
+import src.ar4414.pruning.gop_calculator as gopSrc
+import src.ar4414.pruning.inference as inferenceSrc
+import src.ar4414.pruning.checkpointing as checkpointingSrc
+import src.ar4414.pruning.dapr.binary_search as binSearchSrc
+import src.ar4414.pruning.fbs_channel_probability as fbsChanSrc
+
+import src.ar4414.pruning.pruners.base as pruningSrc
+from src.ar4414.pruning.pruners.alexnet import AlexNetPruning
+from src.ar4414.pruning.pruners.squeezenet import SqueezeNetPruning 
+from src.ar4414.pruning.pruners.resnet import ResNet20PruningDependency as ResNetPruning
+from src.ar4414.pruning.pruners.mobilenetv2 import MobileNetV2PruningDependency as MobileNetV2Pruning 
+
+import src.app as appSrc
+import src.input_preprocessor as preprocSrc
 
 class Application(appSrc.Application):
     def main(self):
@@ -43,7 +42,6 @@ class Application(appSrc.Application):
         self.setup_dataset()
         self.setup_model()
         self.setup_tee_printing()
-        # self.setup_pruners()
 
         if self.params.getGops: 
         #{{{
@@ -206,6 +204,14 @@ class Application(appSrc.Application):
             #}}}
         #}}}
 
+        elif self.params.binSearch: 
+        #{{{    
+            print("==> Performing Binary Search")
+            binSearcher = binSearchSrc.BinarySearch(self.params)
+            bestPruneLevel, bestTestAcc = binSearcher.perform_search(self)
+            print("Best pruning level found = {}, Best test accuracy = {:10.5f}".format(bestPruneLevel, bestTestAcc))
+        #}}}
+
         elif self.params.entropy == True:
         #{{{
             print('=========Baseline Accuracy==========')
@@ -329,6 +335,7 @@ class Application(appSrc.Application):
     
     def setup_pruners(self):
     #{{{
+        self.params.pruneFilters = True
         if 'alexnet' in self.params.arch:
             self.pruner = AlexNetPruning(self.params, self.model)
             self.netName = 'AlexNet'
