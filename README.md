@@ -59,4 +59,5 @@ Multiple configurations possible. Base parameters are as follows:
     * setting this to true will perform the binary search algorithm described in the paper "Now that I can see, I can improve : Enabling data-driven finetuning of CNNs on the edge"
     * the other settings that need to be set are 'Pruning_After'(*n<sub>f</sub>* in paper), 'Finetune_Budget(*n<sub>r</sub>* in paper)'
 - Currently the values of *p<sub>l</sub>* is fixed to 5%, *p<sub>u</sub>* is fixed to 95% and *p<sub>i</sub>* is fixed to 5% corresponding to the paper.
+- The **Lr_Schedule** term works the same as usual and cycles through the desired learning rates after n<sub>f</sub> everytime a new iteration of binary search is performed. 
 

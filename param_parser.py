@@ -38,8 +38,7 @@ class Params(ppSrc.Params) :
         self.pruningPerc = config_file.getfloat('pruning_hyperparameters', 'pruning_perc')
         self.prunePercIncrement = config_file.getint('pruning_hyperparameters', 'iterative_pruning_increment') 
         self.iterPruneInc = config_file.getint('pruning_hyperparameters', 'iterative_pruning_increment') 
-        if self.static:
-            self.pruneAfter = config_file.getint('pruning_hyperparameters', 'prune_after', fallback=-2) 
+        self.pruneAfter = config_file.getint('pruning_hyperparameters', 'prune_after', fallback=-2) 
         self.finetuneBudget = config_file.getint('pruning_hyperparameters', 'finetune_budget', fallback=0) 
 
         self.binSearch = config_file.getboolean('pruning_hyperparameters', 'binary_search', fallback=False)

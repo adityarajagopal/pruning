@@ -26,6 +26,7 @@ class BinarySearch(trainingSrc.Trainer):
         newLrs = params.lr_schedule[1::2]
         epoch = params.curr_epoch
 
+        # effectiveEpoch = epoch if (epoch < params.pruneAfter) else (((epoch - params.pruneAfter) % params.finetuneBudget) + params.pruneAfter)
         effectiveEpoch = epoch if (epoch < params.pruneAfter) else (((epoch - params.pruneAfter) % params.finetuneBudget) + params.pruneAfter)
 
         if effectiveEpoch in changeEpochs:
@@ -125,6 +126,7 @@ class BinarySearch(trainingSrc.Trainer):
         # store model to revert to 
         finetunedModel = app.model
         app.checkpointer.save_model_only(app.model.state_dict(), app.params.printOnly, 'pre_pruning')
+        app.params.curr_epoch += 1
             
         # initialise search
         app.params.start_epoch = app.params.pruneAfter
