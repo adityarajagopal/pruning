@@ -60,11 +60,3 @@ Multiple configurations possible. Base parameters are as follows:
     * the other settings that need to be set are 'Pruning_After'(*n<sub>f</sub>* in paper), 'Finetune_Budget(*n<sub>r</sub>* in paper)'
 - Currently the values of *p<sub>l</sub>* is fixed to 5%, *p<sub>u</sub>* is fixed to 95% and *p<sub>i</sub>* is fixed to 5% corresponding to the paper.
 
-**Pruning a Custom Network** 
-==============================
-- If network has a special module, and this module has a conv, a decorator needs to be created (decorators.py)
-
-sub-heading
------------------------
-text
-
