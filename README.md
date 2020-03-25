@@ -54,6 +54,12 @@ Multiple configurations possible. Base parameters are as follows:
 - **Retrain** : False
 * will prune model specified in Pretrained to pruning percentage sepcified by Pruning_Perc and report inference statistics 
 
+## Performing binary search DaPR methodology 
+- **Binary_Search** : True
+    * setting this to true will perform the binary search algorithm described in the paper "Now that I can see, I can improve : Enabling data-driven finetuning of CNNs on the edge"
+    * the other settings that need to be set are 'Pruning_After'(*n<sub>f</sub>* in paper), 'Finetune_Budget(*n<sub>r</sub>* in paper)'
+- Currently the values of *p<sub>l</sub>* is fixed to 5%, *p<sub>u</sub>* is fixed to 95% and *p<sub>i</sub>* is fixed to 5% corresponding to the paper.
+
 **Pruning a Custom Network** 
 ==============================
 - If network has a special module, and this module has a conv, a decorator needs to be created (decorators.py)
