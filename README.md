@@ -3,6 +3,7 @@
 This is the open-source tool connected to the paper "*Now that I can see, I can improve:* Enabling data-driven finetuning of CNNs on the edge".
 The README goes through various settings in the config files that allow to perform automated pruning and retarining of CNNs.
 The *pruners/* folder has all the details on pruning CNNs.
+The adapt.yml file has the conda environment that would satisfy all the required dependencies for this project. 
 
 ## Pruning Configurations 
 As you go down the config file, within the pruning_hyperpamaters section, each true before will cancel out the following true or falses, i.e. priority is top down.
