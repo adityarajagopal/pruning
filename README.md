@@ -5,6 +5,8 @@ The README goes through various settings in the config files that allow to perfo
 The *pruners/* folder has all the details on pruning CNNs.
 The adapt.yml file has the conda environment that would satisfy all the required dependencies for this project. 
 
+In order to run this project, clone https://github.com/adityarajagopal/pytorch_training.git and place this directory under src/ar4414/ 
+
 ## Pruning Configurations 
 As you go down the config file, within the pruning_hyperpamaters section, each true before will cancel out the following true or falses, i.e. priority is top down.
 This README has details of the main pruning framework. Details on scripts available are in a README in the scripts folder and plotting options are in a README in the plotting folder. 
