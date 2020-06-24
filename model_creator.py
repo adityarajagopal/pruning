@@ -52,8 +52,11 @@ class ModelCreator(mcSrc.ModelCreator):
     def load_pretrained(self, params, model):
     #{{{
         if params.resume or params.branch or params.entropy or params.pruneFilters or params.binSearch: 
-            checkpoint = torch.load(params.pretrained)
-            model.load_state_dict(checkpoint)
+            if params.pretrained is not None:
+                checkpoint = torch.load(params.pretrained)
+                model.load_state_dict(checkpoint)
+            else:
+                print("WARNING: Attempting to run something which would normally require a pretrained model without one - check model_creator.py")
 
         elif params.fbsPruning:
             device_id = params.gpu_list[0]
