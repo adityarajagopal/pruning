@@ -1,0 +1,3 @@
+[submodule "pruners"]
+	path = pruners
+	url = git@github.com:adityarajagopal/pruners.git
