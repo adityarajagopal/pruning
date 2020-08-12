@@ -240,7 +240,8 @@ class BasicPruning(ABC):
         for p in model.named_parameters():
         #{{{
             layerName = '.'.join(p[0].split('.')[:-1])
-            if layerName in self.depBlock.linkedConvAndFc.keys() and layerName not in layers:
+            # if layerName in self.depBlock.linkedConvAndFc.keys() and layerName not in layers:
+            if layerName in self.depBlock.linkedConvs.keys() and layerName not in layers:
                 netInst = type(self.model.module)
                 try:
                     if layerName in self.depBlock.ignore[netInst]:
@@ -248,7 +249,7 @@ class BasicPruning(ABC):
                 except (AttributeError, KeyError): 
                     pass
                 layers.append(layerName)
-            
+                
                 pNp = p[1].data.cpu().numpy()
             
                 # calculate metric

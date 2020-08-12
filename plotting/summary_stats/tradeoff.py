@@ -152,11 +152,3 @@ def plot_tradeoff(data, saveLoc=None):
     print("Max latency gain = {} \n Max gops gain = {} \n Max Pruning level = {}".format(maxLatencyGain, maxGopsGain, maxPruningLvl))
 #}}}
 
-
-
-
-
-
-
-
-

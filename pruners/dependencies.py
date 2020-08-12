@@ -431,6 +431,7 @@ class DependencyBlock(object):
         Returns a list which has connectivity between all convs and FCs in the network 
         """
         linkedLayers = {}
+        self.linkedConvs = {}
         for i in range(len(linkedModulesWithFc)-1):
             # get current module details
             mName, mType, m = linkedModulesWithFc[i]
@@ -448,6 +449,8 @@ class DependencyBlock(object):
                     connected[k] = connectedTo
             
             linkedLayers.update(connected)
+            if convs != []:
+                self.linkedConvs.update(connected)
        
         return linkedLayers
     #}}}

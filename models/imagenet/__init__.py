@@ -1,1 +1,2 @@
-from .resnet import *
+from .alexnet import *
+from .squeezenet import *
