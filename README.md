@@ -14,7 +14,7 @@ This is the open-source tool connected to the paper "*Now that I can see, I can 
 
 The README goes through various settings in the config files that allow to perform automated pruning and retarining of CNNs.
 The **pruners/** folder here has all the details on pruning CNNs on the CIFAR dataset and was used to collect results for the paper. 
-For an updated **pruners** folder that has ImageNet pruning as well as a wider variety of networks for which pruning is implemented, please check out https://github.com/adityarajagopal/pruners.git 
+For an updated **pruners** folder that has ImageNet pruning as well as a wider variety of networks for which pruning is implemented, please check out https://github.com/adityarajagopal/pruners.git. 
 The updated pruners also works as a standalone library that can be used in your own projects.
 The adapt.yml file has the conda environment that would satisfy all the required dependencies for this project. 
 
