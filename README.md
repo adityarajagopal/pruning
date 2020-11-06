@@ -1,11 +1,23 @@
 **A**utomated **D**ata-aware **P**runing and re**T**raining (**ADaPT**)
 =======================================================================
-This is the open-source tool connected to the paper "*Now that I can see, I can improve:* Enabling data-driven finetuning of CNNs on the edge".
+This is the open-source tool connected to the paper "*Now that I can see, I can improve:* Enabling data-driven finetuning of CNNs on the edge" that was published in the EDLCV workshop in CVPR 2020. If you use this tool in a publication, we would appreciate using the following citation:  
+```
+@misc{rajagopal2020i,
+      title={Now that I can see, I can improve: Enabling data-driven finetuning of CNNs on the edge}, 
+      author={Aditya Rajagopal and Christos-Savvas Bouganis},
+      year={2020},
+      eprint={2006.08554},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```
+
 The README goes through various settings in the config files that allow to perform automated pruning and retarining of CNNs.
-The *pruners/* folder has all the details on pruning CNNs.
+The **pruners/** folder has all the details on pruning CNNs on the CIFAR dataset and was used to get results for the paper. 
+An updated **pruners** folder that has ImageNet pruning as well as a wider variety of networks for which pruning is implemented, please check out https://github.com/adityarajagopal/pruners.git 
 The adapt.yml file has the conda environment that would satisfy all the required dependencies for this project. 
 
-In order to run this project, clone https://github.com/adityarajagopal/pytorch_training.git and place this directory under src/ar4414/ 
+In order to run this project, clone https://github.com/adityarajagopal/pytorch_training.git and run "git submodule update --init src/ar4414/pruning". 
 
 ## Pruning Configurations 
 As you go down the config file, within the pruning_hyperpamaters section, each true before will cancel out the following true or falses, i.e. priority is top down.
