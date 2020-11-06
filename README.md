@@ -17,7 +17,7 @@ The **pruners/** folder here has all the details on pruning CNNs on the CIFAR da
 For an updated **pruners** folder that has ImageNet pruning as well as a wider variety of networks for which pruning is implemented, please check out https://github.com/adityarajagopal/pruners.git 
 The adapt.yml file has the conda environment that would satisfy all the required dependencies for this project. 
 
-In order to run this project, clone https://github.com/adityarajagopal/pytorch_training.git and run "git submodule update --init src/ar4414/pruning". 
+In order to run this project, clone https://github.com/adityarajagopal/pytorch_training.git and run **git submodule update --init src/ar4414/pruning**. 
 
 ## Pruning Configurations 
 As you go down the config file, within the pruning_hyperpamaters section, each true before will cancel out the following true or falses, i.e. priority is top down.
