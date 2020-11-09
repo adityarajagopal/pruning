@@ -137,9 +137,9 @@ class Trainer(trainingSrc.Trainer):
             self.overfitCount = 0
         elif epoch == 2: 
             self.overfitCount = 0
-            self.diff = params.val_loss - params.train_loss.data 
+            self.diff = params.val_loss - params.train_loss 
         else:
-            currDiff = params.val_loss - params.train_loss.data
+            currDiff = params.val_loss - params.train_loss
             threshold = self.diff
             if currDiff > threshold:
                 self.overfitCount += 1
